@@ -4,45 +4,45 @@ import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { LayoutGrid, Code2, Network, Shuffle, ShieldCheck, Settings as SettingsIcon } from 'lucide-react';
 
 const configItems = [
-  { 
-    id: 'segments', 
-    title: 'Segments', 
-    icon: LayoutGrid, 
+  {
+    id: 'segments',
+    title: 'Segments',
+    icon: LayoutGrid,
     description: 'Define your chart of accounts structure.',
-    dataAiHint: 'chart structure' 
+    dataAiHint: 'chart structure'
   },
-  { 
-    id: 'segment-codes', 
-    title: 'Segment Codes', 
-    icon: Code2, 
+  {
+    id: 'segment-codes',
+    title: 'Segment Codes',
+    icon: Code2,
     description: 'Manage codes for each segment.',
     dataAiHint: 'code list'
   },
-  { 
-    id: 'hierarchies', 
-    title: 'Hierarchies', 
+  {
+    id: 'hierarchies',
+    title: 'Hierarchies',
     icon: Network,
     description: 'Organize segment codes into hierarchies.',
     dataAiHint: 'organization chart'
   },
-  { 
-    id: 'combination-rules', 
-    title: 'Combination Rules', 
-    icon: Shuffle, 
+  {
+    id: 'combination-rules',
+    title: 'Combination Rules',
+    icon: Shuffle,
     description: 'Set up rules for valid account combinations.',
     dataAiHint: 'rules logic'
   },
-  { 
-    id: 'account-access', 
-    title: 'Account Access Control', 
-    icon: ShieldCheck, 
+  {
+    id: 'account-access',
+    title: 'Account Access Control',
+    icon: ShieldCheck,
     description: 'Control user access to accounts.',
     dataAiHint: 'security access'
   },
-  { 
-    id: 'settings', 
-    title: 'Settings', 
-    icon: SettingsIcon, 
+  {
+    id: 'settings',
+    title: 'Settings',
+    icon: SettingsIcon,
     description: 'Configure application-wide settings.',
     dataAiHint: 'cogwheel gear'
   },
@@ -60,7 +60,7 @@ export default function HomePage() {
             Opengov | General Ledger
           </h1>
         </header>
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {configItems.map((item) => (
             <ConfigurationBlock
