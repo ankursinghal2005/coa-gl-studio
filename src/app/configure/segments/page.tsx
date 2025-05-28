@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { format } from "date-fns";
 import {
   Table,
   TableHeader,
@@ -41,7 +42,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle } from 'lucide-react';
+import { DatePicker } from "@/components/ui/date-picker";
+import { PlusCircle, CalendarDays } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { Label } from '@/components/ui/label';
@@ -57,6 +59,8 @@ interface Segment {
   separator?: string;
   isCustom: boolean;
   isMandatoryForCoding: boolean;
+  validFrom?: Date;
+  validTo?: Date;
 }
 
 const initialSegmentsData: Segment[] = [
@@ -74,9 +78,19 @@ const customSegmentSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
   regex: z.string().optional(),
   defaultCode: z.string().optional(),
-  separator: z.enum(['-', '|', ',', '.']).optional(),
+  separator: z.enum(['-', '|', ',', '.']).optional().default('-'),
   isMandatoryForCoding: z.boolean().default(false),
   isActive: z.boolean().default(true),
+  validFrom: z.date().optional(),
+  validTo: z.date().optional(),
+}).refine(data => {
+  if (data.validFrom && data.validTo) {
+    return data.validTo >= data.validFrom;
+  }
+  return true;
+}, {
+  message: "Valid To date must be after or the same as Valid From date.",
+  path: ["validTo"],
 });
 
 type CustomSegmentFormValues = z.infer<typeof customSegmentSchema>;
@@ -94,6 +108,8 @@ export default function SegmentsPage() {
       separator: '-',
       isMandatoryForCoding: false,
       isActive: true,
+      validFrom: undefined,
+      validTo: undefined,
     },
   });
 
@@ -107,11 +123,18 @@ export default function SegmentsPage() {
 
   const onSubmit = (values: CustomSegmentFormValues) => {
     const newSegment: Segment = {
-      ...values,
       id: crypto.randomUUID(), 
-      segmentType: values.displayName, 
+      segmentType: values.displayName, // Segment Type derived from Display Name
       isCore: false, 
       isCustom: true, 
+      displayName: values.displayName,
+      regex: values.regex,
+      defaultCode: values.defaultCode,
+      separator: values.separator,
+      isMandatoryForCoding: values.isMandatoryForCoding,
+      isActive: values.isActive,
+      validFrom: values.validFrom,
+      validTo: values.validTo,
     };
     setSegments(prevSegments => [...prevSegments, newSegment].sort((a, b) => {
       if (a.isCore && !b.isCore) return -1;
@@ -147,7 +170,12 @@ export default function SegmentsPage() {
         </header>
 
         <div className="mb-6 flex justify-end">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+            setIsDialogOpen(isOpen);
+            if (!isOpen) {
+              form.reset();
+            }
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <PlusCircle className="mr-2 h-5 w-5" />
@@ -185,7 +213,7 @@ export default function SegmentsPage() {
                         <FormItem>
                           <FormLabel>RegEx Pattern</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -198,38 +226,73 @@ export default function SegmentsPage() {
                         <FormItem>
                           <FormLabel>Default Code</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <FormField
-                        control={form.control}
-                        name="separator"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Separator</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a separator" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="-">- (Hyphen)</SelectItem>
-                                <SelectItem value="|">| (Pipe)</SelectItem>
-                                <SelectItem value=",">, (Comma)</SelectItem>
-                                <SelectItem value=".">. (Period)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <FormField
+                      control={form.control}
+                      name="validFrom"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Valid From</FormLabel>
+                          <DatePicker
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            placeholder="Select start date"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="validTo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Valid To</FormLabel>
+                           <DatePicker
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            placeholder="Select end date"
+                            disabled={(date) =>
+                              form.getValues("validFrom") ? date < form.getValues("validFrom")! : false
+                            }
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
+
+                   <FormField
+                      control={form.control}
+                      name="separator"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Separator</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a separator" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="-">- (Hyphen)</SelectItem>
+                              <SelectItem value="|">| (Pipe)</SelectItem>
+                              <SelectItem value=",">, (Comma)</SelectItem>
+                              <SelectItem value=".">. (Period)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                   <div className="space-y-3 pt-2">
                      <FormField
@@ -314,6 +377,13 @@ export default function SegmentsPage() {
                       >
                         {segment.displayName}
                       </span>
+                      {(segment.validFrom || segment.validTo) && (
+                        <p className="text-xs text-muted-foreground">
+                          {segment.validFrom && format(segment.validFrom, "MMM d, yyyy")}
+                          {segment.validFrom && segment.validTo && " - "}
+                          {segment.validTo && format(segment.validTo, "MMM d, yyyy")}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell>{segment.segmentType}</TableCell>
                     <TableCell className="text-right">
