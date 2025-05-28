@@ -85,7 +85,14 @@ export default function SegmentsPage() {
               <TableBody>
                 {segments.map(segment => (
                   <TableRow key={segment.id}>
-                    <TableCell className="font-medium">{segment.displayName}</TableCell>
+                    <TableCell className="font-medium">
+                      <span 
+                        className="text-primary hover:underline cursor-pointer"
+                        onClick={() => console.log(`Clicked on ${segment.displayName}`)} // Placeholder action
+                      >
+                        {segment.displayName}
+                      </span>
+                    </TableCell>
                     <TableCell>{segment.segmentType}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end space-x-2">
