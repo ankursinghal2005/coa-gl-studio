@@ -85,6 +85,8 @@ interface SegmentCode {
   isActive: boolean;
   validFrom: Date;
   validTo?: Date;
+  availableForTransactionCoding: boolean;
+  availableForBudgeting: boolean;
 }
 
 const segmentCodeFormSchema = z.object({
@@ -100,6 +102,8 @@ const segmentCodeFormSchema = z.object({
   isActive: z.boolean().default(true),
   validFrom: z.date({ required_error: "Valid From date is required." }),
   validTo: z.date().optional(),
+  availableForTransactionCoding: z.boolean().default(false),
+  availableForBudgeting: z.boolean().default(false),
 }).refine(data => {
   if (data.validFrom && data.validTo) {
     return data.validTo >= data.validFrom;
@@ -124,6 +128,8 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   isActive: true,
   validFrom: new Date(),
   validTo: undefined,
+  availableForTransactionCoding: false,
+  availableForBudgeting: false,
 };
 
 export default function SegmentCodesPage() {
@@ -133,12 +139,12 @@ export default function SegmentCodesPage() {
   );
   const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>({
     'fund': [
-      { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail", external3: "Ref1", external4: "Ref2", external5: "Ref3" },
-      { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary", external3: "RefA" },
+      { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail", external3: "Ref1", external4: "Ref2", external5: "Ref3", availableForTransactionCoding: true, availableForBudgeting: true },
+      { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary", external3: "RefA", availableForTransactionCoding: false, availableForBudgeting: true },
     ],
     'object': [
-      { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external4: "DeptXYZ" },
-      { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, validFrom: new Date(2022, 5, 1), validTo: new Date(2023, 4, 30), summaryIndicator: false },
+      { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external4: "DeptXYZ", availableForTransactionCoding: true, availableForBudgeting: true },
+      { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, validFrom: new Date(2022, 5, 1), validTo: new Date(2023, 4, 30), summaryIndicator: false, availableForTransactionCoding: false, availableForBudgeting: false },
     ],
     'department': [], 'project': [], 'grant': [], 'function': [], 'location': [], 'program': [],
   });
@@ -234,7 +240,7 @@ export default function SegmentCodesPage() {
     setIsCodeFormOpen(true);
   };
 
-  const handleEditCodeFromDialog = () => { // Renamed to avoid conflict
+  const handleEditCodeFromDialog = () => { 
     if (currentEditingCode) {
       setDialogMode('edit');
       // form.reset for edit is handled by useEffect
@@ -439,6 +445,41 @@ export default function SegmentCodesPage() {
                                   }}
                                 />
                                 <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                          <FormField
+                            control={form.control}
+                            name="availableForTransactionCoding"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                <FormLabel>Available for Transaction Coding</FormLabel>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    disabled={isFieldDisabled}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="availableForBudgeting"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                <FormLabel>Available for Budgeting</FormLabel>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    disabled={isFieldDisabled}
+                                  />
+                                </FormControl>
                               </FormItem>
                             )}
                           />
