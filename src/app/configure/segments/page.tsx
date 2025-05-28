@@ -48,29 +48,26 @@ interface Segment {
   regex?: string;
   defaultCode?: string;
   separator?: string;
-  order?: number;
   isCustom: boolean;
   isMandatoryForCoding: boolean;
 }
 
 const initialSegmentsData: Segment[] = [
-  { id: 'fund', displayName: 'Fund', segmentType: 'Fund', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, order: 1 },
-  { id: 'object', displayName: 'Object', segmentType: 'Object', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, order: 2 },
-  { id: 'department', displayName: 'Department', segmentType: 'Department', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, order: 3 },
-  { id: 'project', displayName: 'Project', segmentType: 'Project', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, order: 4 },
-  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, order: 5 },
-  { id: 'function', displayName: 'Function', segmentType: 'Function', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, order: 6 },
-  { id: 'location', displayName: 'Location', segmentType: 'Location', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, order: 7 },
-  { id: 'program', displayName: 'Program', segmentType: 'Program', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, order: 8 },
+  { id: 'fund', displayName: 'Fund', segmentType: 'Fund', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true },
+  { id: 'object', displayName: 'Object', segmentType: 'Object', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true },
+  { id: 'department', displayName: 'Department', segmentType: 'Department', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true },
+  { id: 'project', displayName: 'Project', segmentType: 'Project', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false },
+  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false },
+  { id: 'function', displayName: 'Function', segmentType: 'Function', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false },
+  { id: 'location', displayName: 'Location', segmentType: 'Location', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false },
+  { id: 'program', displayName: 'Program', segmentType: 'Program', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false },
 ];
 
 const customSegmentSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
-  segmentType: z.string().min(1, { message: 'Segment Type is required.' }),
   regex: z.string().optional(),
   defaultCode: z.string().optional(),
   separator: z.string().optional(),
-  order: z.coerce.number().int().positive({ message: 'Order must be a positive integer.' }),
   isMandatoryForCoding: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
@@ -85,11 +82,9 @@ export default function SegmentsPage() {
     resolver: zodResolver(customSegmentSchema),
     defaultValues: {
       displayName: '',
-      segmentType: '',
       regex: '',
       defaultCode: '',
       separator: '-',
-      order: segments.length + 1,
       isMandatoryForCoding: false,
       isActive: true,
     },
@@ -107,10 +102,26 @@ export default function SegmentsPage() {
     const newSegment: Segment = {
       ...values,
       id: crypto.randomUUID(), // Generate a unique ID
+      segmentType: values.displayName, // Automatically set segmentType to displayName
       isCore: false, // Custom segments are not core
       isCustom: true, // This is a custom segment
     };
-    setSegments(prevSegments => [...prevSegments, newSegment]);
+    setSegments(prevSegments => [...prevSegments, newSegment].sort((a, b) => {
+      // Keep core segments first, then sort by original order (implicit by array position)
+      if (a.isCore && !b.isCore) return -1;
+      if (!a.isCore && b.isCore) return 1;
+      // For non-core or both core, maintain original relative order for now.
+      // If explicit ordering is needed later for custom segments, this logic can be expanded.
+      const indexOfA = initialSegmentsData.findIndex(s => s.id === a.id);
+      const indexOfB = initialSegmentsData.findIndex(s => s.id === b.id);
+
+      if (indexOfA !== -1 && indexOfB !== -1) {
+        return indexOfA - indexOfB;
+      }
+      if (indexOfA !== -1) return -1; // a is an initial segment, b is custom
+      if (indexOfB !== -1) return 1;  // b is an initial segment, a is custom
+      return 0; // both are custom, maintain add order for now
+    }));
     form.reset();
     setIsDialogOpen(false);
   };
@@ -155,25 +166,13 @@ export default function SegmentsPage() {
                       <FormItem>
                         <FormLabel>Display Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g., Region" {...field} />
+                          <Input {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="segmentType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Segment Type</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., REGION_TYPE" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -182,7 +181,7 @@ export default function SegmentsPage() {
                         <FormItem>
                           <FormLabel>RegEx Pattern</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., ^[A-Z0-9]{3}$" {...field} />
+                            <Input {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -195,7 +194,7 @@ export default function SegmentsPage() {
                         <FormItem>
                           <FormLabel>Default Code</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., 000" {...field} />
+                            <Input {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -210,20 +209,7 @@ export default function SegmentsPage() {
                         <FormItem>
                           <FormLabel>Separator</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., -" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="order"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Order</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="e.g., 9" {...field} />
+                            <Input {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -281,7 +267,7 @@ export default function SegmentsPage() {
 
                   <DialogFooter className="pt-4">
                     <DialogClose asChild>
-                      <Button type="button" variant="outline" onClick={() => form.reset()}>Cancel</Button>
+                      <Button type="button" variant="outline" onClick={() => { form.reset(); setIsDialogOpen(false); }}>Cancel</Button>
                     </DialogClose>
                     <Button type="submit">Save</Button>
                   </DialogFooter>
@@ -340,5 +326,3 @@ export default function SegmentsPage() {
     </div>
   );
 }
-
-    
