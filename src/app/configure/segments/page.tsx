@@ -14,13 +14,14 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 
 interface Segment {
   id: string;
   displayName: string;
-  segmentType: string; // Changed from 'Core Segment' | 'Standard Segment'
+  segmentType: string;
   isActive: boolean;
-  isCore: boolean; // True if it's Fund, Object, Department
+  isCore: boolean; 
 }
 
 const initialSegmentsData: Segment[] = [
@@ -43,12 +44,17 @@ export default function SegmentsPage() {
         segment.id === segmentId ? { ...segment, isActive: !segment.isActive } : segment
       )
     );
-    // In a real application, you would persist this change to a backend.
   };
+
+  const breadcrumbItems = [
+    { label: 'COA Configuration', href: '/' },
+    { label: 'Segments' }
+  ];
 
   return (
     <div className="flex flex-col items-center justify-start min-h-screen p-4 py-8 sm:p-8 bg-background">
       <div className="w-full max-w-4xl">
+        <Breadcrumbs items={breadcrumbItems} />
         <header className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-primary">Manage Segments</h1>
           <p className="text-md text-muted-foreground mt-2">
