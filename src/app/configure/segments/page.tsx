@@ -223,7 +223,10 @@ export default function SegmentsPage() {
   const isFieldDisabled = (isCoreSegment: boolean | undefined, isCustomSegment: boolean | undefined) => {
     if (dialogMode === 'view') return true;
     if (dialogMode === 'edit') {
-      return isCoreSegment; // Core segments are not editable
+      // For custom non-core segments, allow editing most fields.
+      // Core segments cannot be edited (this case should be prevented by button logic, but good to double check)
+      // Standard pre-configured segments (isCustom: false, isCore: false) also shouldn't be editable in this manner
+      return isCoreSegment || !isCustomSegment;
     }
     return false; // Add mode fields are enabled
   };
@@ -449,20 +452,7 @@ export default function SegmentsPage() {
                       aria-readonly
                     />
                   </FormItem>
-                  {(dialogMode === 'view' || dialogMode === 'edit') && currentSegmentData?.isCore && (
-                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm bg-muted/50">
-                        <div className="space-y-0.5">
-                          <Label className="text-sm font-medium text-muted-foreground">Core Segment</Label>
-                        </div>
-                        <Switch
-                          checked={currentSegmentData.isCore}
-                          disabled={true}
-                          aria-readonly
-                        />
-                      </FormItem>
-                  )}
-
-
+                  
                 <DialogFooter className="pt-4">
                   {dialogMode === 'add' && (
                     <>
