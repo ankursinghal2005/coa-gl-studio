@@ -54,9 +54,7 @@ export default function HomePage() {
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-primary">
             Opengov | General Ledger
           </h1>
-          <p className="text-md sm:text-lg text-muted-foreground mt-3 sm:mt-4">
-            Configure your financial system components with ease and precision.
-          </p>
+          
         </header>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
