@@ -122,7 +122,7 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   external5: '',
   summaryIndicator: false,
   isActive: true,
-  validFrom: new Date(), 
+  validFrom: new Date(),
   validTo: undefined,
 };
 
@@ -133,11 +133,11 @@ export default function SegmentCodesPage() {
   );
   const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>({
     'fund': [
-      { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail" },
-      { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary" },
+      { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail", external3: "Ref1", external4: "Ref2", external5: "Ref3" },
+      { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary", external3: "RefA" },
     ],
     'object': [
-      { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false },
+      { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external4: "DeptXYZ" },
       { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, validFrom: new Date(2022, 5, 1), validTo: new Date(2023, 4, 30), summaryIndicator: false },
     ],
     'department': [], 'project': [], 'grant': [], 'function': [], 'location': [], 'program': [],
@@ -151,19 +151,24 @@ export default function SegmentCodesPage() {
     resolver: zodResolver(segmentCodeFormSchema),
     defaultValues: defaultCodeFormValues,
   });
-  
+
   useEffect(() => {
     if (isCodeFormOpen) {
       if (dialogMode === 'add') {
         form.reset(defaultCodeFormValues);
-        setCurrentEditingCode(null); 
+        setCurrentEditingCode(null);
       } else if ((dialogMode === 'view' || dialogMode === 'edit') && currentEditingCode) {
-        form.reset(currentEditingCode);
+        form.reset({
+          ...currentEditingCode,
+          validFrom: currentEditingCode.validFrom ? new Date(currentEditingCode.validFrom) : new Date(),
+          validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
+        });
       }
     } else {
+      // Reset everything when dialog closes
       form.reset(defaultCodeFormValues);
       setCurrentEditingCode(null);
-      setDialogMode('add'); 
+      setDialogMode('add'); // Default back to 'add'
     }
   }, [isCodeFormOpen, dialogMode, currentEditingCode, form]);
 
@@ -201,9 +206,10 @@ export default function SegmentCodesPage() {
       }));
       setCurrentEditingCode(updatedCode); // Keep current code updated for view mode
       setDialogMode('view'); // Switch back to view mode after saving edit
-      return; // Avoid closing dialog immediately for edit
+      // Do not close dialog immediately for edit, allow user to see changes or close manually
+      return;
     }
-    setIsCodeFormOpen(false);
+    setIsCodeFormOpen(false); // Close dialog for 'add' mode
   };
 
   const handleCodeStatusToggle = (codeId: string) => {
@@ -215,10 +221,10 @@ export default function SegmentCodesPage() {
       ),
     }));
   };
-  
+
   const handleOpenAddCodeDialog = () => {
     setDialogMode('add');
-    setCurrentEditingCode(null);
+    setCurrentEditingCode(null); // Ensure no prior editing state
     setIsCodeFormOpen(true);
   };
 
@@ -228,13 +234,14 @@ export default function SegmentCodesPage() {
     setIsCodeFormOpen(true);
   };
 
-  const handleEditCode = (code: SegmentCode) => {
-    setDialogMode('edit');
-    setCurrentEditingCode(code);
-    setIsCodeFormOpen(true);
+  const handleEditCodeFromDialog = () => { // Renamed to avoid conflict
+    if (currentEditingCode) {
+      setDialogMode('edit');
+      // form.reset for edit is handled by useEffect
+    }
   };
 
-  const handleDialogClose = (isOpen: boolean) => {
+   const handleDialogClose = (isOpen: boolean) => {
     if (!isOpen) {
       setIsCodeFormOpen(false); // This will trigger the useEffect to reset states
     } else {
@@ -309,7 +316,7 @@ export default function SegmentCodesPage() {
                         {dialogMode === 'edit' && "Modify the details of the segment code."}
                       </DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="pr-6 max-h-[calc(80vh-150px)]">
+                    <ScrollArea className="pr-6 max-h-[calc(80vh-150px)]"> {/* Adjust max-height as needed */}
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(handleSaveCodeSubmit)} className="space-y-4 py-4">
                         <FormField
@@ -338,7 +345,7 @@ export default function SegmentCodesPage() {
                             </FormItem>
                           )}
                         />
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
@@ -384,7 +391,7 @@ export default function SegmentCodesPage() {
                               </FormItem>
                             )}
                           />
-                          <FormField
+                           <FormField
                             control={form.control}
                             name="external5"
                             render={({ field }) => (
@@ -396,7 +403,7 @@ export default function SegmentCodesPage() {
                             )}
                           />
                         </div>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
@@ -427,7 +434,8 @@ export default function SegmentCodesPage() {
                                   disabled={isFieldDisabled}
                                   disableDates={(date) => {
                                     const validFrom = form.getValues("validFrom");
-                                    return validFrom ? date < validFrom : false;
+                                    // Ensure validFrom is a Date object before comparison
+                                    return validFrom instanceof Date ? date < validFrom : false;
                                   }}
                                 />
                                 <FormMessage />
@@ -480,14 +488,19 @@ export default function SegmentCodesPage() {
                           {dialogMode === 'view' && currentEditingCode && (
                             <>
                               <Button type="button" variant="outline" onClick={() => setIsCodeFormOpen(false)}>Close</Button>
-                              <Button type="button" onClick={() => setDialogMode('edit')}>Edit</Button>
+                              <Button type="button" onClick={handleEditCodeFromDialog}>Edit</Button>
                             </>
                           )}
                           {dialogMode === 'edit' && currentEditingCode && (
                             <>
                               <Button type="button" variant="outline" onClick={() => {
-                                setDialogMode('view'); 
-                                if(currentEditingCode) form.reset(currentEditingCode);
+                                setDialogMode('view');
+                                // Reset form to original currentEditingCode values if cancel edit
+                                if(currentEditingCode) form.reset({
+                                  ...currentEditingCode,
+                                  validFrom: currentEditingCode.validFrom ? new Date(currentEditingCode.validFrom) : new Date(),
+                                  validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
+                                });
                               }}>Cancel</Button>
                               <Button type="submit">Save Changes</Button>
                             </>
@@ -514,12 +527,6 @@ export default function SegmentCodesPage() {
                           <TableHead className="min-w-[200px]">Description</TableHead>
                           <TableHead className="text-center min-w-[100px]">Summary</TableHead>
                           <TableHead className="text-center min-w-[100px]">Status</TableHead>
-                          <TableHead className="min-w-[120px]">External 3</TableHead>
-                          <TableHead className="min-w-[120px]">External 4</TableHead>
-                          <TableHead className="min-w-[120px]">External 5</TableHead>
-                          <TableHead className="min-w-[150px]">Valid From</TableHead>
-                          <TableHead className="min-w-[150px]">Valid To</TableHead>
-                          <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -540,23 +547,6 @@ export default function SegmentCodesPage() {
                                 onCheckedChange={() => handleCodeStatusToggle(code.id)}
                                 aria-label={`Toggle status for code ${code.code}`}
                               />
-                            </TableCell>
-                            <TableCell>{code.external3 ?? 'N/A'}</TableCell>
-                            <TableCell>{code.external4 ?? 'N/A'}</TableCell>
-                            <TableCell>{code.external5 ?? 'N/A'}</TableCell>
-                            <TableCell>
-                              {format(code.validFrom, "MMM d, yyyy")}
-                            </TableCell>
-                            <TableCell>
-                              {code.validTo ? format(code.validTo, "MMM d, yyyy") : 'N/A'}
-                            </TableCell>
-                            <TableCell className="text-right space-x-2">
-                              <Button variant="ghost" size="icon" onClick={() => handleEditCode(code)} title="Edit Code">
-                                <FilePenLine className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => alert(`Delete ${code.code}`)} title="Delete Code">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
