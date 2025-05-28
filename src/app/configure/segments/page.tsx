@@ -76,7 +76,7 @@ const initialSegmentsData: Segment[] = [
 
 const segmentFormSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
-  segmentType: z.string().optional(), // Only for display in view mode, derived for new
+  segmentType: z.string().optional(),
   regex: z.string().optional(),
   defaultCode: z.string().optional(),
   separator: z.enum(['-', '|', ',', '.']).optional().default('-'),
@@ -84,9 +84,9 @@ const segmentFormSchema = z.object({
   isActive: z.boolean().default(true),
   validFrom: z.date().optional(),
   validTo: z.date().optional(),
-  isCustom: z.boolean().default(true), // For display and internal logic
-  isCore: z.boolean().default(false), // For display and internal logic
-  id: z.string().optional(), // For existing segments
+  isCustom: z.boolean().default(true),
+  isCore: z.boolean().default(false),
+  id: z.string().optional(),
 }).refine(data => {
   if (data.validFrom && data.validTo) {
     return data.validTo >= data.validFrom;
@@ -125,7 +125,7 @@ export default function SegmentsPage() {
   });
 
   useEffect(() => {
-    if (dialogMode === 'view' && currentSegmentData) {
+    if ((dialogMode === 'view' || dialogMode === 'edit') && currentSegmentData) {
       form.reset(currentSegmentData);
     } else if (dialogMode === 'add') {
       form.reset(defaultFormValues);
@@ -151,15 +151,22 @@ export default function SegmentsPage() {
   const handleViewSegmentClick = (segment: Segment) => {
     setDialogMode('view');
     setCurrentSegmentData(segment);
-    form.reset(segment); // Populate form for viewing
+    form.reset(segment);
     setIsDialogOpen(true);
+  };
+
+  const handleEditSegmentClick = () => {
+    if (currentSegmentData && currentSegmentData.isCustom && !currentSegmentData.isCore) {
+      setDialogMode('edit');
+      // form.reset(currentSegmentData) is already handled by useEffect
+    }
   };
 
   const onSubmit = (values: SegmentFormValues) => {
     if (dialogMode === 'add') {
       const newSegment: Segment = {
         id: crypto.randomUUID(),
-        segmentType: values.displayName, // Segment Type derived from Display Name
+        segmentType: values.displayName, 
         isCore: false,
         isCustom: true,
         displayName: values.displayName,
@@ -184,10 +191,28 @@ export default function SegmentsPage() {
         if (indexOfB !== -1) return 1;
         return 0;
       }));
+    } else if (dialogMode === 'edit' && currentSegmentData) {
+      setSegments(prevSegments =>
+        prevSegments.map(segment =>
+          segment.id === currentSegmentData.id
+            ? {
+                ...segment, // Keep original id, isCore, isCustom, segmentType
+                ...values, // Apply new form values
+                segmentType: segment.segmentType, // Ensure segmentType is not changed by form values.displayName
+              }
+            : segment
+        )
+      );
+      setDialogMode('view'); // Revert to view mode after saving edit
     }
-    // Later: handle 'edit' mode submission
-    form.reset(defaultFormValues);
-    setIsDialogOpen(false);
+    
+    if (dialogMode !== 'edit') { // Don't close dialog if edit saved, stay in view mode
+      setIsDialogOpen(false);
+    }
+    // Reset form to default only if we are not staying in 'view' mode post-edit
+    if (dialogMode === 'add' || (dialogMode === 'edit' && !currentSegmentData)) {
+       form.reset(defaultFormValues);
+    }
   };
 
   const breadcrumbItems = [
@@ -195,7 +220,20 @@ export default function SegmentsPage() {
     { label: 'Segments' }
   ];
   
-  const isViewMode = dialogMode === 'view';
+  const isFieldDisabled = (isCoreSegment: boolean | undefined, isCustomSegment: boolean | undefined) => {
+    if (dialogMode === 'view') return true;
+    if (dialogMode === 'edit') {
+      return isCoreSegment; // Core segments are not editable
+    }
+    return false; // Add mode fields are enabled
+  };
+  
+  const isActiveSwitchDisabled = () => {
+    if (dialogMode === 'view') return true;
+    if (currentSegmentData?.isCore) return true; // Core segment's active status is not editable
+    return false;
+  };
+
 
   return (
     <div className="flex flex-col items-center justify-start min-h-screen p-4 py-8 sm:p-8 bg-background">
@@ -218,24 +256,26 @@ export default function SegmentsPage() {
         <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
           setIsDialogOpen(isOpen);
           if (!isOpen) {
-            form.reset(defaultFormValues); // Reset form when dialog is closed for any reason
+            form.reset(defaultFormValues); 
             setCurrentSegmentData(null);
+            setDialogMode('add'); // Reset to add mode if dialog is closed externally
           }
         }}>
-          <DialogContent className="sm:max-w-[525px]">
+          <DialogContent className="sm:max-w-xl md:max-w-2xl">
             <DialogHeader>
               <DialogTitle>
                 {dialogMode === 'add' && 'Add Custom Segment'}
                 {dialogMode === 'view' && `View Segment: ${currentSegmentData?.displayName || ''}`}
-                {/* Later: {dialogMode === 'edit' && 'Edit Custom Segment'} */}
+                {dialogMode === 'edit' && `Edit Custom Segment: ${currentSegmentData?.displayName || ''}`}
               </DialogTitle>
               <DialogDescription>
-                {dialogMode === 'add' && "Fill in the details for your new custom segment. Click save when you're done."}
+                {dialogMode === 'add' && "Fill in the details for your new custom segment."}
                 {dialogMode === 'view' && "Viewing details for the selected segment."}
+                {dialogMode === 'edit' && "Modify the details of your custom segment."}
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[65vh] overflow-y-auto pr-2">
                 <FormField
                   control={form.control}
                   name="displayName"
@@ -243,14 +283,14 @@ export default function SegmentsPage() {
                     <FormItem>
                       <FormLabel>Display Name</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled={isViewMode && (currentSegmentData?.isCore || !currentSegmentData?.isCustom)} />
+                        <Input {...field} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 
-                {(isViewMode || dialogMode === 'edit') && (
+                {(dialogMode === 'view' || dialogMode === 'edit') && (
                    <FormField
                     control={form.control}
                     name="segmentType"
@@ -274,7 +314,7 @@ export default function SegmentsPage() {
                       <FormItem>
                         <FormLabel>RegEx Pattern</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value ?? ''} disabled={isViewMode && (currentSegmentData?.isCore || !currentSegmentData?.isCustom)} />
+                          <Input {...field} value={field.value ?? ''} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -287,7 +327,7 @@ export default function SegmentsPage() {
                       <FormItem>
                         <FormLabel>Default Code</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value ?? ''} disabled={isViewMode && (currentSegmentData?.isCore || !currentSegmentData?.isCustom)} />
+                          <Input {...field} value={field.value ?? ''} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -306,7 +346,7 @@ export default function SegmentsPage() {
                           value={field.value}
                           onValueChange={field.onChange}
                           placeholder="Select start date"
-                          disabled={isViewMode && (currentSegmentData?.isCore || !currentSegmentData?.isCustom)}
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
                         />
                         <FormMessage />
                       </FormItem>
@@ -323,7 +363,7 @@ export default function SegmentsPage() {
                           onValueChange={field.onChange}
                           placeholder="Select end date"
                           disabled={(date) => {
-                            if (isViewMode && (currentSegmentData?.isCore || !currentSegmentData?.isCustom)) return true;
+                            if (isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)) return true;
                             return form.getValues("validFrom") ? date < form.getValues("validFrom")! : false;
                           }}
                         />
@@ -342,7 +382,7 @@ export default function SegmentsPage() {
                         <Select 
                           onValueChange={field.onChange} 
                           value={field.value} 
-                          disabled={isViewMode && (currentSegmentData?.isCore || !currentSegmentData?.isCustom)}
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -374,7 +414,7 @@ export default function SegmentsPage() {
                             <Switch
                               checked={field.value}
                               onCheckedChange={field.onChange}
-                              disabled={isViewMode && (currentSegmentData?.isCore || !currentSegmentData?.isCustom)}
+                              disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
                             />
                           </FormControl>
                         </FormItem>
@@ -392,7 +432,7 @@ export default function SegmentsPage() {
                             <Switch
                               checked={field.value}
                               onCheckedChange={field.onChange}
-                              disabled={isViewMode && currentSegmentData?.isCore} // Core segments' active status is fixed
+                              disabled={isActiveSwitchDisabled()}
                             />
                           </FormControl>
                         </FormItem>
@@ -409,7 +449,7 @@ export default function SegmentsPage() {
                       aria-readonly
                     />
                   </FormItem>
-                  {isViewMode && currentSegmentData?.isCore && (
+                  {(dialogMode === 'view' || dialogMode === 'edit') && currentSegmentData?.isCore && (
                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm bg-muted/50">
                         <div className="space-y-0.5">
                           <Label className="text-sm font-medium text-muted-foreground">Core Segment</Label>
@@ -433,9 +473,20 @@ export default function SegmentsPage() {
                     </>
                   )}
                   {dialogMode === 'view' && (
-                    <DialogClose asChild>
-                      <Button type="button" variant="outline">Close</Button>
-                    </DialogClose>
+                    <>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline">Close</Button>
+                      </DialogClose>
+                      {currentSegmentData?.isCustom && !currentSegmentData.isCore && (
+                        <Button type="button" onClick={handleEditSegmentClick}>Edit</Button>
+                      )}
+                    </>
+                  )}
+                  {dialogMode === 'edit' && (
+                     <>
+                        <Button type="button" variant="outline" onClick={() => { setDialogMode('view'); if(currentSegmentData) form.reset(currentSegmentData); }}>Cancel</Button>
+                        <Button type="submit">Save Changes</Button>
+                     </>
                   )}
                 </DialogFooter>
               </form>
