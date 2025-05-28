@@ -60,7 +60,6 @@ interface Segment {
 }
 
 // Data that would typically come from an API or shared state
-// For now, we'll use the same initialSegmentsData as in the Segments page.
 const allAvailableSegments: Segment[] = [
   { id: 'fund', displayName: 'Fund', segmentType: 'Fund', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', },
   { id: 'object', displayName: 'Object', segmentType: 'Object', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', },
@@ -84,11 +83,12 @@ interface SegmentCode {
   external5?: string;
   summaryIndicator: boolean;
   isActive: boolean;
-  validFrom: Date; // Changed from effectiveDate, now required
-  validTo?: Date;   // Changed from expirationDate
+  validFrom: Date;
+  validTo?: Date;
 }
 
 const segmentCodeFormSchema = z.object({
+  id: z.string().optional(), // Keep id for editing
   code: z.string().min(1, { message: 'Segment Code is required.' }),
   description: z.string().min(1, { message: 'Description is required.' }),
   external1: z.string().optional(),
@@ -133,8 +133,8 @@ export default function SegmentCodesPage() {
   );
   const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>({
     'fund': [
-      { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001" },
-      { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "GF-002" },
+      { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail" },
+      { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary" },
     ],
     'object': [
       { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false },
@@ -143,7 +143,9 @@ export default function SegmentCodesPage() {
     'department': [], 'project': [], 'grant': [], 'function': [], 'location': [], 'program': [],
   });
 
-  const [isAddCodeDialogOpen, setIsAddCodeDialogOpen] = useState(false);
+  const [isCodeFormOpen, setIsCodeFormOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'add' | 'view' | 'edit'>('add');
+  const [currentEditingCode, setCurrentEditingCode] = useState<SegmentCode | null>(null);
 
   const form = useForm<SegmentCodeFormValues>({
     resolver: zodResolver(segmentCodeFormSchema),
@@ -151,10 +153,19 @@ export default function SegmentCodesPage() {
   });
   
   useEffect(() => {
-    if (isAddCodeDialogOpen) {
+    if (isCodeFormOpen) {
+      if (dialogMode === 'add') {
+        form.reset(defaultCodeFormValues);
+        setCurrentEditingCode(null); 
+      } else if ((dialogMode === 'view' || dialogMode === 'edit') && currentEditingCode) {
+        form.reset(currentEditingCode);
+      }
+    } else {
       form.reset(defaultCodeFormValues);
+      setCurrentEditingCode(null);
+      setDialogMode('add'); 
     }
-  }, [isAddCodeDialogOpen, form]);
+  }, [isCodeFormOpen, dialogMode, currentEditingCode, form]);
 
 
   const selectedSegment = useMemo(() => {
@@ -168,20 +179,31 @@ export default function SegmentCodesPage() {
     return segmentCodesData[selectedSegmentId];
   }, [selectedSegmentId, segmentCodesData]);
 
-  const handleAddCodeSubmit = (values: SegmentCodeFormValues) => {
+  const handleSaveCodeSubmit = (values: SegmentCodeFormValues) => {
     if (!selectedSegmentId) return;
 
-    const newCode: SegmentCode = {
-      id: crypto.randomUUID(),
-      ...values,
-    };
-
-    setSegmentCodesData(prev => ({
-      ...prev,
-      [selectedSegmentId]: [...(prev[selectedSegmentId] || []), newCode],
-    }));
-    setIsAddCodeDialogOpen(false);
-    form.reset(defaultCodeFormValues);
+    if (dialogMode === 'add') {
+      const newCode: SegmentCode = {
+        id: crypto.randomUUID(),
+        ...values,
+      };
+      setSegmentCodesData(prev => ({
+        ...prev,
+        [selectedSegmentId]: [...(prev[selectedSegmentId] || []), newCode],
+      }));
+    } else if (dialogMode === 'edit' && currentEditingCode) {
+      const updatedCode = { ...currentEditingCode, ...values };
+      setSegmentCodesData(prev => ({
+        ...prev,
+        [selectedSegmentId]: (prev[selectedSegmentId] || []).map(code =>
+          code.id === currentEditingCode.id ? updatedCode : code
+        ),
+      }));
+      setCurrentEditingCode(updatedCode); // Keep current code updated for view mode
+      setDialogMode('view'); // Switch back to view mode after saving edit
+      return; // Avoid closing dialog immediately for edit
+    }
+    setIsCodeFormOpen(false);
   };
 
   const handleCodeStatusToggle = (codeId: string) => {
@@ -193,11 +215,39 @@ export default function SegmentCodesPage() {
       ),
     }));
   };
+  
+  const handleOpenAddCodeDialog = () => {
+    setDialogMode('add');
+    setCurrentEditingCode(null);
+    setIsCodeFormOpen(true);
+  };
+
+  const handleViewCode = (code: SegmentCode) => {
+    setDialogMode('view');
+    setCurrentEditingCode(code);
+    setIsCodeFormOpen(true);
+  };
+
+  const handleEditCode = (code: SegmentCode) => {
+    setDialogMode('edit');
+    setCurrentEditingCode(code);
+    setIsCodeFormOpen(true);
+  };
+
+  const handleDialogClose = (isOpen: boolean) => {
+    if (!isOpen) {
+      setIsCodeFormOpen(false); // This will trigger the useEffect to reset states
+    } else {
+      setIsCodeFormOpen(true);
+    }
+  };
 
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
     { label: 'Segment Codes' }
   ];
+
+  const isFieldDisabled = dialogMode === 'view';
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -205,7 +255,6 @@ export default function SegmentCodesPage() {
          <Breadcrumbs items={breadcrumbItems} />
       </div>
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar for Segment Selection */}
         <aside className="w-1/4 min-w-[200px] max-w-[300px] border-r bg-card p-4 space-y-2 overflow-y-auto">
           <h2 className="text-lg font-semibold mb-3 text-primary flex items-center">
             <ListFilter className="mr-2 h-5 w-5" /> Segments
@@ -227,7 +276,6 @@ export default function SegmentCodesPage() {
           </ScrollArea>
         </aside>
 
-        {/* Main Content Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           {selectedSegment ? (
             <>
@@ -241,23 +289,29 @@ export default function SegmentCodesPage() {
               </header>
 
               <div className="mb-6 flex justify-end">
-                <Dialog open={isAddCodeDialogOpen} onOpenChange={setIsAddCodeDialogOpen}>
+                <Dialog open={isCodeFormOpen} onOpenChange={handleDialogClose}>
                   <DialogTrigger asChild>
-                    <Button onClick={() => { form.reset(defaultCodeFormValues); setIsAddCodeDialogOpen(true);}}>
+                    <Button onClick={handleOpenAddCodeDialog}>
                       <PlusCircle className="mr-2 h-5 w-5" />
                       Add Code
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-2xl md:max-w-3xl max-h-[80vh]">
                     <DialogHeader>
-                      <DialogTitle>Add New Code for {selectedSegment.displayName}</DialogTitle>
+                      <DialogTitle>
+                        {dialogMode === 'add' && `Add New Code for ${selectedSegment.displayName}`}
+                        {dialogMode === 'view' && `View Code: ${currentEditingCode?.code} for ${selectedSegment.displayName}`}
+                        {dialogMode === 'edit' && `Edit Code: ${currentEditingCode?.code} for ${selectedSegment.displayName}`}
+                      </DialogTitle>
                       <DialogDescription>
-                        Fill in the details for the new segment code.
+                        {dialogMode === 'add' && "Fill in the details for the new segment code."}
+                        {dialogMode === 'view' && "Viewing details for the selected segment code."}
+                        {dialogMode === 'edit' && "Modify the details of the segment code."}
                       </DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="pr-6 max-h-[calc(80vh-150px)]"> {/* Adjust max-height as needed */}
+                    <ScrollArea className="pr-6 max-h-[calc(80vh-150px)]">
                     <Form {...form}>
-                      <form onSubmit={form.handleSubmit(handleAddCodeSubmit)} className="space-y-4 py-4">
+                      <form onSubmit={form.handleSubmit(handleSaveCodeSubmit)} className="space-y-4 py-4">
                         <FormField
                           control={form.control}
                           name="code"
@@ -265,7 +319,7 @@ export default function SegmentCodesPage() {
                             <FormItem>
                               <FormLabel>Segment Code *</FormLabel>
                               <FormControl>
-                                <Input {...field} />
+                                <Input {...field} disabled={isFieldDisabled || dialogMode === 'edit'} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -278,7 +332,7 @@ export default function SegmentCodesPage() {
                             <FormItem>
                               <FormLabel>Description *</FormLabel>
                               <FormControl>
-                                <Textarea {...field} />
+                                <Textarea {...field} disabled={isFieldDisabled} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -292,7 +346,7 @@ export default function SegmentCodesPage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>External 1</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -303,7 +357,7 @@ export default function SegmentCodesPage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>External 2</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -314,7 +368,7 @@ export default function SegmentCodesPage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>External 3</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -325,7 +379,7 @@ export default function SegmentCodesPage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>External 4</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -336,7 +390,7 @@ export default function SegmentCodesPage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>External 5</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -354,6 +408,7 @@ export default function SegmentCodesPage() {
                                   value={field.value}
                                   onValueChange={field.onChange}
                                   placeholder="Select valid from date"
+                                  disabled={isFieldDisabled}
                                 />
                                 <FormMessage />
                               </FormItem>
@@ -369,6 +424,7 @@ export default function SegmentCodesPage() {
                                   value={field.value}
                                   onValueChange={field.onChange}
                                   placeholder="Select valid to date"
+                                  disabled={isFieldDisabled}
                                   disableDates={(date) => {
                                     const validFrom = form.getValues("validFrom");
                                     return validFrom ? date < validFrom : false;
@@ -391,6 +447,7 @@ export default function SegmentCodesPage() {
                                   <Switch
                                     checked={field.value}
                                     onCheckedChange={field.onChange}
+                                    disabled={isFieldDisabled}
                                   />
                                 </FormControl>
                               </FormItem>
@@ -406,6 +463,7 @@ export default function SegmentCodesPage() {
                                   <Switch
                                     checked={field.value}
                                     onCheckedChange={field.onChange}
+                                    disabled={isFieldDisabled}
                                   />
                                 </FormControl>
                               </FormItem>
@@ -413,10 +471,27 @@ export default function SegmentCodesPage() {
                           />
                         </div>
                         <DialogFooter className="pt-4">
-                          <DialogClose asChild>
-                            <Button type="button" variant="outline">Cancel</Button>
-                          </DialogClose>
-                          <Button type="submit">Save Code</Button>
+                          {dialogMode === 'add' && (
+                            <>
+                              <Button type="button" variant="outline" onClick={() => setIsCodeFormOpen(false)}>Cancel</Button>
+                              <Button type="submit">Save Code</Button>
+                            </>
+                          )}
+                          {dialogMode === 'view' && currentEditingCode && (
+                            <>
+                              <Button type="button" variant="outline" onClick={() => setIsCodeFormOpen(false)}>Close</Button>
+                              <Button type="button" onClick={() => setDialogMode('edit')}>Edit</Button>
+                            </>
+                          )}
+                          {dialogMode === 'edit' && currentEditingCode && (
+                            <>
+                              <Button type="button" variant="outline" onClick={() => {
+                                setDialogMode('view'); 
+                                if(currentEditingCode) form.reset(currentEditingCode);
+                              }}>Cancel</Button>
+                              <Button type="submit">Save Changes</Button>
+                            </>
+                          )}
                         </DialogFooter>
                       </form>
                     </Form>
@@ -439,8 +514,6 @@ export default function SegmentCodesPage() {
                           <TableHead className="min-w-[200px]">Description</TableHead>
                           <TableHead className="text-center min-w-[100px]">Summary</TableHead>
                           <TableHead className="text-center min-w-[100px]">Status</TableHead>
-                          <TableHead className="min-w-[120px]">External 1</TableHead>
-                          <TableHead className="min-w-[120px]">External 2</TableHead>
                           <TableHead className="min-w-[120px]">External 3</TableHead>
                           <TableHead className="min-w-[120px]">External 4</TableHead>
                           <TableHead className="min-w-[120px]">External 5</TableHead>
@@ -452,7 +525,11 @@ export default function SegmentCodesPage() {
                       <TableBody>
                         {currentSegmentCodes.map(code => (
                           <TableRow key={code.id}>
-                            <TableCell className="font-medium">{code.code}</TableCell>
+                            <TableCell className="font-medium">
+                              <span onClick={() => handleViewCode(code)} className="cursor-pointer text-primary hover:underline">
+                                {code.code}
+                              </span>
+                            </TableCell>
                             <TableCell className="whitespace-normal break-words">{code.description}</TableCell>
                             <TableCell className="text-center">
                               {code.summaryIndicator ? <CheckCircle className="h-5 w-5 text-green-500 inline" /> : <XCircle className="h-5 w-5 text-muted-foreground inline" />}
@@ -464,8 +541,6 @@ export default function SegmentCodesPage() {
                                 aria-label={`Toggle status for code ${code.code}`}
                               />
                             </TableCell>
-                            <TableCell>{code.external1 ?? 'N/A'}</TableCell>
-                            <TableCell>{code.external2 ?? 'N/A'}</TableCell>
                             <TableCell>{code.external3 ?? 'N/A'}</TableCell>
                             <TableCell>{code.external4 ?? 'N/A'}</TableCell>
                             <TableCell>{code.external5 ?? 'N/A'}</TableCell>
@@ -476,7 +551,7 @@ export default function SegmentCodesPage() {
                               {code.validTo ? format(code.validTo, "MMM d, yyyy") : 'N/A'}
                             </TableCell>
                             <TableCell className="text-right space-x-2">
-                              <Button variant="ghost" size="icon" onClick={() => alert(`Edit ${code.code}`)} title="Edit Code">
+                              <Button variant="ghost" size="icon" onClick={() => handleEditCode(code)} title="Edit Code">
                                 <FilePenLine className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="icon" onClick={() => alert(`Delete ${code.code}`)} title="Delete Code">
@@ -506,4 +581,3 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
-
