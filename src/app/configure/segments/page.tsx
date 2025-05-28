@@ -404,12 +404,12 @@ export default function SegmentsPage() {
                     )}
                   />
 
-                <div className="space-y-3 pt-2">
+                <div className="space-y-2 pt-2">
                    <FormField
                       control={form.control}
                       name="isMandatoryForCoding"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2 shadow-sm">
                           <div className="space-y-0.5">
                             <FormLabel>Mandatory for Coding</FormLabel>
                           </div>
@@ -427,7 +427,7 @@ export default function SegmentsPage() {
                       control={form.control}
                       name="isActive"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2 shadow-sm">
                           <div className="space-y-0.5">
                             <FormLabel>Active</FormLabel>
                           </div>
@@ -442,7 +442,7 @@ export default function SegmentsPage() {
                       )}
                     />
                 </div>
-                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm bg-muted/50">
+                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2 shadow-sm bg-muted/50">
                     <div className="space-y-0.5">
                       <Label className="text-sm font-medium text-muted-foreground">Custom Segment</Label>
                     </div>
