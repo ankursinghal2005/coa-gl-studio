@@ -18,20 +18,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 interface Segment {
   id: string;
   displayName: string;
-  segmentType: 'Core Segment' | 'Standard Segment';
+  segmentType: string; // Changed from 'Core Segment' | 'Standard Segment'
   isActive: boolean;
   isCore: boolean; // True if it's Fund, Object, Department
 }
 
 const initialSegmentsData: Segment[] = [
-  { id: 'fund', displayName: 'Fund', segmentType: 'Core Segment', isActive: true, isCore: true },
-  { id: 'object', displayName: 'Object', segmentType: 'Core Segment', isActive: true, isCore: true },
-  { id: 'department', displayName: 'Department', segmentType: 'Core Segment', isActive: true, isCore: true },
-  { id: 'project', displayName: 'Project', segmentType: 'Standard Segment', isActive: true, isCore: false },
-  { id: 'grant', displayName: 'Grant', segmentType: 'Standard Segment', isActive: true, isCore: false },
-  { id: 'function', displayName: 'Function', segmentType: 'Standard Segment', isActive: true, isCore: false },
-  { id: 'location', displayName: 'Location', segmentType: 'Standard Segment', isActive: true, isCore: false },
-  { id: 'program', displayName: 'Program', segmentType: 'Standard Segment', isActive: true, isCore: false },
+  { id: 'fund', displayName: 'Fund', segmentType: 'Fund', isActive: true, isCore: true },
+  { id: 'object', displayName: 'Object', segmentType: 'Object', isActive: true, isCore: true },
+  { id: 'department', displayName: 'Department', segmentType: 'Department', isActive: true, isCore: true },
+  { id: 'project', displayName: 'Project', segmentType: 'Project', isActive: true, isCore: false },
+  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', isActive: true, isCore: false },
+  { id: 'function', displayName: 'Function', segmentType: 'Function', isActive: true, isCore: false },
+  { id: 'location', displayName: 'Location', segmentType: 'Location', isActive: true, isCore: false },
+  { id: 'program', displayName: 'Program', segmentType: 'Program', isActive: true, isCore: false },
 ];
 
 export default function SegmentsPage() {
