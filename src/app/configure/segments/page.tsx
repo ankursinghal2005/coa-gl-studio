@@ -203,13 +203,14 @@ export default function SegmentsPage() {
             : segment
         )
       );
+      setCurrentSegmentData(prev => prev ? {...prev, ...values, segmentType: prev.segmentType } : null); // Update currentSegmentData for view mode
       setDialogMode('view'); // Revert to view mode after saving edit
     }
     
-    if (dialogMode !== 'edit') { // Don't close dialog if edit saved, stay in view mode
+    if (dialogMode !== 'edit') { 
       setIsDialogOpen(false);
     }
-    // Reset form to default only if we are not staying in 'view' mode post-edit
+    
     if (dialogMode === 'add' || (dialogMode === 'edit' && !currentSegmentData)) {
        form.reset(defaultFormValues);
     }
@@ -223,17 +224,14 @@ export default function SegmentsPage() {
   const isFieldDisabled = (isCoreSegment: boolean | undefined, isCustomSegment: boolean | undefined) => {
     if (dialogMode === 'view') return true;
     if (dialogMode === 'edit') {
-      // For custom non-core segments, allow editing most fields.
-      // Core segments cannot be edited (this case should be prevented by button logic, but good to double check)
-      // Standard pre-configured segments (isCustom: false, isCore: false) also shouldn't be editable in this manner
       return isCoreSegment || !isCustomSegment;
     }
-    return false; // Add mode fields are enabled
+    return false; 
   };
   
   const isActiveSwitchDisabled = () => {
     if (dialogMode === 'view') return true;
-    if (currentSegmentData?.isCore) return true; // Core segment's active status is not editable
+    if (currentSegmentData?.isCore) return true; 
     return false;
   };
 
@@ -261,7 +259,7 @@ export default function SegmentsPage() {
           if (!isOpen) {
             form.reset(defaultFormValues); 
             setCurrentSegmentData(null);
-            setDialogMode('add'); // Reset to add mode if dialog is closed externally
+            setDialogMode('add'); 
           }
         }}>
           <DialogContent className="sm:max-w-xl md:max-w-2xl">
@@ -365,8 +363,8 @@ export default function SegmentsPage() {
                           value={field.value}
                           onValueChange={field.onChange}
                           placeholder="Select end date"
-                          disabled={(date) => {
-                            if (isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)) return true;
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
+                          disableDates={(date) => {
                             return form.getValues("validFrom") ? date < form.getValues("validFrom")! : false;
                           }}
                         />
@@ -474,7 +472,12 @@ export default function SegmentsPage() {
                   )}
                   {dialogMode === 'edit' && (
                      <>
-                        <Button type="button" variant="outline" onClick={() => { setDialogMode('view'); if(currentSegmentData) form.reset(currentSegmentData); }}>Cancel</Button>
+                        <Button type="button" variant="outline" onClick={() => { 
+                          setDialogMode('view'); 
+                          if(currentSegmentData) {
+                            form.reset(currentSegmentData); // Reset form to original data of currentSegmentData
+                          }
+                        }}>Cancel</Button>
                         <Button type="submit">Save Changes</Button>
                      </>
                   )}
