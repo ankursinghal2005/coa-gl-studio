@@ -19,14 +19,14 @@ const configItems = [
   { 
     id: 'hierarchies', 
     title: 'Hierarchies', 
-    icon: Network, // Replaced Sitemap with Network
+    icon: Network,
     description: 'Organize segment codes into hierarchies.',
     dataAiHint: 'organization chart'
   },
   { 
     id: 'combination-rules', 
     title: 'Combination Rules', 
-    icon: Shuffle, // Using Shuffle as a stand-in for 'Combine' or 'Rules' logic
+    icon: Shuffle, 
     description: 'Set up rules for valid account combinations.',
     dataAiHint: 'rules logic'
   },
@@ -54,7 +54,11 @@ export default function HomePage() {
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-primary">
             Opengov | General Ledger
           </h1>
-          
+          <div className="mt-2 text-center">
+            <span className="text-md text-muted-foreground">
+              COA Configuration
+            </span>
+          </div>
         </header>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -64,7 +68,7 @@ export default function HomePage() {
               icon={item.icon}
               title={item.title}
               description={item.description}
-              href={`/configure/${item.id}`} // Placeholder href, assuming future routes
+              href={`/configure/${item.id}`}
             />
           ))}
         </div>
