@@ -37,7 +37,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { DatePicker } from "@/components/ui/date-picker";
-import { PlusCircle, FilePenLine, Trash2, ListFilter } from 'lucide-react';
+import { PlusCircle, FilePenLine, Trash2, ListFilter, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -77,25 +77,37 @@ interface SegmentCode {
   id: string;
   code: string;
   description: string;
+  external1?: string;
+  external2?: string;
+  external3?: string;
+  external4?: string;
+  external5?: string;
+  summaryIndicator: boolean;
   isActive: boolean;
-  effectiveDate?: Date;
-  expirationDate?: Date;
+  validFrom: Date; // Changed from effectiveDate, now required
+  validTo?: Date;   // Changed from expirationDate
 }
 
 const segmentCodeFormSchema = z.object({
-  code: z.string().min(1, { message: 'Code is required.' }),
+  code: z.string().min(1, { message: 'Segment Code is required.' }),
   description: z.string().min(1, { message: 'Description is required.' }),
-  effectiveDate: z.date().optional(),
-  expirationDate: z.date().optional(),
+  external1: z.string().optional(),
+  external2: z.string().optional(),
+  external3: z.string().optional(),
+  external4: z.string().optional(),
+  external5: z.string().optional(),
+  summaryIndicator: z.boolean().default(false),
   isActive: z.boolean().default(true),
+  validFrom: z.date({ required_error: "Valid From date is required." }),
+  validTo: z.date().optional(),
 }).refine(data => {
-  if (data.effectiveDate && data.expirationDate) {
-    return data.expirationDate >= data.effectiveDate;
+  if (data.validFrom && data.validTo) {
+    return data.validTo >= data.validFrom;
   }
   return true;
 }, {
-  message: "Expiration Date must be after or the same as Effective Date.",
-  path: ["expirationDate"],
+  message: "Valid To date must be after or the same as Valid From date.",
+  path: ["validTo"],
 });
 
 type SegmentCodeFormValues = z.infer<typeof segmentCodeFormSchema>;
@@ -103,9 +115,15 @@ type SegmentCodeFormValues = z.infer<typeof segmentCodeFormSchema>;
 const defaultCodeFormValues: SegmentCodeFormValues = {
   code: '',
   description: '',
-  effectiveDate: undefined,
-  expirationDate: undefined,
+  external1: '',
+  external2: '',
+  external3: '',
+  external4: '',
+  external5: '',
+  summaryIndicator: false,
   isActive: true,
+  validFrom: new Date(), // Default to today or handle as undefined if you prefer placeholder
+  validTo: undefined,
 };
 
 export default function SegmentCodesPage() {
@@ -115,14 +133,13 @@ export default function SegmentCodesPage() {
   );
   const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>({
     'fund': [
-      { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, effectiveDate: new Date(2023, 0, 1) },
-      { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, expirationDate: new Date(2024, 11, 31) },
+      { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001" },
+      { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "GF-002" },
     ],
     'object': [
-      { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true },
-      { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, effectiveDate: new Date(2022, 5, 1), expirationDate: new Date(2023, 4, 30) },
+      { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false },
+      { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, validFrom: new Date(2022, 5, 1), validTo: new Date(2023, 4, 30), summaryIndicator: false },
     ],
-    // Initialize with empty arrays for other segments to avoid errors
     'department': [], 'project': [], 'grant': [], 'function': [], 'location': [], 'program': [],
   });
 
@@ -132,6 +149,13 @@ export default function SegmentCodesPage() {
     resolver: zodResolver(segmentCodeFormSchema),
     defaultValues: defaultCodeFormValues,
   });
+  
+  useEffect(() => {
+    if (isAddCodeDialogOpen) {
+      form.reset(defaultCodeFormValues);
+    }
+  }, [isAddCodeDialogOpen, form]);
+
 
   const selectedSegment = useMemo(() => {
     return segments.find(s => s.id === selectedSegmentId);
@@ -224,13 +248,14 @@ export default function SegmentCodesPage() {
                       Add Code
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-lg">
+                  <DialogContent className="sm:max-w-2xl md:max-w-3xl max-h-[80vh]">
                     <DialogHeader>
                       <DialogTitle>Add New Code for {selectedSegment.displayName}</DialogTitle>
                       <DialogDescription>
                         Fill in the details for the new segment code.
                       </DialogDescription>
                     </DialogHeader>
+                    <ScrollArea className="pr-6 max-h-[calc(80vh-150px)]"> {/* Adjust max-height as needed */}
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(handleAddCodeSubmit)} className="space-y-4 py-4">
                         <FormField
@@ -238,7 +263,7 @@ export default function SegmentCodesPage() {
                           name="code"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Code</FormLabel>
+                              <FormLabel>Segment Code *</FormLabel>
                               <FormControl>
                                 <Input {...field} />
                               </FormControl>
@@ -251,7 +276,7 @@ export default function SegmentCodesPage() {
                           name="description"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Description</FormLabel>
+                              <FormLabel>Description *</FormLabel>
                               <FormControl>
                                 <Textarea {...field} />
                               </FormControl>
@@ -259,17 +284,76 @@ export default function SegmentCodesPage() {
                             </FormItem>
                           )}
                         />
+                        
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
-                            name="effectiveDate"
+                            name="external1"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>External 1</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="external2"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>External 2</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="external3"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>External 3</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="external4"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>External 4</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="external5"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>External 5</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="validFrom"
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
-                                <FormLabel>Effective Date</FormLabel>
+                                <FormLabel>Valid From *</FormLabel>
                                 <DatePicker
                                   value={field.value}
                                   onValueChange={field.onChange}
-                                  placeholder="Select effective date"
+                                  placeholder="Select valid from date"
                                 />
                                 <FormMessage />
                               </FormItem>
@@ -277,16 +361,17 @@ export default function SegmentCodesPage() {
                           />
                           <FormField
                             control={form.control}
-                            name="expirationDate"
+                            name="validTo"
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
-                                <FormLabel>Expiration Date</FormLabel>
+                                <FormLabel>Valid To</FormLabel>
                                 <DatePicker
                                   value={field.value}
                                   onValueChange={field.onChange}
-                                  placeholder="Select expiration date"
+                                  placeholder="Select valid to date"
                                   disableDates={(date) => {
-                                    return form.getValues("effectiveDate") ? date < form.getValues("effectiveDate")! : false;
+                                    const validFrom = form.getValues("validFrom");
+                                    return validFrom ? date < validFrom : false;
                                   }}
                                 />
                                 <FormMessage />
@@ -294,21 +379,39 @@ export default function SegmentCodesPage() {
                             )}
                           />
                         </div>
-                        <FormField
-                          control={form.control}
-                          name="isActive"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                              <FormLabel>Active</FormLabel>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                          <FormField
+                            control={form.control}
+                            name="summaryIndicator"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                <FormLabel>Summary Indicator</FormLabel>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="isActive"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                <FormLabel>Active</FormLabel>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                         <DialogFooter className="pt-4">
                           <DialogClose asChild>
                             <Button type="button" variant="outline">Cancel</Button>
@@ -317,6 +420,7 @@ export default function SegmentCodesPage() {
                         </DialogFooter>
                       </form>
                     </Form>
+                    </ScrollArea>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -327,27 +431,42 @@ export default function SegmentCodesPage() {
                 </CardHeader>
                 <CardContent>
                   {currentSegmentCodes.length > 0 ? (
+                    <ScrollArea className="w-full whitespace-nowrap">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[120px]">Code</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead className="w-[150px]">Effective</TableHead>
-                          <TableHead className="w-[150px]">Expires</TableHead>
-                          <TableHead className="text-center w-[100px]">Status</TableHead>
-                          <TableHead className="text-right w-[100px]">Actions</TableHead>
+                          <TableHead className="min-w-[100px]">Code</TableHead>
+                          <TableHead className="min-w-[200px]">Description</TableHead>
+                          <TableHead className="min-w-[120px]">External 1</TableHead>
+                          <TableHead className="min-w-[120px]">External 2</TableHead>
+                          <TableHead className="min-w-[120px]">External 3</TableHead>
+                          <TableHead className="min-w-[120px]">External 4</TableHead>
+                          <TableHead className="min-w-[120px]">External 5</TableHead>
+                          <TableHead className="text-center min-w-[100px]">Summary</TableHead>
+                          <TableHead className="min-w-[150px]">Valid From</TableHead>
+                          <TableHead className="min-w-[150px]">Valid To</TableHead>
+                          <TableHead className="text-center min-w-[100px]">Status</TableHead>
+                          <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {currentSegmentCodes.map(code => (
                           <TableRow key={code.id}>
                             <TableCell className="font-medium">{code.code}</TableCell>
-                            <TableCell>{code.description}</TableCell>
-                            <TableCell>
-                              {code.effectiveDate ? format(code.effectiveDate, "MMM d, yyyy") : 'N/A'}
+                            <TableCell className="whitespace-normal break-words">{code.description}</TableCell>
+                            <TableCell>{code.external1 ?? 'N/A'}</TableCell>
+                            <TableCell>{code.external2 ?? 'N/A'}</TableCell>
+                            <TableCell>{code.external3 ?? 'N/A'}</TableCell>
+                            <TableCell>{code.external4 ?? 'N/A'}</TableCell>
+                            <TableCell>{code.external5 ?? 'N/A'}</TableCell>
+                            <TableCell className="text-center">
+                              {code.summaryIndicator ? <CheckCircle className="h-5 w-5 text-green-500 inline" /> : <XCircle className="h-5 w-5 text-muted-foreground inline" />}
                             </TableCell>
                             <TableCell>
-                              {code.expirationDate ? format(code.expirationDate, "MMM d, yyyy") : 'N/A'}
+                              {format(code.validFrom, "MMM d, yyyy")}
+                            </TableCell>
+                            <TableCell>
+                              {code.validTo ? format(code.validTo, "MMM d, yyyy") : 'N/A'}
                             </TableCell>
                             <TableCell className="text-center">
                               <Switch
@@ -368,6 +487,7 @@ export default function SegmentCodesPage() {
                         ))}
                       </TableBody>
                     </Table>
+                    </ScrollArea>
                   ) : (
                     <p className="text-muted-foreground text-center py-8">
                       No codes defined for {selectedSegment.displayName}. Click "Add Code" to get started.
@@ -386,3 +506,4 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
+
