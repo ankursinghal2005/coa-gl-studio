@@ -122,7 +122,7 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   external5: '',
   summaryIndicator: false,
   isActive: true,
-  validFrom: new Date(), // Default to today or handle as undefined if you prefer placeholder
+  validFrom: new Date(), 
   validTo: undefined,
 };
 
@@ -437,15 +437,15 @@ export default function SegmentCodesPage() {
                         <TableRow>
                           <TableHead className="min-w-[100px]">Code</TableHead>
                           <TableHead className="min-w-[200px]">Description</TableHead>
+                          <TableHead className="text-center min-w-[100px]">Summary</TableHead>
+                          <TableHead className="text-center min-w-[100px]">Status</TableHead>
                           <TableHead className="min-w-[120px]">External 1</TableHead>
                           <TableHead className="min-w-[120px]">External 2</TableHead>
                           <TableHead className="min-w-[120px]">External 3</TableHead>
                           <TableHead className="min-w-[120px]">External 4</TableHead>
                           <TableHead className="min-w-[120px]">External 5</TableHead>
-                          <TableHead className="text-center min-w-[100px]">Summary</TableHead>
                           <TableHead className="min-w-[150px]">Valid From</TableHead>
                           <TableHead className="min-w-[150px]">Valid To</TableHead>
-                          <TableHead className="text-center min-w-[100px]">Status</TableHead>
                           <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -454,19 +454,8 @@ export default function SegmentCodesPage() {
                           <TableRow key={code.id}>
                             <TableCell className="font-medium">{code.code}</TableCell>
                             <TableCell className="whitespace-normal break-words">{code.description}</TableCell>
-                            <TableCell>{code.external1 ?? 'N/A'}</TableCell>
-                            <TableCell>{code.external2 ?? 'N/A'}</TableCell>
-                            <TableCell>{code.external3 ?? 'N/A'}</TableCell>
-                            <TableCell>{code.external4 ?? 'N/A'}</TableCell>
-                            <TableCell>{code.external5 ?? 'N/A'}</TableCell>
                             <TableCell className="text-center">
                               {code.summaryIndicator ? <CheckCircle className="h-5 w-5 text-green-500 inline" /> : <XCircle className="h-5 w-5 text-muted-foreground inline" />}
-                            </TableCell>
-                            <TableCell>
-                              {format(code.validFrom, "MMM d, yyyy")}
-                            </TableCell>
-                            <TableCell>
-                              {code.validTo ? format(code.validTo, "MMM d, yyyy") : 'N/A'}
                             </TableCell>
                             <TableCell className="text-center">
                               <Switch
@@ -474,6 +463,17 @@ export default function SegmentCodesPage() {
                                 onCheckedChange={() => handleCodeStatusToggle(code.id)}
                                 aria-label={`Toggle status for code ${code.code}`}
                               />
+                            </TableCell>
+                            <TableCell>{code.external1 ?? 'N/A'}</TableCell>
+                            <TableCell>{code.external2 ?? 'N/A'}</TableCell>
+                            <TableCell>{code.external3 ?? 'N/A'}</TableCell>
+                            <TableCell>{code.external4 ?? 'N/A'}</TableCell>
+                            <TableCell>{code.external5 ?? 'N/A'}</TableCell>
+                            <TableCell>
+                              {format(code.validFrom, "MMM d, yyyy")}
+                            </TableCell>
+                            <TableCell>
+                              {code.validTo ? format(code.validTo, "MMM d, yyyy") : 'N/A'}
                             </TableCell>
                             <TableCell className="text-right space-x-2">
                               <Button variant="ghost" size="icon" onClick={() => alert(`Edit ${code.code}`)} title="Edit Code">
