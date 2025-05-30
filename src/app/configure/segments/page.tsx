@@ -47,36 +47,14 @@ import { PlusCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { Label } from '@/components/ui/label';
+import { useSegments } from '@/contexts/SegmentsContext'; // Import useSegments
+import type { Segment } from '@/lib/segment-types'; // Import Segment type
 
-interface Segment {
-  id: string;
-  displayName: string;
-  segmentType: string;
-  isActive: boolean;
-  isCore: boolean;
-  regex?: string;
-  defaultCode?: string;
-  separator?: '-' | '|' | ',' | '.';
-  isCustom: boolean;
-  isMandatoryForCoding: boolean;
-  validFrom?: Date;
-  validTo?: Date;
-}
-
-const initialSegmentsData: Segment[] = [
-  { id: 'fund', displayName: 'Fund', segmentType: 'Fund', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'object', displayName: 'Object', segmentType: 'Object', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'department', displayName: 'Department', segmentType: 'Department', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'project', displayName: 'Project', segmentType: 'Project', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'function', displayName: 'Function', segmentType: 'Function', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'location', displayName: 'Location', segmentType: 'Location', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'program', displayName: 'Program', segmentType: 'Program', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-];
+// initialSegmentsData is now managed by SegmentsContext
 
 const segmentFormSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
-  segmentType: z.string().optional(),
+  segmentType: z.string().optional(), // Will be auto-filled from displayName for new custom segments
   regex: z.string().optional(),
   defaultCode: z.string().optional(),
   separator: z.enum(['-', '|', ',', '.']).optional().default('-'),
@@ -84,9 +62,9 @@ const segmentFormSchema = z.object({
   isActive: z.boolean().default(true),
   validFrom: z.date().optional(),
   validTo: z.date().optional(),
-  isCustom: z.boolean().default(true),
-  isCore: z.boolean().default(false),
-  id: z.string().optional(),
+  isCustom: z.boolean().default(true), // default for new segments
+  isCore: z.boolean().default(false), // default for new segments
+  id: z.string().optional(), // For editing
 }).refine(data => {
   if (data.validFrom && data.validTo) {
     return data.validTo >= data.validFrom;
@@ -101,7 +79,7 @@ type SegmentFormValues = z.infer<typeof segmentFormSchema>;
 
 const defaultFormValues: SegmentFormValues = {
   displayName: '',
-  segmentType: '',
+  segmentType: '', // Will be set programmatically
   regex: '',
   defaultCode: '',
   separator: '-',
@@ -114,7 +92,7 @@ const defaultFormValues: SegmentFormValues = {
 };
 
 export default function SegmentsPage() {
-  const [segments, setSegments] = useState<Segment[]>(initialSegmentsData);
+  const { segments, addSegment, updateSegment, toggleSegmentStatus } = useSegments(); // Use context
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'view' | 'edit'>('add');
   const [currentSegmentData, setCurrentSegmentData] = useState<Segment | null>(null);
@@ -126,19 +104,19 @@ export default function SegmentsPage() {
 
   useEffect(() => {
     if ((dialogMode === 'view' || dialogMode === 'edit') && currentSegmentData) {
-      form.reset(currentSegmentData);
+      form.reset({
+        ...currentSegmentData,
+        validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : undefined,
+        validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
+      });
     } else if (dialogMode === 'add') {
       form.reset(defaultFormValues);
     }
-  }, [dialogMode, currentSegmentData, form]);
+  }, [dialogMode, currentSegmentData, form, isDialogOpen]);
 
 
   const handleToggleChange = (segmentId: string) => {
-    setSegments(prevSegments =>
-      prevSegments.map(segment =>
-        segment.id === segmentId ? { ...segment, isActive: !segment.isActive } : segment
-      )
-    );
+    toggleSegmentStatus(segmentId); // Use context function
   };
 
   const handleAddSegmentClick = () => {
@@ -151,14 +129,14 @@ export default function SegmentsPage() {
   const handleViewSegmentClick = (segment: Segment) => {
     setDialogMode('view');
     setCurrentSegmentData(segment);
-    form.reset(segment);
+    // form.reset is handled by useEffect
     setIsDialogOpen(true);
   };
 
   const handleEditSegmentClick = () => {
     if (currentSegmentData && currentSegmentData.isCustom && !currentSegmentData.isCore) {
       setDialogMode('edit');
-      // form.reset(currentSegmentData) is already handled by useEffect
+      // form.reset for edit is handled by useEffect
     }
   };
 
@@ -166,9 +144,9 @@ export default function SegmentsPage() {
     if (dialogMode === 'add') {
       const newSegment: Segment = {
         id: crypto.randomUUID(),
-        segmentType: values.displayName, 
-        isCore: false,
-        isCustom: true,
+        segmentType: values.displayName, // Set segmentType same as displayName
+        isCore: false, // Custom segments are not core
+        isCustom: true,  // Explicitly set as custom
         displayName: values.displayName,
         regex: values.regex,
         defaultCode: values.defaultCode,
@@ -178,41 +156,20 @@ export default function SegmentsPage() {
         validFrom: values.validFrom,
         validTo: values.validTo,
       };
-      setSegments(prevSegments => [...prevSegments, newSegment].sort((a, b) => {
-        if (a.isCore && !b.isCore) return -1;
-        if (!a.isCore && b.isCore) return 1;
-        const indexOfA = initialSegmentsData.findIndex(s => s.id === a.id);
-        const indexOfB = initialSegmentsData.findIndex(s => s.id === b.id);
-
-        if (indexOfA !== -1 && indexOfB !== -1) {
-          return indexOfA - indexOfB;
-        }
-        if (indexOfA !== -1) return -1;
-        if (indexOfB !== -1) return 1;
-        return 0;
-      }));
+      addSegment(newSegment); // Use context function
     } else if (dialogMode === 'edit' && currentSegmentData) {
-      setSegments(prevSegments =>
-        prevSegments.map(segment =>
-          segment.id === currentSegmentData.id
-            ? {
-                ...segment, // Keep original id, isCore, isCustom, segmentType
-                ...values, // Apply new form values
-                segmentType: segment.segmentType, // Ensure segmentType is not changed by form values.displayName
-              }
-            : segment
-        )
-      );
-      setCurrentSegmentData(prev => prev ? {...prev, ...values, segmentType: prev.segmentType } : null); // Update currentSegmentData for view mode
+      const updatedSegment: Segment = {
+        ...currentSegmentData, // Preserve id, isCore, isCustom, segmentType
+        ...values,
+        segmentType: currentSegmentData.segmentType, // Ensure segmentType is not changed from original
+      };
+      updateSegment(updatedSegment); // Use context function
+      setCurrentSegmentData(updatedSegment); // Keep currentSegmentData updated for view mode
       setDialogMode('view'); // Revert to view mode after saving edit
     }
     
     if (dialogMode !== 'edit') { 
       setIsDialogOpen(false);
-    }
-    
-    if (dialogMode === 'add' || (dialogMode === 'edit' && !currentSegmentData)) {
-       form.reset(defaultFormValues);
     }
   };
 
@@ -224,9 +181,11 @@ export default function SegmentsPage() {
   const isFieldDisabled = (isCoreSegment: boolean | undefined, isCustomSegment: boolean | undefined) => {
     if (dialogMode === 'view') return true;
     if (dialogMode === 'edit') {
-      return isCoreSegment || !isCustomSegment;
+      // For editing custom segments, displayName and other attributes are editable.
+      // Core segments' attributes should generally not be editable.
+      return isCoreSegment; // Only disable if it's a core segment.
     }
-    return false; 
+    return false; // Enable for 'add' mode
   };
   
   const isActiveSwitchDisabled = () => {
@@ -257,7 +216,7 @@ export default function SegmentsPage() {
         <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
           setIsDialogOpen(isOpen);
           if (!isOpen) {
-            form.reset(defaultFormValues); 
+            // form.reset(defaultFormValues); // Reset handled by useEffect
             setCurrentSegmentData(null);
             setDialogMode('add'); 
           }
@@ -282,7 +241,7 @@ export default function SegmentsPage() {
                   name="displayName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Display Name</FormLabel>
+                      <FormLabel>Display Name *</FormLabel>
                       <FormControl>
                         <Input {...field} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)} />
                       </FormControl>
@@ -291,7 +250,7 @@ export default function SegmentsPage() {
                   )}
                 />
                 
-                {(dialogMode === 'view' || dialogMode === 'edit') && (
+                {(dialogMode === 'view' || dialogMode === 'edit') && currentSegmentData && (
                    <FormField
                     control={form.control}
                     name="segmentType"
@@ -299,7 +258,7 @@ export default function SegmentsPage() {
                       <FormItem>
                         <FormLabel>Segment Type</FormLabel>
                         <FormControl>
-                          <Input {...field} disabled />
+                          <Input {...field} value={currentSegmentData.segmentType} disabled />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -347,7 +306,7 @@ export default function SegmentsPage() {
                           value={field.value}
                           onValueChange={field.onChange}
                           placeholder="Select start date"
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom) || dialogMode === 'view' || (currentSegmentData?.isCore && dialogMode === 'edit')}
                         />
                         <FormMessage />
                       </FormItem>
@@ -363,9 +322,10 @@ export default function SegmentsPage() {
                           value={field.value}
                           onValueChange={field.onChange}
                           placeholder="Select end date"
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom) || dialogMode === 'view' || (currentSegmentData?.isCore && dialogMode === 'edit')}
                           disableDates={(date) => {
-                            return form.getValues("validFrom") ? date < form.getValues("validFrom")! : false;
+                            const validFrom = form.getValues("validFrom");
+                            return validFrom instanceof Date ? date < validFrom : false;
                           }}
                         />
                         <FormMessage />
@@ -382,7 +342,7 @@ export default function SegmentsPage() {
                         <FormLabel>Separator</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
-                          value={field.value} 
+                          value={field.value ?? '-'}
                           disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
                         >
                           <FormControl>
@@ -445,7 +405,7 @@ export default function SegmentsPage() {
                       <Label className="text-sm font-medium text-muted-foreground">Custom Segment</Label>
                     </div>
                     <Switch
-                      checked={dialogMode === 'add' || (currentSegmentData?.isCustom ?? false)}
+                      checked={dialogMode === 'add' ? true : (currentSegmentData?.isCustom ?? false)}
                       disabled={true}
                       aria-readonly
                     />
@@ -454,17 +414,13 @@ export default function SegmentsPage() {
                 <DialogFooter className="pt-4">
                   {dialogMode === 'add' && (
                     <>
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">Cancel</Button>
-                      </DialogClose>
+                      <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
                       <Button type="submit">Save</Button>
                     </>
                   )}
                   {dialogMode === 'view' && (
                     <>
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">Close</Button>
-                      </DialogClose>
+                      <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Close</Button>
                       {currentSegmentData?.isCustom && !currentSegmentData.isCore && (
                         <Button type="button" onClick={handleEditSegmentClick}>Edit</Button>
                       )}
@@ -475,7 +431,11 @@ export default function SegmentsPage() {
                         <Button type="button" variant="outline" onClick={() => { 
                           setDialogMode('view'); 
                           if(currentSegmentData) {
-                            form.reset(currentSegmentData); // Reset form to original data of currentSegmentData
+                            form.reset({ // Reset form to original data of currentSegmentData
+                                ...currentSegmentData,
+                                validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : undefined,
+                                validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
+                            }); 
                           }
                         }}>Cancel</Button>
                         <Button type="submit">Save Changes</Button>
@@ -512,9 +472,9 @@ export default function SegmentsPage() {
                       </span>
                       {(segment.validFrom || segment.validTo) && (
                         <p className="text-xs text-muted-foreground">
-                          {segment.validFrom && format(segment.validFrom, "MMM d, yyyy")}
+                          {segment.validFrom && format(new Date(segment.validFrom), "MMM d, yyyy")}
                           {segment.validFrom && segment.validTo && " - "}
-                          {segment.validTo && format(segment.validTo, "MMM d, yyyy")}
+                          {segment.validTo && format(new Date(segment.validTo), "MMM d, yyyy")}
                         </p>
                       )}
                     </TableCell>
@@ -543,4 +503,3 @@ export default function SegmentsPage() {
     </div>
   );
 }
-

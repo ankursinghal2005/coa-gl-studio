@@ -1,8 +1,10 @@
+
 import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
+import { SegmentsProvider } from '@/contexts/SegmentsContext'; // Added import
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -26,7 +28,9 @@ export default function RootLayout({
         "min-h-screen bg-background font-sans antialiased",
         dmSans.variable
       )}>
-        {children}
+        <SegmentsProvider> {/* Wrapped children with SegmentsProvider */}
+          {children}
+        </SegmentsProvider>
         <Toaster />
       </body>
     </html>

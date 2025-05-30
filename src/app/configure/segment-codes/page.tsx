@@ -37,41 +37,17 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { DatePicker } from "@/components/ui/date-picker";
-import { PlusCircle, FilePenLine, Trash2, ListFilter, CheckCircle, XCircle } from 'lucide-react';
+import { PlusCircle, ListFilter, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { useSegments } from '@/contexts/SegmentsContext'; // Import useSegments
+import type { Segment } from '@/lib/segment-types'; // Import Segment type
 
-// Consistent Segment definition
-interface Segment {
-  id: string;
-  displayName: string;
-  segmentType: string;
-  isActive: boolean;
-  isCore: boolean;
-  regex?: string;
-  defaultCode?: string;
-  separator?: '-' | '|' | ',' | '.';
-  isCustom: boolean;
-  isMandatoryForCoding: boolean;
-  validFrom?: Date;
-  validTo?: Date;
-}
+// Segment interface is now imported
 
-// This list should ideally be in sync with initialSegmentsData from SegmentsPage or a shared source
-const allAvailableSegments: Segment[] = [
-  { id: 'fund', displayName: 'Fund', segmentType: 'Fund', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'object', displayName: 'Object', segmentType: 'Object', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'department', displayName: 'Department', segmentType: 'Department', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'project', displayName: 'Project', segmentType: 'Project', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'function', displayName: 'Function', segmentType: 'Function', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'location', displayName: 'Location', segmentType: 'Location', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-  { id: 'program', displayName: 'Program', segmentType: 'Program', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
-];
-
-
+// SegmentCode definition remains local to this page as it's specific to segment codes
 interface SegmentCode {
   id: string;
   code: string;
@@ -90,7 +66,7 @@ interface SegmentCode {
 }
 
 const segmentCodeFormSchema = z.object({
-  id: z.string().optional(), // Keep id for editing
+  id: z.string().optional(),
   code: z.string().min(1, { message: 'Segment Code is required.' }),
   description: z.string().min(1, { message: 'Description is required.' }),
   external1: z.string().optional(),
@@ -132,31 +108,35 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   availableForBudgeting: false,
 };
 
-// Initialize segmentCodesData dynamically based on allAvailableSegments
-const initialSegmentCodesData = (): Record<string, SegmentCode[]> => {
-  const data: Record<string, SegmentCode[]> = {};
-  allAvailableSegments.forEach(segment => {
-    data[segment.id] = []; // Start with empty codes for all segments
-  });
-  // Add some mock data for specific segments for demonstration
-  data['fund'] = [
-    { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail", external3: "Ref1", external4: "Ref2", external5: "Ref3", availableForTransactionCoding: true, availableForBudgeting: true },
-    { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary", external3: "RefA", availableForTransactionCoding: false, availableForBudgeting: true },
-  ];
-  data['object'] = [
-    { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external4: "DeptXYZ", availableForTransactionCoding: true, availableForBudgeting: true },
-    { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, validFrom: new Date(2022, 5, 1), validTo: new Date(2023, 4, 30), summaryIndicator: false, availableForTransactionCoding: false, availableForBudgeting: false },
-  ];
-  return data;
-};
-
 
 export default function SegmentCodesPage() {
-  const [segments] = useState<Segment[]>(allAvailableSegments);
+  const { segments: allAvailableSegments } = useSegments(); // Use segments from context
+  
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(
-    segments.length > 0 ? segments[0].id : null
+    allAvailableSegments.length > 0 ? allAvailableSegments[0].id : null
   );
-  const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>(initialSegmentCodesData());
+
+  // Initialize segmentCodesData dynamically based on segments from context
+  const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>(() => {
+    const data: Record<string, SegmentCode[]> = {};
+    allAvailableSegments.forEach(segment => {
+      data[segment.id] = []; 
+    });
+    // Add some mock data for specific segments for demonstration, if segments exist
+    if (data['fund']) {
+      data['fund'] = [
+        { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail", external3: "Ref1", external4: "Ref2", external5: "Ref3", availableForTransactionCoding: true, availableForBudgeting: true },
+        { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary", external3: "RefA", availableForTransactionCoding: false, availableForBudgeting: true },
+      ];
+    }
+    if (data['object']) {
+       data['object'] = [
+        { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external4: "DeptXYZ", availableForTransactionCoding: true, availableForBudgeting: true },
+        { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, validFrom: new Date(2022, 5, 1), validTo: new Date(2023, 4, 30), summaryIndicator: false, availableForTransactionCoding: false, availableForBudgeting: false },
+      ];
+    }
+    return data;
+  });
 
   const [isCodeFormOpen, setIsCodeFormOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'view' | 'edit'>('add');
@@ -166,6 +146,12 @@ export default function SegmentCodesPage() {
     resolver: zodResolver(segmentCodeFormSchema),
     defaultValues: defaultCodeFormValues,
   });
+
+  useEffect(() => {
+    if (allAvailableSegments.length > 0 && !selectedSegmentId) {
+      setSelectedSegmentId(allAvailableSegments[0].id);
+    }
+  }, [allAvailableSegments, selectedSegmentId]);
 
   useEffect(() => {
     if (isCodeFormOpen) {
@@ -180,17 +166,16 @@ export default function SegmentCodesPage() {
         });
       }
     } else {
-      // Reset everything when dialog closes
       form.reset(defaultCodeFormValues);
       setCurrentEditingCode(null);
-      setDialogMode('add'); // Default back to 'add'
+      setDialogMode('add');
     }
   }, [isCodeFormOpen, dialogMode, currentEditingCode, form]);
 
 
   const selectedSegment = useMemo(() => {
-    return segments.find(s => s.id === selectedSegmentId);
-  }, [segments, selectedSegmentId]);
+    return allAvailableSegments.find(s => s.id === selectedSegmentId);
+  }, [allAvailableSegments, selectedSegmentId]);
 
   const currentSegmentCodes = useMemo(() => {
     if (!selectedSegmentId || !segmentCodesData[selectedSegmentId]) {
@@ -219,12 +204,11 @@ export default function SegmentCodesPage() {
           code.id === currentEditingCode.id ? updatedCode : code
         ),
       }));
-      setCurrentEditingCode(updatedCode); // Keep current code updated for view mode
-      setDialogMode('view'); // Switch back to view mode after saving edit
-      // Do not close dialog immediately for edit, allow user to see changes or close manually
+      setCurrentEditingCode(updatedCode); 
+      setDialogMode('view'); 
       return;
     }
-    setIsCodeFormOpen(false); // Close dialog for 'add' mode
+    setIsCodeFormOpen(false);
   };
 
   const handleCodeStatusToggle = (codeId: string) => {
@@ -239,7 +223,7 @@ export default function SegmentCodesPage() {
 
   const handleOpenAddCodeDialog = () => {
     setDialogMode('add');
-    setCurrentEditingCode(null); // Ensure no prior editing state
+    setCurrentEditingCode(null); 
     setIsCodeFormOpen(true);
   };
 
@@ -252,13 +236,12 @@ export default function SegmentCodesPage() {
   const handleEditCodeFromDialog = () => { 
     if (currentEditingCode) {
       setDialogMode('edit');
-      // form.reset for edit is handled by useEffect
     }
   };
 
    const handleDialogClose = (isOpen: boolean) => {
     if (!isOpen) {
-      setIsCodeFormOpen(false); // This will trigger the useEffect to reset states
+      setIsCodeFormOpen(false); 
     } else {
       setIsCodeFormOpen(true);
     }
@@ -282,7 +265,7 @@ export default function SegmentCodesPage() {
             <ListFilter className="mr-2 h-5 w-5" /> Segments
           </h2>
           <ScrollArea className="h-[calc(100%-3rem)]">
-            {segments.map(segment => (
+            {allAvailableSegments.map(segment => (
               <Button
                 key={segment.id}
                 variant={selectedSegmentId === segment.id ? 'secondary' : 'ghost'}
@@ -331,7 +314,7 @@ export default function SegmentCodesPage() {
                         {dialogMode === 'edit' && "Modify the details of the segment code."}
                       </DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="pr-6 max-h-[calc(80vh-150px)]"> {/* Adjust max-height as needed */}
+                    <ScrollArea className="pr-6 max-h-[calc(80vh-150px)]">
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(handleSaveCodeSubmit)} className="space-y-4 py-4">
                         <FormField
@@ -449,7 +432,6 @@ export default function SegmentCodesPage() {
                                   disabled={isFieldDisabled}
                                   disableDates={(date) => {
                                     const validFrom = form.getValues("validFrom");
-                                    // Ensure validFrom is a Date object before comparison
                                     return validFrom instanceof Date ? date < validFrom : false;
                                   }}
                                 />
@@ -545,7 +527,6 @@ export default function SegmentCodesPage() {
                             <>
                               <Button type="button" variant="outline" onClick={() => {
                                 setDialogMode('view');
-                                // Reset form to original currentEditingCode values if cancel edit
                                 if(currentEditingCode) form.reset({
                                   ...currentEditingCode,
                                   validFrom: currentEditingCode.validFrom ? new Date(currentEditingCode.validFrom) : new Date(),
@@ -613,7 +594,11 @@ export default function SegmentCodesPage() {
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full">
-              <p className="text-xl text-muted-foreground">Please select a segment from the left panel.</p>
+               {allAvailableSegments.length > 0 ?
+                <p className="text-xl text-muted-foreground">Please select a segment from the left panel.</p>
+                :
+                <p className="text-xl text-muted-foreground">No segments configured. Please add segments in 'Manage Segments' first.</p>
+              }
             </div>
           )}
         </main>
@@ -621,6 +606,3 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
-
-
-    
