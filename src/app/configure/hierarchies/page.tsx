@@ -2,8 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
-import Link from 'next/link'; // Added Link
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Table,
   TableHeader,
@@ -33,8 +32,8 @@ interface Hierarchy {
   name: string;
   segmentId: string;
   status: 'Active' | 'Inactive' | 'Deprecated';
-  lastModifiedDate?: Date; // Placeholder
-  lastModifiedBy?: string; // Placeholder
+  lastModifiedDate?: Date;
+  lastModifiedBy?: string;
 }
 
 // Mock data for hierarchies
@@ -52,42 +51,56 @@ const initialHierarchiesData: Record<string, Hierarchy[]> = {
   'project': [
     { id: 'project-h1', name: 'Capital Projects Hierarchy', segmentId: 'project', status: 'Deprecated', lastModifiedDate: new Date(2023, 5, 20), lastModifiedBy: 'Admin User' },
   ]
-  // Other segments like 'grant', 'function', 'location', 'program' will be initialized with [] by the useEffect
 };
 
 
 export default function HierarchiesPage() {
   const { segments: allAvailableSegments } = useSegments();
   const searchParams = useSearchParams();
-  const router = useRouter(); // Added useRouter
+  const router = useRouter();
   
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
-  const [hierarchiesData, setHierarchiesData] = useState<Record<string, Hierarchy[]>>(initialHierarchiesData);
+  const [hierarchiesData, setHierarchiesData] = useState<Record<string, Hierarchy[]>>({});
 
   useEffect(() => {
-    // Initialize hierarchies for all segments if not already present from initialHierarchiesData
+    // Initialize hierarchies data structure for all available segments
     setHierarchiesData(prevData => {
-      const newData = {...prevData};
+      const newData = { ...prevData };
       allAvailableSegments.forEach(segment => {
+        // Only add initial mock data if the segment key exists in initialHierarchiesData
+        // and hasn't been populated yet. Otherwise, initialize with an empty array.
         if (!Object.prototype.hasOwnProperty.call(newData, segment.id)) {
-          newData[segment.id] = [];
+          newData[segment.id] = initialHierarchiesData[segment.id] || [];
         }
       });
       return newData;
     });
 
     const querySegmentId = searchParams.get('segmentId');
+    
+    let targetSegmentId: string | null = null;
+
     if (querySegmentId && allAvailableSegments.some(s => s.id === querySegmentId)) {
-      if (selectedSegmentId !== querySegmentId) {
-        setSelectedSegmentId(querySegmentId);
+      targetSegmentId = querySegmentId;
+    } else if (allAvailableSegments.length > 0) {
+      // Default to the first segment if query param is invalid or missing
+      targetSegmentId = allAvailableSegments[0].id;
+      // Optionally, update URL if it's not reflecting the default.
+      // Avoid doing this if querySegmentId was null and we are just defaulting,
+      // to prevent unnecessary URL changes on initial load without params.
+      if (querySegmentId && querySegmentId !== targetSegmentId) {
+         // router.replace(`/configure/hierarchies?segmentId=${targetSegmentId}`, { scroll: false });
+      } else if (!querySegmentId) {
+        // If loaded without params, and we default, consider updating URL.
+        // For now, let user click drive URL or initial link.
       }
-    } else if (!selectedSegmentId && allAvailableSegments.length > 0) {
-      setSelectedSegmentId(allAvailableSegments[0].id);
-    } else if (selectedSegmentId && !allAvailableSegments.some(s => s.id === selectedSegmentId)) {
-      // If current selected segment is no longer valid (e.g. removed from context), reset
-      setSelectedSegmentId(allAvailableSegments.length > 0 ? allAvailableSegments[0].id : null);
     }
-  }, [searchParams, allAvailableSegments, selectedSegmentId]);
+
+    if (selectedSegmentId !== targetSegmentId) {
+      setSelectedSegmentId(targetSegmentId);
+    }
+
+  }, [searchParams, allAvailableSegments, selectedSegmentId, router]);
 
 
   const selectedSegment = useMemo(() => {
@@ -129,6 +142,9 @@ export default function HierarchiesPage() {
     alert('Hierarchy deletion logic not yet implemented.');
   };
 
+  const handleSegmentSelect = (segmentId: string) => {
+    router.push(`/configure/hierarchies?segmentId=${segmentId}`);
+  };
 
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
@@ -154,7 +170,7 @@ export default function HierarchiesPage() {
                   "w-full justify-start text-left mb-1",
                   selectedSegmentId === segment.id && "font-semibold text-primary"
                 )}
-                onClick={() => setSelectedSegmentId(segment.id)}
+                onClick={() => handleSegmentSelect(segment.id)}
               >
                 {segment.displayName}
               </Button>
@@ -265,3 +281,4 @@ export default function HierarchiesPage() {
   );
 }
 
+    
