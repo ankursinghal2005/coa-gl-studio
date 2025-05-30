@@ -47,8 +47,12 @@ const initialHierarchiesData: Record<string, Hierarchy[]> = {
     { id: 'dept-h1', name: 'Organizational Chart View', segmentId: 'department', status: 'Active', lastModifiedDate: new Date(2024, 0, 5), lastModifiedBy: 'System Admin' },
   ],
   'object': [
-    // No hierarchies for object initially
+    { id: 'object-h1', name: 'Expense Object Rollup', segmentId: 'object', status: 'Active', lastModifiedDate: new Date(2024, 1, 10), lastModifiedBy: 'Finance Team' },
+  ],
+  'project': [
+    { id: 'project-h1', name: 'Capital Projects Hierarchy', segmentId: 'project', status: 'Deprecated', lastModifiedDate: new Date(2023, 5, 20), lastModifiedBy: 'Admin User' },
   ]
+  // Other segments like 'grant', 'function', 'location', 'program' will be initialized with [] by the useEffect
 };
 
 
@@ -61,11 +65,11 @@ export default function HierarchiesPage() {
   const [hierarchiesData, setHierarchiesData] = useState<Record<string, Hierarchy[]>>(initialHierarchiesData);
 
   useEffect(() => {
-    // Initialize hierarchies for all segments
+    // Initialize hierarchies for all segments if not already present from initialHierarchiesData
     setHierarchiesData(prevData => {
       const newData = {...prevData};
       allAvailableSegments.forEach(segment => {
-        if (!newData[segment.id]) {
+        if (!Object.prototype.hasOwnProperty.call(newData, segment.id)) {
           newData[segment.id] = [];
         }
       });
@@ -260,3 +264,4 @@ export default function HierarchiesPage() {
     </div>
   );
 }
+
