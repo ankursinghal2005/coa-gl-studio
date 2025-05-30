@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
+import Link from 'next/link'; // Added Link
 import {
   Table,
   TableHeader,
@@ -54,10 +55,10 @@ const initialHierarchiesData: Record<string, Hierarchy[]> = {
 export default function HierarchiesPage() {
   const { segments: allAvailableSegments } = useSegments();
   const searchParams = useSearchParams();
+  const router = useRouter(); // Added useRouter
   
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [hierarchiesData, setHierarchiesData] = useState<Record<string, Hierarchy[]>>(initialHierarchiesData);
-  // Add state for dialogs later: const [isCreateHierarchyOpen, setIsCreateHierarchyOpen] = useState(false);
 
   useEffect(() => {
     // Initialize hierarchies for all segments
@@ -97,9 +98,11 @@ export default function HierarchiesPage() {
   }, [selectedSegmentId, hierarchiesData]);
 
   const handleCreateHierarchy = () => {
-    // Placeholder: Will open a dialog or navigate to a builder page
-    console.log('Create Hierarchy for segment:', selectedSegment?.displayName);
-    alert('Hierarchy creation UI not yet implemented.');
+    if (selectedSegmentId) {
+      router.push(`/configure/hierarchies/build?segmentId=${selectedSegmentId}`);
+    } else {
+      alert('Please select a segment first.');
+    }
   };
 
   const handleViewHierarchy = (hierarchy: Hierarchy) => {
@@ -119,13 +122,7 @@ export default function HierarchiesPage() {
 
   const handleDeleteHierarchy = (hierarchyId: string) => {
     console.log('Delete Hierarchy ID:', hierarchyId);
-    // Add confirmation dialog here in a real app
-    // For now, just a placeholder
     alert('Hierarchy deletion logic not yet implemented.');
-    // setHierarchiesData(prev => ({
-    //   ...prev,
-    //   [selectedSegmentId!]: prev[selectedSegmentId!].filter(h => h.id !== hierarchyId)
-    // }));
   };
 
 
