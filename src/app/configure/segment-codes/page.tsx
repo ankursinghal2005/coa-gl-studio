@@ -44,24 +44,8 @@ import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useSegments } from '@/contexts/SegmentsContext';
-import type { Segment } from '@/lib/segment-types';
-
-interface SegmentCode {
-  id: string;
-  code: string;
-  description: string;
-  external1?: string;
-  external2?: string;
-  external3?: string;
-  external4?: string;
-  external5?: string;
-  summaryIndicator: boolean;
-  isActive: boolean;
-  validFrom: Date;
-  validTo?: Date;
-  availableForTransactionCoding: boolean;
-  availableForBudgeting: boolean;
-}
+import type { Segment, SegmentCode } from '@/lib/segment-types'; // Updated import
+import { mockSegmentCodesData } from '@/lib/segment-types'; // Import shared mock data
 
 const segmentCodeFormSchema = z.object({
   id: z.string().optional(),
@@ -110,35 +94,24 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
 export default function SegmentCodesPage() {
   const { segments: allAvailableSegments } = useSegments();
   const searchParams = useSearchParams();
+  const querySegmentIdParam = searchParams.get('segmentId');
   
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
 
+  // Use the shared mockSegmentCodesData and allow local modifications
   const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>(() => {
-    const data: Record<string, SegmentCode[]> = {};
+    // Deep copy initial mock data to prevent modifying the shared source directly
+    const initialData: Record<string, SegmentCode[]> = {};
+    for (const segmentKey in mockSegmentCodesData) {
+      initialData[segmentKey] = mockSegmentCodesData[segmentKey].map(code => ({...code}));
+    }
+    // Ensure all segments from context have an entry, even if empty
     allAvailableSegments.forEach(segment => {
-      data[segment.id] = []; 
+      if (!initialData[segment.id]) {
+        initialData[segment.id] = [];
+      }
     });
-    if (data['fund']) {
-      data['fund'] = [
-        { id: 'fund-code-100', code: '100', description: 'General Fund', summaryIndicator: true, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: false, availableForBudgeting: true, external1: "GF-001" },
-        { id: 'fund-code-101', code: '101', description: 'Special Revenue Fund A', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "SRFA-001" },
-        { id: 'fund-code-102', code: '102', description: 'Capital Projects Fund B', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "CPFB-001" },
-        { id: 'fund-code-103', code: '103', description: 'Debt Service Fund C', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "DSFC-001" },
-        { id: 'fund-code-200', code: '200', description: 'Grant Fund', summaryIndicator: true, isActive: true, validFrom: new Date(2023, 6, 1), validTo: new Date(2024, 11, 31), availableForTransactionCoding: false, availableForBudgeting: true, external2: "Summary" },
-        { id: 'fund-code-201', code: '201', description: 'State Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "SRFD-001" },
-        { id: 'fund-code-202', code: '202', description: 'Federal Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "CPFE-001" },
-        { id: 'fund-code-203', code: '203', description: 'Local Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "DSFF-001" },
-        { id: 'fund-code-300', code: '300', description: 'Capital Projects (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true },
-        { id: 'fund-code-301', code: '301', description: 'Building Project Z (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
-      ];
-    }
-    if (data['object']) {
-       data['object'] = [
-        { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external4: "DeptXYZ", availableForTransactionCoding: true, availableForBudgeting: true },
-        { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, validFrom: new Date(2022, 5, 1), validTo: new Date(2023, 4, 30), summaryIndicator: false, availableForTransactionCoding: false, availableForBudgeting: false },
-      ];
-    }
-    return data;
+    return initialData;
   });
 
   const [isCodeFormOpen, setIsCodeFormOpen] = useState(false);
@@ -150,29 +123,21 @@ export default function SegmentCodesPage() {
     defaultValues: defaultCodeFormValues,
   });
   
-  const querySegmentIdParam = searchParams.get('segmentId');
 
   useEffect(() => {
     setSelectedSegmentId(currentSelectedId => {
-      // Priority 1: querySegmentIdParam from URL
       if (querySegmentIdParam && allAvailableSegments.some(s => s.id === querySegmentIdParam)) {
         if (currentSelectedId !== querySegmentIdParam) {
           return querySegmentIdParam;
         }
         return currentSelectedId;
       }
-  
-      // Priority 2: If currentSelectedId is valid, keep it.
       if (currentSelectedId && allAvailableSegments.some(s => s.id === currentSelectedId)) {
         return currentSelectedId;
       }
-  
-      // Priority 3: Default to first available segment if any exist
       if (allAvailableSegments.length > 0) {
         return allAvailableSegments[0].id;
       }
-  
-      // Priority 4: No segments available, or no valid selection
       return null;
     });
   }, [querySegmentIdParam, allAvailableSegments]);
@@ -213,7 +178,7 @@ export default function SegmentCodesPage() {
 
     if (dialogMode === 'add') {
       const newCode: SegmentCode = {
-        id: crypto.randomUUID(),
+        id: `${selectedSegmentId}-code-${crypto.randomUUID()}`, // Ensure unique ID
         ...values,
       };
       setSegmentCodesData(prev => ({

@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } // Imported Label
+import { Label } 
 from '@/components/ui/label';
 import {
   Select,
@@ -22,8 +22,8 @@ import {
   Form,
   FormControl,
   FormField,
-  FormItem, // Restored import
-  FormLabel, // Restored import
+  FormItem, 
+  FormLabel, 
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,64 +31,10 @@ import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { GripVertical, FolderTree, Trash2, AlertTriangle } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
-import type { Segment } from '@/lib/segment-types';
-
-// Mock Segment Code interface (simplified for this page)
-interface SegmentCode {
-  id: string;
-  code: string;
-  description: string;
-  summaryIndicator: boolean;
-}
-
-// Interface for a node in our hierarchy tree
-interface HierarchyNode {
-  id: string; // Unique ID for this node instance in the tree (can be segmentCode.id if codes are unique in tree)
-  segmentCode: SegmentCode;
-  children: HierarchyNode[];
-}
-
-// Updated mock data for segment codes, specific to this builder page
-const mockSegmentCodesForBuilder: Record<string, SegmentCode[]> = {
-  'fund': [
-    { id: 'fb-f-100', code: '100', description: 'General Fund', summaryIndicator: true },
-    { id: 'fb-f-101', code: '101', description: 'Governmental Operating Fund', summaryIndicator: false },
-    { id: 'fb-f-102', code: '102', description: 'Enterprise Parking Fund', summaryIndicator: false },
-    { id: 'fb-f-103', code: '103', description: 'Special Revenue Fund - Grants', summaryIndicator: false },
-    { id: 'fb-f-104', code: '104', description: 'Capital Projects Fund - Infrastructure', summaryIndicator: false },
-    { id: 'fb-f-105', code: '105', description: 'Debt Service Fund - Bonds', summaryIndicator: false },
-    { id: 'fb-f-106', code: '106', description: 'Internal Service Fund - IT', summaryIndicator: false },
-    { id: 'fb-f-107', code: '107', description: 'Trust Fund - Pension', summaryIndicator: false },
-    { id: 'fb-f-108', code: '108', description: 'Agency Fund - Payroll Deductions', summaryIndicator: false },
-    { id: 'fb-f-109', code: '109', description: 'Permanent Fund - Library Endowment', summaryIndicator: false },
-    { id: 'fb-f-200', code: '200', description: 'Grants & Donations Fund', summaryIndicator: true },
-    { id: 'fb-f-210', code: '210', description: 'Federal Grant A', summaryIndicator: false },
-    { id: 'fb-f-220', code: '220', description: 'State Grant B', summaryIndicator: false },
-    { id: 'fb-f-230', code: '230', description: 'Private Donation C', summaryIndicator: false },
-    { id: 'fb-f-300', code: '300', description: 'Capital Outlay Fund', summaryIndicator: true },
-    { id: 'fb-f-301', code: '301', description: 'Building Project Z (Detail)', summaryIndicator: false },
-    { id: 'fb-f-310', code: '310', description: 'Equipment Purchase X', summaryIndicator: false },
-    { id: 'fb-f-320', code: '320', description: 'Infrastructure Upgrade Y', summaryIndicator: false },
-  ],
-  'department': [
-    { id: 'fb-d-FIN', code: 'FIN', description: 'Finance Department (Summary)', summaryIndicator: true },
-    { id: 'fb-d-HR', code: 'HR', description: 'Human Resources (Summary)', summaryIndicator: true },
-    { id: 'fb-d-FIN-ACC', code: 'FIN-ACC', description: 'Accounting (Detail)', summaryIndicator: false },
-    { id: 'fb-d-FIN-BUD', code: 'FIN-BUD', description: 'Budgeting (Detail)', summaryIndicator: false },
-    { id: 'fb-d-IT', code: 'IT', description: 'IT Department (Detail)', summaryIndicator: false },
-    { id: 'fb-d-PD', code: 'PD', description: 'Police Department', summaryIndicator: false },
-    { id: 'fb-d-FD', code: 'FD', description: 'Fire Department', summaryIndicator: false },
-    { id: 'fb-d-PW', code: 'PW', description: 'Public Works', summaryIndicator: false },
-  ],
-  'object': [
-    { id: 'fb-o-5000', code: '5000', description: 'Salaries & Wages (Summary)', summaryIndicator: true },
-    { id: 'fb-o-5100', code: '5100', description: 'Full-time Salaries (Detail)', summaryIndicator: false },
-    { id: 'fb-o-5200', code: '5200', description: 'Part-time Salaries (Detail)', summaryIndicator: false },
-    { id: 'fb-o-6000', code: '6000', description: 'Operating Expenses (Summary)', summaryIndicator: true },
-    { id: 'fb-o-6100', code: '6100', description: 'Office Supplies (Detail)', summaryIndicator: false },
-    { id: 'fb-o-6200', code: '6200', description: 'Utilities (Detail)', summaryIndicator: false },
-  ]
-};
+import { useHierarchies } from '@/contexts/HierarchiesContext'; // Added import
+import type { Segment, SegmentCode } from '@/lib/segment-types'; // Updated import
+import { mockSegmentCodesData } from '@/lib/segment-types'; // Import shared mock data
+import type { HierarchyNode, Hierarchy } from '@/lib/hierarchy-types'; // Added import
 
 
 const hierarchyBuilderFormSchema = z.object({
@@ -101,10 +47,9 @@ const hierarchyBuilderFormSchema = z.object({
 
 type HierarchyBuilderFormValues = z.infer<typeof hierarchyBuilderFormSchema>;
 
-// Helper to check if a code already exists anywhere in the tree
 const codeExistsInTree = (nodes: HierarchyNode[], codeId: string): boolean => {
   for (const node of nodes) {
-    if (node.segmentCode.id === codeId) return true; // Check against segmentCode.id
+    if (node.segmentCode.id === codeId) return true;
     if (node.children && node.children.length > 0) {
       if (codeExistsInTree(node.children, codeId)) return true;
     }
@@ -112,7 +57,6 @@ const codeExistsInTree = (nodes: HierarchyNode[], codeId: string): boolean => {
   return false;
 };
 
-// Helper to check if a node (by ID) exists anywhere in the tree
 const nodeStillExistsInTree = (nodes: HierarchyNode[], nodeId: string | null): boolean => {
   if (!nodeId) return false;
   for (const node of nodes) {
@@ -124,7 +68,6 @@ const nodeStillExistsInTree = (nodes: HierarchyNode[], nodeId: string | null): b
   return false;
 };
 
-// Helper function to find a node by ID in the tree
 const findNodeById = (nodes: HierarchyNode[], nodeId: string): HierarchyNode | null => {
   for (const node of nodes) {
     if (node.id === nodeId) return node;
@@ -136,8 +79,6 @@ const findNodeById = (nodes: HierarchyNode[], nodeId: string): HierarchyNode | n
   return null;
 };
 
-
-// Helper function to recursively find a node by ID and add a child
 const addChildToNode = (nodes: HierarchyNode[], parentId: string, childNode: HierarchyNode): HierarchyNode[] => {
   return nodes.map(node => {
     if (node.id === parentId) {
@@ -145,7 +86,6 @@ const addChildToNode = (nodes: HierarchyNode[], parentId: string, childNode: Hie
         alert(`Cannot add child to detail code "${node.segmentCode.code}". Select a summary code.`);
         return node;
       }
-      // Check if the child segmentCode.id already exists under this parent
       if (node.children.find(c => c.segmentCode.id === childNode.segmentCode.id)) {
           alert(`Code ${childNode.segmentCode.code} already exists under this parent.`);
           return node;
@@ -159,7 +99,6 @@ const addChildToNode = (nodes: HierarchyNode[], parentId: string, childNode: Hie
   });
 };
 
-// Helper function to recursively remove a node by ID from the tree
 const removeNodeFromTreeRecursive = (nodes: HierarchyNode[], idToRemove: string): HierarchyNode[] => {
   return nodes
     .filter(node => node.id !== idToRemove)
@@ -171,8 +110,6 @@ const removeNodeFromTreeRecursive = (nodes: HierarchyNode[], idToRemove: string)
     });
 };
 
-
-// Recursive component to display tree nodes
 const TreeNodeDisplay: React.FC<{
   node: HierarchyNode;
   level: number;
@@ -244,6 +181,7 @@ export default function HierarchyBuildPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getSegmentById } = useSegments();
+  const { addHierarchy } = useHierarchies(); // Added
   
   const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]);
   const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
@@ -278,11 +216,10 @@ export default function HierarchyBuildPage() {
       const segment = getSegmentById(segmentId);
       if (segment) {
         setSelectedSegment(segment);
-        // Sort all codes numerically for robust range selection, then filter based on search
-        const codesForSegment = (mockSegmentCodesForBuilder[segment.id] || [])
+        const codesForSegment = (mockSegmentCodesData[segment.id] || [])
           .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
         
-        setAllSegmentCodes(codesForSegment); // Store all sorted codes for range functionality
+        setAllSegmentCodes(codesForSegment); 
 
         const filteredCodes = searchTerm
           ? codesForSegment.filter(
@@ -312,14 +249,29 @@ export default function HierarchyBuildPage() {
   }
 
   const onSubmit = (values: HierarchyBuilderFormValues) => {
-    console.log('Hierarchy Form Submitted:', values);
-    console.log('Current Tree Nodes:', JSON.stringify(treeNodes, null, 2));
-    alert(`Hierarchy "${values.hierarchyName}" save action placeholder. Tree structure logged to console. Full save logic not yet implemented.`);
-    if (segmentId) {
-        router.push(`/configure/hierarchies?segmentId=${segmentId}`);
-    } else {
-        router.push('/configure/hierarchies');
+    if (!segmentId) {
+        alert("Segment ID is missing. Cannot save hierarchy.");
+        return;
     }
+    if (treeNodes.length === 0) {
+        alert("Hierarchy structure is empty. Please add at least one root node.");
+        return;
+    }
+
+    const newHierarchy: Hierarchy = {
+        id: crypto.randomUUID(),
+        name: values.hierarchyName,
+        segmentId: segmentId,
+        status: values.status,
+        description: values.description,
+        treeNodes: treeNodes,
+        lastModifiedDate: new Date(),
+        lastModifiedBy: "Current User", // Placeholder
+    };
+
+    addHierarchy(newHierarchy);
+    alert(`Hierarchy "${values.hierarchyName}" saved successfully!`);
+    router.push(`/configure/hierarchies?segmentId=${segmentId}`);
   };
 
   const handleCancel = () => {
@@ -337,7 +289,7 @@ export default function HierarchyBuildPage() {
     setSelectedParentNodeId(null);
     setRangeStartCode('');
     setRangeEndCode('');
-    alert('Reset Hierarchy action placeholder. Form and tree structure cleared.');
+    alert('Hierarchy builder reset.');
   };
 
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>, code: SegmentCode) => {
@@ -478,9 +430,6 @@ export default function HierarchyBuildPage() {
          newTreeNodesState = tempTreeWithPotentiallyNewChild; 
          codesAddedCount++;
       } else {
-        // This code was not added by addChildToNode, likely because it already exists under this parent (checked by addChildToNode)
-        // or the parent was not a summary (also checked by addChildToNode).
-        // We only add to codesSkippedLocally if it wasn't already skipped globally.
         if (!codesSkippedGlobally.includes(code.code)) {
             codesSkippedLocally.push(code.code);
         }
@@ -612,11 +561,11 @@ export default function HierarchyBuildPage() {
                 disabled={!selectedSegment}
               />
             </div>
-            <div className="flex flex-col"> {/* Wrapper for summary/detail sections */}
+            <div className="flex flex-col"> 
               <div className="px-4 pt-4 pb-2">
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Summary Codes (Parents)</h4>
               </div>
-              <ScrollArea className="px-4 max-h-48">
+              <ScrollArea className="px-4 max-h-48 min-h-0">
                 {availableSummaryCodes.length > 0 ? (
                   availableSummaryCodes.map(code => (
                     <div
@@ -638,10 +587,10 @@ export default function HierarchyBuildPage() {
                   </p>
                 )}
               </ScrollArea>
-               <div className="px-4 pt-4 pb-2 border-t"> {/* Increased top padding for better separation */}
+               <div className="px-4 pt-4 pb-2 border-t"> 
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Detail Codes (Children)</h4>
               </div>
-              <ScrollArea className="px-4 pb-1 max-h-48">
+              <ScrollArea className="px-4 pb-1 max-h-48 min-h-0">
                  {availableDetailCodes.length > 0 ? (
                   availableDetailCodes.map(code => (
                      <div
@@ -677,7 +626,7 @@ export default function HierarchyBuildPage() {
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden p-6 bg-slate-50">
             {selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
-              <Card className="mb-4 p-4 shadow shrink-0"> {/* Added shrink-0 */}
+              <Card className="mb-4 p-4 shadow shrink-0"> 
                 <h3 className="text-lg font-semibold mb-2 text-primary">
                   Add Codes to Parent: {selectedParentNodeDetails.segmentCode.code} - {selectedParentNodeDetails.segmentCode.description}
                 </h3>
@@ -737,12 +686,12 @@ export default function HierarchyBuildPage() {
               )}
             </ScrollArea>
              {selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
-                <div className="mt-4 p-3 border border-dashed border-green-500 rounded-md bg-green-50/70 text-center text-sm text-green-700 shrink-0"> {/* Added shrink-0 */}
+                <div className="mt-4 p-3 border border-dashed border-green-500 rounded-md bg-green-50/70 text-center text-sm text-green-700 shrink-0"> 
                     New children will be added to parent: '{selectedParentNodeDetails.segmentCode.code} - {selectedParentNodeDetails.segmentCode.description}'. Drag and drop or use 'Add Range'.
                 </div>
             )}
              {!selectedParentNodeId && treeNodes.length > 0 && (
-                <div className="mt-4 p-3 border border-dashed border-blue-500 rounded-md bg-blue-50/70 text-center text-sm text-blue-700 shrink-0"> {/* Added shrink-0 */}
+                <div className="mt-4 p-3 border border-dashed border-blue-500 rounded-md bg-blue-50/70 text-center text-sm text-blue-700 shrink-0"> 
                     No parent selected. Drag a new SUMMARY code to create another root, or click an existing SUMMARY node to select it as parent.
                 </div>
             )}

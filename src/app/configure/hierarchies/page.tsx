@@ -24,74 +24,38 @@ import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useSegments } from '@/contexts/SegmentsContext';
+import { useHierarchies } from '@/contexts/HierarchiesContext'; // Added import
 import type { Segment } from '@/lib/segment-types';
-
-// Basic Hierarchy interface for now
-interface Hierarchy {
-  id: string;
-  name: string;
-  segmentId: string;
-  status: 'Active' | 'Inactive' | 'Deprecated';
-  lastModifiedDate?: Date;
-  lastModifiedBy?: string;
-}
-
-// Mock data for hierarchies
-const initialHierarchiesData: Record<string, Hierarchy[]> = {
-  'fund': [
-    { id: 'fund-h1', name: 'Standard Fund Hierarchy', segmentId: 'fund', status: 'Active', lastModifiedDate: new Date(2023, 10, 15), lastModifiedBy: 'Admin User' },
-    { id: 'fund-h2', name: 'Budgeting Fund Rollup', segmentId: 'fund', status: 'Inactive', lastModifiedDate: new Date(2023, 8, 1), lastModifiedBy: 'Finance Team' },
-  ],
-  'department': [
-    { id: 'dept-h1', name: 'Organizational Chart View', segmentId: 'department', status: 'Active', lastModifiedDate: new Date(2024, 0, 5), lastModifiedBy: 'System Admin' },
-  ],
-  'object': [
-    { id: 'object-h1', name: 'Expense Object Rollup', segmentId: 'object', status: 'Active', lastModifiedDate: new Date(2024, 1, 10), lastModifiedBy: 'Finance Team' },
-  ],
-  'project': [
-    { id: 'project-h1', name: 'Capital Projects Hierarchy', segmentId: 'project', status: 'Deprecated', lastModifiedDate: new Date(2023, 5, 20), lastModifiedBy: 'Admin User' },
-  ]
-};
+import type { Hierarchy } from '@/lib/hierarchy-types'; // Added import
 
 
 export default function HierarchiesPage() {
   const { segments: allAvailableSegments } = useSegments();
+  const { hierarchies: allHierarchies } = useHierarchies(); // Use context
   const searchParams = useSearchParams();
   const router = useRouter();
   
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
-  const [hierarchiesData, setHierarchiesData] = useState<Record<string, Hierarchy[]>>({});
-
   const querySegmentIdParam = searchParams.get('segmentId');
 
   useEffect(() => {
-    // Initialize hierarchiesData (depends on allAvailableSegments)
-    setHierarchiesData(prevData => {
-      const newData = { ...prevData };
-      allAvailableSegments.forEach(segment => {
-        if (!Object.prototype.hasOwnProperty.call(newData, segment.id)) {
-          newData[segment.id] = initialHierarchiesData[segment.id] || [];
-        }
-      });
-      return newData;
-    });
-
-    // Determine and set selectedSegmentId (depends on querySegmentIdParam, allAvailableSegments)
     let targetSegmentId: string | null = null;
     if (querySegmentIdParam && allAvailableSegments.some(s => s.id === querySegmentIdParam)) {
       targetSegmentId = querySegmentIdParam;
     } else if (allAvailableSegments.length > 0) {
       targetSegmentId = allAvailableSegments[0].id;
     }
-
-    setSelectedSegmentId(currentSelectedId => {
-      if (currentSelectedId !== targetSegmentId) {
-        return targetSegmentId;
+    // Only update if the target is different from current to prevent unnecessary re-renders/navigation
+    if (selectedSegmentId !== targetSegmentId) {
+      setSelectedSegmentId(targetSegmentId);
+      // If targetSegmentId is determined and different, or if query param isn't current, update URL
+      if (targetSegmentId && querySegmentIdParam !== targetSegmentId) {
+         router.replace(`/configure/hierarchies?segmentId=${targetSegmentId}`, { scroll: false });
+      } else if (!targetSegmentId && querySegmentIdParam) { // No valid segment, but URL has one (e.g. invalid)
+         router.replace('/configure/hierarchies', { scroll: false });
       }
-      return currentSelectedId;
-    });
-
-  }, [querySegmentIdParam, allAvailableSegments]);
+    }
+  }, [querySegmentIdParam, allAvailableSegments, router, selectedSegmentId]);
 
 
   const selectedSegment = useMemo(() => {
@@ -99,11 +63,11 @@ export default function HierarchiesPage() {
   }, [allAvailableSegments, selectedSegmentId]);
 
   const currentSegmentHierarchies = useMemo(() => {
-    if (!selectedSegmentId || !hierarchiesData[selectedSegmentId]) {
+    if (!selectedSegmentId) {
       return [];
     }
-    return hierarchiesData[selectedSegmentId];
-  }, [selectedSegmentId, hierarchiesData]);
+    return allHierarchies.filter(h => h.segmentId === selectedSegmentId);
+  }, [selectedSegmentId, allHierarchies]);
 
   const handleCreateHierarchy = () => {
     if (selectedSegmentId) {
@@ -115,12 +79,13 @@ export default function HierarchiesPage() {
 
   const handleViewHierarchy = (hierarchy: Hierarchy) => {
     console.log('View Hierarchy:', hierarchy.name);
-    alert('Hierarchy view UI not yet implemented.');
+    alert(`Hierarchy view for "${hierarchy.name}" not yet implemented. Tree structure: ${JSON.stringify(hierarchy.treeNodes, null, 2)}`);
   };
 
   const handleEditHierarchy = (hierarchy: Hierarchy) => {
     console.log('Edit Hierarchy:', hierarchy.name);
     alert('Hierarchy edit UI not yet implemented.');
+    // Future: router.push(`/configure/hierarchies/build?segmentId=${hierarchy.segmentId}&hierarchyId=${hierarchy.id}`);
   };
 
   const handleCopyHierarchy = (hierarchy: Hierarchy) => {
@@ -131,10 +96,12 @@ export default function HierarchiesPage() {
   const handleDeleteHierarchy = (hierarchyId: string) => {
     console.log('Delete Hierarchy ID:', hierarchyId);
     alert('Hierarchy deletion logic not yet implemented.');
+    // Future: call a deleteHierarchy function from context
   };
 
-  const handleSegmentSelect = (segmentId: string) => {
-    router.push(`/configure/hierarchies?segmentId=${segmentId}`);
+  const handleSegmentSelect = (segmentIdToSelect: string) => {
+    //setSelectedSegmentId(segmentIdToSelect); // State will update via useEffect reacting to URL change
+    router.push(`/configure/hierarchies?segmentId=${segmentIdToSelect}`);
   };
 
   const breadcrumbItems = [
