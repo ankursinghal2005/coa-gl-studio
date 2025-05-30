@@ -62,13 +62,13 @@ export default function HierarchiesPage() {
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [hierarchiesData, setHierarchiesData] = useState<Record<string, Hierarchy[]>>({});
 
+  const querySegmentIdParam = searchParams.get('segmentId');
+
   useEffect(() => {
-    // Initialize hierarchies data structure for all available segments
+    // Initialize hierarchiesData (depends on allAvailableSegments)
     setHierarchiesData(prevData => {
       const newData = { ...prevData };
       allAvailableSegments.forEach(segment => {
-        // Only add initial mock data if the segment key exists in initialHierarchiesData
-        // and hasn't been populated yet. Otherwise, initialize with an empty array.
         if (!Object.prototype.hasOwnProperty.call(newData, segment.id)) {
           newData[segment.id] = initialHierarchiesData[segment.id] || [];
         }
@@ -76,31 +76,22 @@ export default function HierarchiesPage() {
       return newData;
     });
 
-    const querySegmentId = searchParams.get('segmentId');
-    
+    // Determine and set selectedSegmentId (depends on querySegmentIdParam, allAvailableSegments)
     let targetSegmentId: string | null = null;
-
-    if (querySegmentId && allAvailableSegments.some(s => s.id === querySegmentId)) {
-      targetSegmentId = querySegmentId;
+    if (querySegmentIdParam && allAvailableSegments.some(s => s.id === querySegmentIdParam)) {
+      targetSegmentId = querySegmentIdParam;
     } else if (allAvailableSegments.length > 0) {
-      // Default to the first segment if query param is invalid or missing
       targetSegmentId = allAvailableSegments[0].id;
-      // Optionally, update URL if it's not reflecting the default.
-      // Avoid doing this if querySegmentId was null and we are just defaulting,
-      // to prevent unnecessary URL changes on initial load without params.
-      if (querySegmentId && querySegmentId !== targetSegmentId) {
-         // router.replace(`/configure/hierarchies?segmentId=${targetSegmentId}`, { scroll: false });
-      } else if (!querySegmentId) {
-        // If loaded without params, and we default, consider updating URL.
-        // For now, let user click drive URL or initial link.
+    }
+
+    setSelectedSegmentId(currentSelectedId => {
+      if (currentSelectedId !== targetSegmentId) {
+        return targetSegmentId;
       }
-    }
+      return currentSelectedId;
+    });
 
-    if (selectedSegmentId !== targetSegmentId) {
-      setSelectedSegmentId(targetSegmentId);
-    }
-
-  }, [searchParams, allAvailableSegments, selectedSegmentId, router]);
+  }, [querySegmentIdParam, allAvailableSegments]);
 
 
   const selectedSegment = useMemo(() => {
@@ -280,5 +271,3 @@ export default function HierarchiesPage() {
     </div>
   );
 }
-
-    

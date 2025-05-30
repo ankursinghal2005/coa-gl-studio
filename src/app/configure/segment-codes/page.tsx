@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from "date-fns";
-import { useSearchParams } from 'next/navigation'; // Added import
+import { useSearchParams } from 'next/navigation'; 
 import {
   Table,
   TableHeader,
@@ -125,9 +125,11 @@ export default function SegmentCodesPage() {
         { id: 'fund-code-102', code: '102', description: 'Capital Projects Fund B', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "CPFB-001" },
         { id: 'fund-code-103', code: '103', description: 'Debt Service Fund C', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "DSFC-001" },
         { id: 'fund-code-200', code: '200', description: 'Grant Fund', summaryIndicator: true, isActive: true, validFrom: new Date(2023, 6, 1), validTo: new Date(2024, 11, 31), availableForTransactionCoding: false, availableForBudgeting: true, external2: "Summary" },
-        { id: 'fund-code-201', code: '201', description: 'Special Revenue Fund D', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "SRFD-001" },
-        { id: 'fund-code-202', code: '202', description: 'Capital Projects Fund E', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "CPFE-001" },
-        { id: 'fund-code-203', code: '203', description: 'Debt Service Fund F', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "DSFF-001" },
+        { id: 'fund-code-201', code: '201', description: 'State Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "SRFD-001" },
+        { id: 'fund-code-202', code: '202', description: 'Federal Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "CPFE-001" },
+        { id: 'fund-code-203', code: '203', description: 'Local Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "DSFF-001" },
+        { id: 'fund-code-300', code: '300', description: 'Capital Projects (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true },
+        { id: 'fund-code-301', code: '301', description: 'Building Project Z (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
       ];
     }
     if (data['object']) {
@@ -147,19 +149,33 @@ export default function SegmentCodesPage() {
     resolver: zodResolver(segmentCodeFormSchema),
     defaultValues: defaultCodeFormValues,
   });
+  
+  const querySegmentIdParam = searchParams.get('segmentId');
 
   useEffect(() => {
-    const querySegmentId = searchParams.get('segmentId');
-    if (querySegmentId && allAvailableSegments.some(s => s.id === querySegmentId)) {
-      if (selectedSegmentId !== querySegmentId) {
-        setSelectedSegmentId(querySegmentId);
+    setSelectedSegmentId(currentSelectedId => {
+      // Priority 1: querySegmentIdParam from URL
+      if (querySegmentIdParam && allAvailableSegments.some(s => s.id === querySegmentIdParam)) {
+        if (currentSelectedId !== querySegmentIdParam) {
+          return querySegmentIdParam;
+        }
+        return currentSelectedId;
       }
-    } else if (!selectedSegmentId && allAvailableSegments.length > 0) {
-      setSelectedSegmentId(allAvailableSegments[0].id);
-    } else if (selectedSegmentId && !allAvailableSegments.some(s => s.id === selectedSegmentId)) {
-      setSelectedSegmentId(allAvailableSegments.length > 0 ? allAvailableSegments[0].id : null);
-    }
-  }, [searchParams, allAvailableSegments, selectedSegmentId, setSelectedSegmentId]);
+  
+      // Priority 2: If currentSelectedId is valid, keep it.
+      if (currentSelectedId && allAvailableSegments.some(s => s.id === currentSelectedId)) {
+        return currentSelectedId;
+      }
+  
+      // Priority 3: Default to first available segment if any exist
+      if (allAvailableSegments.length > 0) {
+        return allAvailableSegments[0].id;
+      }
+  
+      // Priority 4: No segments available, or no valid selection
+      return null;
+    });
+  }, [querySegmentIdParam, allAvailableSegments]);
 
   useEffect(() => {
     if (isCodeFormOpen) {
@@ -614,4 +630,3 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
-
