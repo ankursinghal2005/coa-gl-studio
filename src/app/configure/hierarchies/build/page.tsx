@@ -283,7 +283,7 @@ export default function HierarchyBuildPage() {
               <div className="p-4">
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Summary Codes (Parents)</h4>
               </div>
-              <ScrollArea className="flex-1 px-4 pb-4">
+              <ScrollArea className="flex-1 min-h-0 px-4 pb-2"> {/* Changed pb-4 to pb-2 */}
                 {availableSummaryCodes.length > 0 ? (
                   availableSummaryCodes.map(code => (
                     <div
@@ -305,10 +305,10 @@ export default function HierarchyBuildPage() {
                   </p>
                 )}
               </ScrollArea>
-               <div className="p-4 border-t">
+               <div className="px-4 pt-2 border-t"> {/* Changed p-4 to px-4 pt-2 */}
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Detail Codes (Children)</h4>
               </div>
-              <ScrollArea className="flex-1 px-4 pb-4">
+              <ScrollArea className="flex-1 min-h-0 px-4 pb-4">
                  {availableDetailCodes.length > 0 ? (
                   availableDetailCodes.map(code => (
                     <div
@@ -341,7 +341,7 @@ export default function HierarchyBuildPage() {
           </CardHeader>
           <CardContent className="flex-1 flex items-center justify-center p-6">
             <div className="text-center text-muted-foreground">
-              <p className="text-lg mb-2">Drag codes from the left panel here to build your hierarchy.</p>
+              <p className="text-lg mb-2">Drag summary and detail codes here from the left panel to build your hierarchy.</p>
               <p className="text-sm">(Full interactive tree builder and assignment tools will be implemented in a future step.)</p>
               <div className="mt-4 p-4 border border-dashed rounded-md text-left bg-muted/50">
                 <p className="font-mono text-xs">Example Structure (Static):</p>
@@ -373,3 +373,4 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
+
