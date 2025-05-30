@@ -188,7 +188,7 @@ const TreeNodeDisplay: React.FC<{
       className={`relative p-3 border rounded-md mb-2 shadow-sm ${isSelectedParent ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-card hover:bg-accent/50'}`}
       onClick={(e) => {
         if (canBeParent) {
-          e.stopPropagation(); // Prevent event bubbling if needed
+          e.stopPropagation(); 
           onSelectParent(node.id);
         }
       }}
@@ -198,7 +198,7 @@ const TreeNodeDisplay: React.FC<{
         size="icon"
         className="absolute top-1 right-1 h-6 w-6 text-destructive hover:text-destructive/80"
         onClick={(e) => {
-          e.stopPropagation(); // Prevent event bubbling to the parent div's onClick
+          e.stopPropagation(); 
           onRemoveNode(node.id);
         }}
         aria-label="Remove node"
@@ -243,10 +243,10 @@ export default function HierarchyBuildPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getSegmentById } = useSegments();
-
+  
   const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]);
   const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
-
+  
   const selectedParentNodeDetails = useMemo(() => {
     if (!selectedParentNodeId) return null;
     return findNodeById(treeNodes, selectedParentNodeId);
@@ -291,8 +291,8 @@ export default function HierarchyBuildPage() {
             )
           : codesForSegment;
 
-        setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator)); // No need to re-sort here
-        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator)); // No need to re-sort here
+        setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator)); 
+        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator)); 
       } else {
         router.push('/configure/hierarchies');
       }
@@ -363,7 +363,7 @@ export default function HierarchyBuildPage() {
       }
 
       const newNode: HierarchyNode = {
-        id: crypto.randomUUID(), // Ensure unique node ID for tree operations
+        id: crypto.randomUUID(), 
         segmentCode: droppedSegmentCode,
         children: [],
       };
@@ -389,7 +389,7 @@ export default function HierarchyBuildPage() {
             return;
           }
           setTreeNodes(prevNodes => [...prevNodes, newNode]);
-          setSelectedParentNodeId(newNode.id); // Select new root as parent
+          setSelectedParentNodeId(newNode.id); 
         }
       }
     } catch (e) {
@@ -403,7 +403,7 @@ export default function HierarchyBuildPage() {
     if (node && node.segmentCode.summaryIndicator) {
       setSelectedParentNodeId(nodeId);
     } else if (node && !node.segmentCode.summaryIndicator) {
-        setSelectedParentNodeId(null); // Clear parent if a detail node somehow gets clicked (though it shouldn't be selectable)
+        setSelectedParentNodeId(null); 
         alert("Detail codes cannot be selected as parents.");
     } else {
       setSelectedParentNodeId(null); 
@@ -447,7 +447,7 @@ export default function HierarchyBuildPage() {
     }
 
     const codesToAddInRange = allSegmentCodes.slice(startIndex, endIndex + 1);
-    let newTreeNodesState = [...treeNodes]; // Work with a mutable copy for this iteration
+    let newTreeNodesState = [...treeNodes]; 
     let codesAddedCount = 0;
     const codesSkippedGlobally: string[] = [];
     const codesSkippedLocally: string[] = [];
@@ -456,17 +456,15 @@ export default function HierarchyBuildPage() {
     codesToAddInRange.forEach(code => {
       if (codeExistsInTree(newTreeNodesState, code.id)) { 
         codesSkippedGlobally.push(code.code);
-        return; // Skip if code already exists anywhere in the tree
+        return; 
       }
       
       const newNode: HierarchyNode = {
-        id: crypto.randomUUID(), // Unique ID for the new node instance
+        id: crypto.randomUUID(), 
         segmentCode: code,
         children: [],
       };
       
-      // Temporarily simulate adding to a copy to check if addChildToNode would succeed
-      // by checking if the children count changes for the selected parent.
       const parentNodeBeforeAdd = findNodeById(newTreeNodesState, selectedParentNodeId);
       const childrenCountBefore = parentNodeBeforeAdd?.children.length ?? 0;
 
@@ -476,19 +474,16 @@ export default function HierarchyBuildPage() {
       const childrenCountAfter = parentNodeAfterAdd?.children.length ?? 0;
 
       if (childrenCountAfter > childrenCountBefore) {
-         newTreeNodesState = tempTreeWithPotentiallyNewChild; // Commit the change
+         newTreeNodesState = tempTreeWithPotentiallyNewChild; 
          codesAddedCount++;
       } else {
-        // addChildToNode might have alerted and not added (e.g. duplicate under parent)
-        // We need to know if it was skipped due to local duplicate vs global.
-        // If it wasn't skipped globally, but didn't add, it was likely a local duplicate.
         if (!codesSkippedGlobally.includes(code.code)) {
             codesSkippedLocally.push(code.code);
         }
       }
     });
 
-    setTreeNodes(newTreeNodesState); // Set the final state once after processing all codes
+    setTreeNodes(newTreeNodesState); 
     setRangeStartCode('');
     setRangeEndCode('');
     let message = `${codesAddedCount} codes added to parent "${parentNode.segmentCode.code}".`;
@@ -610,6 +605,7 @@ export default function HierarchyBuildPage() {
                 placeholder="Search codes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={!selectedSegment}
               />
             </div>
             <div className="flex-1 flex flex-col overflow-hidden">
@@ -623,12 +619,12 @@ export default function HierarchyBuildPage() {
                       key={code.id}
                       draggable="true"
                       onDragStart={(e) => handleDragStart(e, code)}
-                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
+                      className="flex items-center p-1.5 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
                     >
-                      <GripVertical className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-grow">
-                        <div className="font-medium">{code.code}</div>
-                        <div className="text-xs text-muted-foreground">{code.description}</div>
+                      <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-grow text-xs overflow-hidden">
+                        <span className="font-semibold text-primary">{code.code}</span>
+                        <span className="text-muted-foreground ml-1 truncate"> - {code.description}</span>
                       </div>
                     </div>
                   ))
@@ -648,12 +644,12 @@ export default function HierarchyBuildPage() {
                       key={code.id}
                       draggable="true"
                       onDragStart={(e) => handleDragStart(e, code)}
-                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
+                      className="flex items-center p-1.5 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
                     >
-                      <GripVertical className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-grow">
-                        <div className="font-medium">{code.code}</div>
-                        <div className="text-xs text-muted-foreground">{code.description}</div>
+                      <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
+                       <div className="flex-grow text-xs overflow-hidden">
+                        <span className="font-semibold text-primary">{code.code}</span>
+                        <span className="text-muted-foreground ml-1 truncate"> - {code.description}</span>
                       </div>
                     </div>
                   ))
