@@ -27,7 +27,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { GripVertical, FolderTree, AlertTriangle } from 'lucide-react';
+import { GripVertical, FolderTree, Trash2 } from 'lucide-react'; // Added Trash2
 import { useSegments } from '@/contexts/SegmentsContext';
 import type { Segment } from '@/lib/segment-types';
 
@@ -110,6 +110,18 @@ const codeExistsInTree = (nodes: HierarchyNode[], codeId: string): boolean => {
   return false;
 };
 
+// Helper to check if a node (by ID) exists anywhere in the tree
+const nodeStillExistsInTree = (nodes: HierarchyNode[], nodeId: string | null): boolean => {
+  if (!nodeId) return false;
+  for (const node of nodes) {
+    if (node.id === nodeId) return true;
+    if (node.children && node.children.length > 0) {
+      if (nodeStillExistsInTree(node.children, nodeId)) return true;
+    }
+  }
+  return false;
+};
+
 // Helper function to recursively find a node by ID and add a child
 const addChildToNode = (nodes: HierarchyNode[], parentId: string, childNode: HierarchyNode): HierarchyNode[] => {
   return nodes.map(node => {
@@ -122,11 +134,6 @@ const addChildToNode = (nodes: HierarchyNode[], parentId: string, childNode: Hie
           alert(`Code ${childNode.segmentCode.code} already exists under this parent.`);
           return node;
       }
-      // This validation might be redundant given the first check ensures parent is summary
-      // if (childNode.segmentCode.summaryIndicator && !node.segmentCode.summaryIndicator) { 
-      //   alert(`Summary code ${childNode.segmentCode.code} cannot be child of detail code ${node.segmentCode.code}.`);
-      //   return node;
-      // }
       return { ...node, children: [...node.children, childNode] };
     }
     if (node.children && node.children.length > 0) {
@@ -136,6 +143,18 @@ const addChildToNode = (nodes: HierarchyNode[], parentId: string, childNode: Hie
   });
 };
 
+// Helper function to recursively remove a node by ID from the tree
+const removeNodeFromTreeRecursive = (nodes: HierarchyNode[], idToRemove: string): HierarchyNode[] => {
+  return nodes
+    .filter(node => node.id !== idToRemove)
+    .map(node => {
+      if (node.children && node.children.length > 0) {
+        return { ...node, children: removeNodeFromTreeRecursive(node.children, idToRemove) };
+      }
+      return node;
+    });
+};
+
 
 // Recursive component to display tree nodes
 const TreeNodeDisplay: React.FC<{ 
@@ -143,23 +162,34 @@ const TreeNodeDisplay: React.FC<{
   level: number; 
   selectedParentNodeId: string | null;
   onSelectParent: (nodeId: string) => void;
-}> = ({ node, level, selectedParentNodeId, onSelectParent }) => {
+  onRemoveNode: (nodeId: string) => void; // New prop
+}> = ({ node, level, selectedParentNodeId, onSelectParent, onRemoveNode }) => {
   const isSelectedParent = node.id === selectedParentNodeId;
   const canBeParent = node.segmentCode.summaryIndicator;
 
   return (
     <div 
       style={{ marginLeft: `${level * 20}px` }}
-      className={`p-3 border rounded-md mb-2 shadow-sm ${isSelectedParent ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-card hover:bg-accent/50'}`}
+      className={`relative p-3 border rounded-md mb-2 shadow-sm ${isSelectedParent ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-card hover:bg-accent/50'}`}
       onClick={(e) => {
-        // Stop propagation to prevent parent divs from also handling the click
-        // if this node itself is a valid parent target
         if (canBeParent) {
           e.stopPropagation(); 
           onSelectParent(node.id);
         }
       }}
     >
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="absolute top-1 right-1 h-6 w-6 text-destructive hover:text-destructive/80"
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent node selection when clicking remove
+          onRemoveNode(node.id);
+        }}
+        aria-label="Remove node"
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
       <div className="font-medium text-primary flex items-center">
         {node.segmentCode.code} - {node.segmentCode.description}
       </div>
@@ -184,6 +214,7 @@ const TreeNodeDisplay: React.FC<{
               level={level + 1} 
               selectedParentNodeId={selectedParentNodeId}
               onSelectParent={onSelectParent}
+              onRemoveNode={onRemoveNode} // Pass down
             />
           ))}
         </div>
@@ -328,6 +359,16 @@ export default function HierarchyBuildPage() {
     setSelectedParentNodeId(nodeId);
   };
 
+  const handleRemoveNode = (nodeIdToRemove: string) => {
+    const newTree = removeNodeFromTreeRecursive(treeNodes, nodeIdToRemove);
+    setTreeNodes(newTree);
+
+    // If the selected parent was removed, reset selection
+    if (selectedParentNodeId && !nodeStillExistsInTree(newTree, selectedParentNodeId)) {
+      setSelectedParentNodeId(null);
+    }
+  };
+
 
   if (!selectedSegment) {
     return (
@@ -350,7 +391,10 @@ export default function HierarchyBuildPage() {
     if (!selectedParentNodeId) {
       return "Select a summary node from the tree to add children, or drag another SUMMARY code here to create a new root.";
     }
-    return "Drag codes here to add as children to the selected parent node. You can also drag a new SUMMARY code to start another root.";
+    const selectedNode = treeNodes.find(n => n.id === selectedParentNodeId) || 
+                         treeNodes.flatMap(r => r.children).find(n => n.id === selectedParentNodeId); // Basic find for this example
+    const selectedNodeName = selectedNode ? `${selectedNode.segmentCode.code} - ${selectedNode.segmentCode.description}` : 'the selected parent';
+    return `Drag codes here to add as children to "${selectedNodeName}". You can also drag a new SUMMARY code to start another root.`;
   };
 
   return (
@@ -524,11 +568,27 @@ export default function HierarchyBuildPage() {
                     level={0} 
                     selectedParentNodeId={selectedParentNodeId}
                     onSelectParent={handleSelectParent}
+                    onRemoveNode={handleRemoveNode} // Pass down
                   />
                 ))}
                  {selectedParentNodeId && treeNodes.length > 0 && (
                     <div className="mt-4 p-3 border border-dashed border-green-500 rounded-md bg-green-50 text-center text-sm text-green-700">
-                        New children will be added to the selected parent node ({selectedParentNodeId}). Drag and drop here or on the parent.
+                        New children will be added to parent: '{
+                           (() => {
+                                const findNode = (nodes: HierarchyNode[], id: string): HierarchyNode | null => {
+                                    for (const n of nodes) {
+                                        if (n.id === id) return n;
+                                        if (n.children) {
+                                            const found = findNode(n.children, id);
+                                            if (found) return found;
+                                        }
+                                    }
+                                    return null;
+                                };
+                                const selectedNode = findNode(treeNodes, selectedParentNodeId);
+                                return selectedNode ? `${selectedNode.segmentCode.code} - ${selectedNode.segmentCode.description}` : 'Selected Parent';
+                           })()
+                        }'. Drag and drop here or on the parent.
                     </div>
                 )}
               </div>
@@ -551,4 +611,6 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
+    
+
     
