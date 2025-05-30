@@ -237,32 +237,34 @@ export default function HierarchyBuildPage() {
             <CardDescription>Drag codes to the tree or use assignment tools.</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden p-0">
-            <ScrollArea className="h-full p-6">
-              {availableCodesForSegment.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-center">Summary</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {availableCodesForSegment.map((code) => (
-                      <TableRow key={code.id}>
-                        <TableCell className="font-medium">{code.code}</TableCell>
-                        <TableCell>{code.description}</TableCell>
-                        <TableCell className="text-center">{code.summaryIndicator ? 'Yes' : 'No'}</TableCell>
+            <ScrollArea className="h-full">
+              <div className="p-6">
+                {availableCodesForSegment.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-center">Summary</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                 <p className="text-muted-foreground text-sm">
-                  No codes found for this segment, or data is not yet loaded.
-                  (Filter/search to be implemented)
-                </p>
-              )}
+                    </TableHeader>
+                    <TableBody>
+                      {availableCodesForSegment.map((code) => (
+                        <TableRow key={code.id}>
+                          <TableCell className="font-medium">{code.code}</TableCell>
+                          <TableCell>{code.description}</TableCell>
+                          <TableCell className="text-center">{code.summaryIndicator ? 'Yes' : 'No'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No codes found for this segment, or data is not yet loaded.
+                    (Filter/search to be implemented)
+                  </p>
+                )}
+              </div>
             </ScrollArea>
           </CardContent>
         </Card>
@@ -287,7 +289,7 @@ export default function HierarchyBuildPage() {
             <CardTitle>Live Tree Preview</CardTitle>
             <CardDescription>View the hierarchy structure as you build it.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 overflow-hidden">
+          <CardContent className="flex-1 overflow-hidden p-0">
             <ScrollArea className="h-full">
                 <div className="p-4 text-sm text-muted-foreground">
                     <p className="mb-4">
