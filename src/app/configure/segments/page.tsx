@@ -51,10 +51,10 @@ import type { Segment, DataType } from '@/lib/segment-types';
 
 const segmentFormSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
-  segmentType: z.string().optional(), // This will be derived from displayName for custom, or fixed
+  segmentType: z.string().optional(), 
   dataType: z.enum(['Alphanumeric', 'Numeric', 'Text'], { required_error: "Data Type is required." }),
   maxLength: z.coerce.number({ required_error: "Max Length is required.", invalid_type_error: "Max Length must be a number." }).int().positive({ message: "Max Length must be a positive number." }),
-  specialCharsAllowed: z.string({required_error: "Special Characters Allowed is required."}).refine(value => value !== null, { message: "Special Characters Allowed cannot be null." }), // Empty string means none
+  specialCharsAllowed: z.string({required_error: "Special Characters Allowed is required."}).refine(value => value !== null, { message: "Special Characters Allowed cannot be null." }),
   defaultCode: z.string().optional(),
   separator: z.enum(['-', '|', ',', '.'], { required_error: "Separator is required." }),
   isMandatoryForCoding: z.boolean().default(false),
@@ -85,7 +85,7 @@ const defaultFormValues: Omit<SegmentFormValues, 'id' | 'segmentType' | 'isCore'
   separator: '-',
   isMandatoryForCoding: false,
   isActive: true,
-  validFrom: new Date(), // Set a default Date object
+  validFrom: new Date(),
   validTo: undefined,
   isCustom: true,
 };
@@ -100,7 +100,7 @@ export default function SegmentsPage() {
     resolver: zodResolver(segmentFormSchema),
     defaultValues: {
       ...defaultFormValues,
-      isCore: false, // default explicitly for the form
+      isCore: false, 
     },
   });
 
@@ -109,9 +109,9 @@ export default function SegmentsPage() {
       if (dialogMode === 'add') {
         form.reset({
           ...defaultFormValues,
-          isCore: false, // ensure isCore is set for add mode
-          id: undefined, // no id for new segment
-          segmentType: '', // segmentType will be set from displayName
+          isCore: false, 
+          id: undefined, 
+          segmentType: '', 
         });
         setCurrentSegmentData(null);
       } else if ((dialogMode === 'view' || dialogMode === 'edit') && currentSegmentData) {
@@ -140,8 +140,8 @@ export default function SegmentsPage() {
 
   const handleAddSegmentClick = () => {
     setDialogMode('add');
-    setCurrentSegmentData(null); // Clear any existing segment data
-    form.reset({ // Reset form with defaults for 'add' mode
+    setCurrentSegmentData(null); 
+    form.reset({ 
         ...defaultFormValues,
         isCore: false, 
         id: undefined,
@@ -157,7 +157,7 @@ export default function SegmentsPage() {
   };
 
   const handleEditSegmentClick = () => {
-    if (currentSegmentData && currentSegmentData.isCustom && !currentSegmentData.isCore) {
+    if (currentSegmentData) {
       setDialogMode('edit');
     }
   };
@@ -166,10 +166,10 @@ export default function SegmentsPage() {
     if (dialogMode === 'add') {
       const newSegment: Segment = {
         id: crypto.randomUUID(),
-        isCore: false, // Custom segments are not core
+        isCore: false, 
         isCustom: true,
         displayName: values.displayName,
-        segmentType: values.displayName, // Set segmentType to displayName for custom segments
+        segmentType: values.displayName, 
         dataType: values.dataType,
         maxLength: values.maxLength,
         specialCharsAllowed: values.specialCharsAllowed,
@@ -183,9 +183,8 @@ export default function SegmentsPage() {
       addSegment(newSegment);
     } else if (dialogMode === 'edit' && currentSegmentData) {
       const updatedSegment: Segment = {
-        ...currentSegmentData, // Preserve id, isCore, isCustom, segmentType
-        displayName: values.displayName, // DisplayName can be edited
-        // segmentType remains unchanged for existing segments
+        ...currentSegmentData, 
+        displayName: values.displayName, 
         dataType: values.dataType,
         maxLength: values.maxLength,
         specialCharsAllowed: values.specialCharsAllowed,
@@ -197,8 +196,8 @@ export default function SegmentsPage() {
         validTo: values.validTo,
       };
       updateSegment(updatedSegment);
-      setCurrentSegmentData(updatedSegment); // Update currentSegmentData to reflect changes
-      setDialogMode('view'); // Switch back to view mode after saving
+      setCurrentSegmentData(updatedSegment); 
+      setDialogMode('view'); 
       return; 
     }
     
@@ -210,22 +209,28 @@ export default function SegmentsPage() {
     { label: 'Segments' }
   ];
   
-  const isFieldDisabled = (isCoreSegment: boolean | undefined, isCustomSegment: boolean | undefined, fieldName?: keyof SegmentFormValues) => {
+  const isFieldDisabled = (isCoreSegment: boolean | undefined, fieldName?: keyof SegmentFormValues) => {
     if (dialogMode === 'view') return true;
+
     if (dialogMode === 'edit') {
-      // For core segments, nearly all fields are disabled.
-      // For custom segments, displayName and segmentType are typically not editable after creation or have special rules.
-      // For this implementation, allow displayName editing for custom segments. segmentType is derived and not directly editable.
-      if (isCoreSegment) return true; // Disable all fields for core segments in edit mode.
-      if (fieldName === 'segmentType') return true; // SegmentType is not directly editable
-      if (fieldName === 'displayName' && !isCustomSegment) return true; // Don't allow editing display name for non-custom (standard) segments.
+      // DisplayName is editable for ALL segments in edit mode.
+      if (fieldName === 'displayName') return false;
+
+      // For other fields:
+      // Core segments: all other fields are disabled.
+      if (isCoreSegment) return true;
+      
+      // SegmentType is not directly editable for any segment (custom or standard).
+      if (fieldName === 'segmentType') return true;
     }
-    return false;
+    // Default to enabled for non-core segments for fields other than displayName & segmentType in edit mode,
+    // and for all relevant fields in add mode.
+    return false; 
   };
   
   const isActiveSwitchDisabled = () => {
     if (dialogMode === 'view') return true;
-    if (currentSegmentData?.isCore) return true; 
+    if (currentSegmentData?.isCore && dialogMode === 'edit') return true; 
     return false;
   };
 
@@ -258,12 +263,12 @@ export default function SegmentsPage() {
               <DialogTitle>
                 {dialogMode === 'add' && 'Add Custom Segment'}
                 {dialogMode === 'view' && `View Segment: ${currentSegmentData?.displayName || ''}`}
-                {dialogMode === 'edit' && `Edit Custom Segment: ${currentSegmentData?.displayName || ''}`}
+                {dialogMode === 'edit' && `Edit Segment: ${currentSegmentData?.displayName || ''}`}
               </DialogTitle>
               <DialogDescription>
                 {dialogMode === 'add' && "Fill in the details for your new custom segment."}
                 {dialogMode === 'view' && "Viewing details for the selected segment."}
-                {dialogMode === 'edit' && "Modify the details of your custom segment."}
+                {dialogMode === 'edit' && "Modify the details of the segment."}
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -275,7 +280,7 @@ export default function SegmentsPage() {
                     <FormItem>
                       <FormLabel>Display Name *</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'displayName')} />
+                        <Input {...field} disabled={isFieldDisabled(currentSegmentData?.isCore, 'displayName')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -307,7 +312,7 @@ export default function SegmentsPage() {
                       <Select 
                         onValueChange={field.onChange} 
                         value={field.value}
-                        disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'dataType')}
+                        disabled={isFieldDisabled(currentSegmentData?.isCore, 'dataType')}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -332,7 +337,7 @@ export default function SegmentsPage() {
                     <FormItem>
                       <FormLabel>Maximum Character Length *</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} onChange={event => field.onChange(+event.target.value)} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'maxLength')} />
+                        <Input type="number" {...field} onChange={event => field.onChange(+event.target.value)} disabled={isFieldDisabled(currentSegmentData?.isCore, 'maxLength')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -346,7 +351,7 @@ export default function SegmentsPage() {
                     <FormItem>
                       <FormLabel>Special Characters Allowed *</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value ?? ''} placeholder="e.g., -_ (empty for none)" disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'specialCharsAllowed')} />
+                        <Input {...field} value={field.value ?? ''} placeholder="e.g., -_ (empty for none)" disabled={isFieldDisabled(currentSegmentData?.isCore, 'specialCharsAllowed')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -360,7 +365,7 @@ export default function SegmentsPage() {
                     <FormItem>
                       <FormLabel>Default Code</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value ?? ''} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'defaultCode')} />
+                        <Input {...field} value={field.value ?? ''} disabled={isFieldDisabled(currentSegmentData?.isCore, 'defaultCode')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -378,7 +383,7 @@ export default function SegmentsPage() {
                           value={field.value}
                           onValueChange={field.onChange}
                           placeholder="Select start date"
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'validFrom')}
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, 'validFrom')}
                         />
                         <FormMessage />
                       </FormItem>
@@ -394,7 +399,7 @@ export default function SegmentsPage() {
                           value={field.value}
                           onValueChange={field.onChange}
                           placeholder="Select end date"
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'validTo')}
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, 'validTo')}
                           disableDates={(date) => {
                             const validFrom = form.getValues("validFrom");
                             return validFrom instanceof Date ? date < validFrom : false;
@@ -415,7 +420,7 @@ export default function SegmentsPage() {
                         <Select 
                           onValueChange={field.onChange} 
                           value={field.value ?? '-'} 
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'separator')}
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, 'separator')}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -447,7 +452,7 @@ export default function SegmentsPage() {
                             <Switch
                               checked={field.value}
                               onCheckedChange={field.onChange}
-                              disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'isMandatoryForCoding')}
+                              disabled={isFieldDisabled(currentSegmentData?.isCore, 'isMandatoryForCoding')}
                             />
                           </FormControl>
                         </FormItem>
@@ -490,12 +495,10 @@ export default function SegmentsPage() {
                       <Button type="submit">Save</Button>
                     </>
                   )}
-                  {dialogMode === 'view' && (
+                  {dialogMode === 'view' && currentSegmentData && (
                     <>
                       <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Close</Button>
-                      {currentSegmentData?.isCustom && !currentSegmentData.isCore && (
-                        <Button type="button" onClick={handleEditSegmentClick}>Edit</Button>
-                      )}
+                      <Button type="button" onClick={handleEditSegmentClick}>Edit</Button>
                     </>
                   )}
                   {dialogMode === 'edit' && (
