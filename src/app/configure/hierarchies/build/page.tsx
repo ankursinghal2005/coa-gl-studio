@@ -149,7 +149,7 @@ export default function HierarchyBuildPage() {
   ];
 
   return (
-    <div className="flex flex-col h-screen p-4 sm:p-6 lg:p-8 bg-background">
+    <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-primary">
@@ -342,3 +342,4 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
+
