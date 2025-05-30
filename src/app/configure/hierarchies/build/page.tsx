@@ -21,8 +21,8 @@ import {
   Form,
   FormControl,
   FormField,
-  FormItem, // Re-added
-  FormLabel, // Re-added
+  FormItem,
+  FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -243,6 +243,10 @@ export default function HierarchyBuildPage() {
   const searchParams = useSearchParams();
   const { getSegmentById } = useSegments();
 
+  // Moved useState declarations for treeNodes and selectedParentNodeId up
+  const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]);
+  const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
+
   const selectedParentNodeDetails = useMemo(() => {
     if (!selectedParentNodeId) return null;
     return findNodeById(treeNodes, selectedParentNodeId);
@@ -253,9 +257,6 @@ export default function HierarchyBuildPage() {
   const [availableSummaryCodes, setAvailableSummaryCodes] = useState<SegmentCode[]>([]);
   const [availableDetailCodes, setAvailableDetailCodes] = useState<SegmentCode[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-
-  const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]);
-  const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
 
   const [rangeStartCode, setRangeStartCode] = useState('');
   const [rangeEndCode, setRangeEndCode] = useState('');
@@ -281,12 +282,12 @@ export default function HierarchyBuildPage() {
         setAllSegmentCodes(codesForSegment.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })));
 
         const filteredCodes = searchTerm
-          ? codesForSegment.filter( // This codesForSegment is unsorted for filtering display
+          ? codesForSegment.filter(
               (code) =>
                 code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 code.description.toLowerCase().includes(searchTerm.toLowerCase())
             )
-          : codesForSegment; // This codesForSegment is unsorted for initial display
+          : codesForSegment;
 
         setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator).sort((a,b) => a.code.localeCompare(b.code, undefined, {numeric: true})));
         setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator).sort((a,b) => a.code.localeCompare(b.code, undefined, {numeric: true})));
@@ -400,7 +401,7 @@ export default function HierarchyBuildPage() {
     if (node && node.segmentCode.summaryIndicator) {
       setSelectedParentNodeId(nodeId);
     } else {
-      setSelectedParentNodeId(null); // Or keep previous selection if clicking on detail
+      setSelectedParentNodeId(null); 
     }
   };
 
@@ -428,7 +429,6 @@ export default function HierarchyBuildPage() {
       return;
     }
 
-    // allSegmentCodes is already sorted numerically
     const startIndex = allSegmentCodes.findIndex(c => c.code === rangeStartCode);
     const endIndex = allSegmentCodes.findIndex(c => c.code === rangeEndCode);
 
@@ -447,12 +447,10 @@ export default function HierarchyBuildPage() {
     const codesSkipped: string[] = [];
 
     codesToAddInRange.forEach(code => {
-      if (codeExistsInTree(newTreeNodes, code.id)) { // Global check for code existence in tree
+      if (codeExistsInTree(newTreeNodes, code.id)) { 
         codesSkipped.push(code.code);
         return;
       }
-      // addChildToNode handles the check for duplicate child under the *specific* parent.
-      // So, the explicit check here: parentNode.children.some(child => child.id === code.id) is redundant.
       
       const newNode: HierarchyNode = {
         id: code.id,
@@ -460,8 +458,6 @@ export default function HierarchyBuildPage() {
         children: [],
       };
       
-      // Try to add the node and see if it was actually added by comparing tree structure or checking return from a modified addChildToNode
-      // For now, we assume addChildToNode will alert if it fails for specific parent reasons (like parent is detail, or child already under this parent)
       const previousNodeCount = (findNodeById(newTreeNodes, selectedParentNodeId)?.children || []).length;
       const tempTree = addChildToNode(newTreeNodes, selectedParentNodeId, newNode);
       const currentNodeCount = (findNodeById(tempTree, selectedParentNodeId)?.children || []).length;
@@ -469,13 +465,7 @@ export default function HierarchyBuildPage() {
       if (currentNodeCount > previousNodeCount) {
          newTreeNodes = tempTree;
          codesAddedCount++;
-      } else {
-        // If addChildToNode didn't add it (and alerted internally), or if it was skipped by global check.
-        // The codeExistsInTree check above should catch global duplicates.
-        // addChildToNode alerts for local duplicates or if parent is detail.
-        // We only add to codesSkipped if it's a global duplicate, local duplicate is handled by addChildToNode's alert.
-        // This part could be refined if addChildToNode returned a status.
-      }
+      } 
     });
 
     setTreeNodes(newTreeNodes);
@@ -659,7 +649,6 @@ export default function HierarchyBuildPage() {
             <CardTitle>Hierarchy Structure</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden p-6 bg-slate-50">
-            {/* Add by Range Form */}
             {selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
               <Card className="mb-4 p-4 shadow">
                 <h3 className="text-lg font-semibold mb-2 text-primary">
@@ -743,5 +732,3 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
-
-    
