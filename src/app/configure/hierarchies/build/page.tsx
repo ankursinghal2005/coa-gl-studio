@@ -243,6 +243,11 @@ export default function HierarchyBuildPage() {
   const searchParams = useSearchParams();
   const { getSegmentById } = useSegments();
 
+  const selectedParentNodeDetails = useMemo(() => {
+    if (!selectedParentNodeId) return null;
+    return findNodeById(treeNodes, selectedParentNodeId);
+  }, [selectedParentNodeId, treeNodes]);
+
   const [selectedSegment, setSelectedSegment] = useState<Segment | null>(null);
   const [allSegmentCodes, setAllSegmentCodes] = useState<SegmentCode[]>([]);
   const [availableSummaryCodes, setAvailableSummaryCodes] = useState<SegmentCode[]>([]);
@@ -266,30 +271,25 @@ export default function HierarchyBuildPage() {
     },
   });
 
-  // Moved useMemo hook to the top level, before any conditional returns.
-  const selectedParentNodeDetails = useMemo(() => {
-    if (!selectedParentNodeId) return null;
-    return findNodeById(treeNodes, selectedParentNodeId);
-  }, [selectedParentNodeId, treeNodes]);
-
   useEffect(() => {
     if (segmentId) {
       const segment = getSegmentById(segmentId);
       if (segment) {
         setSelectedSegment(segment);
         const codesForSegment = mockSegmentCodesForBuilder[segment.id] || [];
-        setAllSegmentCodes(codesForSegment.sort((a, b) => a.code.localeCompare(b.code))); // Sort all codes
+        // Sort all codes numerically for robust range selection
+        setAllSegmentCodes(codesForSegment.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })));
 
         const filteredCodes = searchTerm
-          ? codesForSegment.filter(
+          ? codesForSegment.filter( // This codesForSegment is unsorted for filtering display
               (code) =>
                 code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 code.description.toLowerCase().includes(searchTerm.toLowerCase())
             )
-          : codesForSegment;
+          : codesForSegment; // This codesForSegment is unsorted for initial display
 
-        setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator));
-        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator));
+        setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator).sort((a,b) => a.code.localeCompare(b.code, undefined, {numeric: true})));
+        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator).sort((a,b) => a.code.localeCompare(b.code, undefined, {numeric: true})));
       } else {
         router.push('/configure/hierarchies');
       }
@@ -428,6 +428,7 @@ export default function HierarchyBuildPage() {
       return;
     }
 
+    // allSegmentCodes is already sorted numerically
     const startIndex = allSegmentCodes.findIndex(c => c.code === rangeStartCode);
     const endIndex = allSegmentCodes.findIndex(c => c.code === rangeEndCode);
 
@@ -446,29 +447,41 @@ export default function HierarchyBuildPage() {
     const codesSkipped: string[] = [];
 
     codesToAddInRange.forEach(code => {
-      if (codeExistsInTree(newTreeNodes, code.id)) {
+      if (codeExistsInTree(newTreeNodes, code.id)) { // Global check for code existence in tree
         codesSkipped.push(code.code);
         return;
       }
-      // Check if already child of current parent
-      if (parentNode.children.some(child => child.id === code.id)) {
-        codesSkipped.push(code.code);
-        return;
-      }
-
+      // addChildToNode handles the check for duplicate child under the *specific* parent.
+      // So, the explicit check here: parentNode.children.some(child => child.id === code.id) is redundant.
+      
       const newNode: HierarchyNode = {
         id: code.id,
         segmentCode: code,
         children: [],
       };
-      newTreeNodes = addChildToNode(newTreeNodes, selectedParentNodeId, newNode);
-      codesAddedCount++;
+      
+      // Try to add the node and see if it was actually added by comparing tree structure or checking return from a modified addChildToNode
+      // For now, we assume addChildToNode will alert if it fails for specific parent reasons (like parent is detail, or child already under this parent)
+      const previousNodeCount = (findNodeById(newTreeNodes, selectedParentNodeId)?.children || []).length;
+      const tempTree = addChildToNode(newTreeNodes, selectedParentNodeId, newNode);
+      const currentNodeCount = (findNodeById(tempTree, selectedParentNodeId)?.children || []).length;
+
+      if (currentNodeCount > previousNodeCount) {
+         newTreeNodes = tempTree;
+         codesAddedCount++;
+      } else {
+        // If addChildToNode didn't add it (and alerted internally), or if it was skipped by global check.
+        // The codeExistsInTree check above should catch global duplicates.
+        // addChildToNode alerts for local duplicates or if parent is detail.
+        // We only add to codesSkipped if it's a global duplicate, local duplicate is handled by addChildToNode's alert.
+        // This part could be refined if addChildToNode returned a status.
+      }
     });
 
     setTreeNodes(newTreeNodes);
     setRangeStartCode('');
     setRangeEndCode('');
-    alert(`${codesAddedCount} codes added to parent "${parentNode.segmentCode.code}". ${codesSkipped.length > 0 ? `Skipped existing codes: ${codesSkipped.join(', ')}` : ''}`);
+    alert(`${codesAddedCount} codes added to parent "${parentNode.segmentCode.code}". ${codesSkipped.length > 0 ? `Skipped existing codes (globally): ${codesSkipped.join(', ')}` : ''}`);
   };
 
 
@@ -730,3 +743,5 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
+
+    
