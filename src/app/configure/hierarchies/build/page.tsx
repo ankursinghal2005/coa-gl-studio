@@ -273,12 +273,22 @@ export default function HierarchyBuildPage() {
         <Card className="lg:col-span-4 flex flex-col">
           <CardHeader>
             <CardTitle>Assignment Tools</CardTitle>
-             <CardDescription>Select a node in the tree to manage children.</CardDescription>
+             <CardDescription>Select a node in the Tree Preview (right panel) to manage its children.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 flex items-center justify-center">
-            <p className="text-muted-foreground text-center p-4">
-              Hierarchy assignment tools (e.g., add code to tree, create virtual node) will appear here based on tree selection.
-              <br /><br />(This section is a placeholder for future interactive components.)
+          <CardContent className="flex-1 flex flex-col items-center justify-center text-center p-4">
+            <p className="text-muted-foreground mb-2">
+              Based on your selection in the tree, tools to:
+            </p>
+            <ul className="list-disc list-inside text-muted-foreground text-sm mb-4">
+              <li>Assign codes from the 'Available Codes' pool</li>
+              <li>Create virtual (grouping) nodes</li>
+              <li>Remove child nodes</li>
+            </ul>
+            <p className="text-muted-foreground text-sm">
+              ...will appear here.
+            </p>
+            <p className="text-xs text-muted-foreground/80 mt-auto">
+              (This section is a placeholder for future interactive components. Node selection and assignment are not yet active.)
             </p>
           </CardContent>
         </Card>
@@ -292,9 +302,13 @@ export default function HierarchyBuildPage() {
           <CardContent className="flex-1 overflow-hidden p-0">
             <ScrollArea className="h-full">
                 <div className="p-4 text-sm text-muted-foreground">
-                    <p className="mb-4">
-                        (This is a placeholder for the interactive tree. Below is a static example of a tree structure.)
+                    <p className="mb-2">
+                        (This is a placeholder for the interactive tree. Node interaction, drag & drop, and dynamic updates are planned for a future step.)
                     </p>
+                    <p className="italic text-xs mb-4">
+                        Conceptual: Clicking a node here would select it, and its details/children would be manageable in the 'Assignment Tools' panel.
+                    </p>
+                    <p className="mb-2 font-medium">Example Static Tree Structure:</p>
                     <div className="space-y-1 font-mono">
                         <div className="flex items-center">
                             <Folder className="w-4 h-4 mr-2 text-primary" />
