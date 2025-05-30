@@ -24,21 +24,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { useSegments } from '@/contexts/SegmentsContext';
 import type { Segment } from '@/lib/segment-types';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Folder, FileText } from 'lucide-react'; // Icons for tree preview
-
-// Simplified SegmentCode interface for mock data in this builder
-interface BuilderSegmentCode {
-  id: string;
-  code: string;
-  description: string;
-  summaryIndicator: boolean;
-}
 
 const hierarchyBuilderFormSchema = z.object({
   hierarchyName: z.string().min(1, { message: 'Hierarchy Name is required.' }),
@@ -49,25 +38,6 @@ const hierarchyBuilderFormSchema = z.object({
 });
 
 type HierarchyBuilderFormValues = z.infer<typeof hierarchyBuilderFormSchema>;
-
-// Mock data for segment codes, to be replaced with actual data fetching/context later
-const mockSegmentCodes: Record<string, BuilderSegmentCode[]> = {
-  fund: [
-    { id: 'fsc1', code: '100', description: 'General Fund', summaryIndicator: true },
-    { id: 'fsc2', code: '110', description: 'Restricted Revenue', summaryIndicator: true },
-    { id: 'fsc3', code: '111', description: 'Federal Grants', summaryIndicator: false },
-    { id: 'fsc4', code: '112', description: 'State Grants', summaryIndicator: false },
-    { id: 'fsc5', code: '120', description: 'Operating Expenditures', summaryIndicator: false },
-    { id: 'fsc6', code: '200', description: 'Enterprise Fund', summaryIndicator: true },
-    { id: 'fsc7', code: '210', description: 'Water Utility', summaryIndicator: false },
-  ],
-  department: [
-    { id: 'dsc1', code: 'FIN', description: 'Finance Department', summaryIndicator: true },
-    { id: 'dsc2', code: 'IT', description: 'IT Department', summaryIndicator: true },
-    { id: 'dsc3', code: 'HR', description: 'Human Resources', summaryIndicator: false },
-  ],
-};
-
 
 export default function HierarchyBuildPage() {
   const router = useRouter();
@@ -123,16 +93,8 @@ export default function HierarchyBuildPage() {
 
   const handleReset = () => {
     form.reset();
-    // Placeholder: Reset tree structure state here in the future
     alert('Reset Hierarchy action placeholder.');
   };
-
-  const availableCodesForSegment = useMemo(() => {
-    if (selectedSegment && mockSegmentCodes[selectedSegment.id]) {
-      return mockSegmentCodes[selectedSegment.id];
-    }
-    return [];
-  }, [selectedSegment]);
 
   if (!selectedSegment) {
     return (
@@ -223,123 +185,11 @@ export default function HierarchyBuildPage() {
                   </FormItem>
                 )}
               />
+              {/* The Save button for the form is now part of the bottom action buttons */}
             </form>
           </Form>
         </CardContent>
       </Card>
-
-      {/* Main Content Area - Three Panels */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
-        {/* Left Panel - Segment Code Pool */}
-        <Card className="lg:col-span-3 flex flex-col">
-          <CardHeader>
-            <CardTitle>Available Codes for {selectedSegment.displayName}</CardTitle>
-            <CardDescription>Drag codes to the tree or use assignment tools.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-hidden p-0">
-            <ScrollArea className="h-full">
-              <div className="p-6">
-                {availableCodesForSegment.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-center">Summary</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {availableCodesForSegment.map((code) => (
-                        <TableRow key={code.id}>
-                          <TableCell className="font-medium">{code.code}</TableCell>
-                          <TableCell>{code.description}</TableCell>
-                          <TableCell className="text-center">{code.summaryIndicator ? 'Yes' : 'No'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No codes found for this segment, or data is not yet loaded.
-                    (Filter/search to be implemented)
-                  </p>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* Center Panel - Assignment Tools */}
-        <Card className="lg:col-span-4 flex flex-col">
-          <CardHeader>
-            <CardTitle>Assignment Tools</CardTitle>
-             <CardDescription>Select a node in the Tree Preview (right panel) to manage its children.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col items-center justify-center text-center p-4">
-            <p className="text-muted-foreground mb-2">
-              Based on your selection in the tree, tools to:
-            </p>
-            <ul className="list-disc list-inside text-muted-foreground text-sm mb-4">
-              <li>Assign codes from the 'Available Codes' pool</li>
-              <li>Create virtual (grouping) nodes</li>
-              <li>Remove child nodes</li>
-            </ul>
-            <p className="text-muted-foreground text-sm">
-              ...will appear here.
-            </p>
-            <p className="text-xs text-muted-foreground/80 mt-auto">
-              (This section is a placeholder for future interactive components. Node selection and assignment are not yet active.)
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Right Panel - Live Tree Preview */}
-        <Card className="lg:col-span-5 flex flex-col">
-          <CardHeader>
-            <CardTitle>Live Tree Preview</CardTitle>
-            <CardDescription>View the hierarchy structure as you build it.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-hidden p-0">
-            <ScrollArea className="h-full">
-                <div className="p-4 text-sm text-muted-foreground">
-                    <p className="mb-2">
-                        (This is a placeholder for the interactive tree. Node interaction, drag & drop, and dynamic updates are planned for a future step.)
-                    </p>
-                    <p className="italic text-xs mb-4">
-                        Conceptual: Clicking a node here would select it, and its details/children would be manageable in the 'Assignment Tools' panel.
-                    </p>
-                    <p className="mb-2 font-medium">Example Static Tree Structure:</p>
-                    <div className="space-y-1 font-mono">
-                        <div className="flex items-center">
-                            <Folder className="w-4 h-4 mr-2 text-primary" />
-                            <span className="font-semibold">100 (summary)</span>
-                        </div>
-                        <div className="ml-6 space-y-1">
-                            <div className="flex items-center">
-                                <Folder className="w-4 h-4 mr-2 text-primary" />
-                                <span className="font-semibold">110 (summary)</span>
-                            </div>
-                            <div className="ml-6 space-y-1">
-                                <div className="flex items-center">
-                                    <FileText className="w-4 h-4 mr-2 text-accent" />
-                                    <span>111 (detail, postable)</span>
-                                </div>
-                                <div className="flex items-center">
-                                    <FileText className="w-4 h-4 mr-2 text-accent" />
-                                    <span>112 (detail, postable)</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center mt-1">
-                                <FileText className="w-4 h-4 mr-2 text-accent" />
-                                <span>120 (detail, postable)</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Bottom Action Buttons */}
       <div className="mt-8 flex justify-end space-x-3">
@@ -356,4 +206,3 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
-
