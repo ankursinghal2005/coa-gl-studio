@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label'; // Added import for Label
 import {
   Select,
   SelectContent,
@@ -20,10 +21,10 @@ import {
   Form,
   FormControl,
   FormField,
-  FormItem,
-  FormLabel,
+  // FormItem, // No longer needed for the range section's direct use here
+  // FormLabel, // No longer needed for the range section's direct use here
   FormMessage,
-} from '@/components/ui/form';
+} from '@/components/ui/form'; // Kept for the main form
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -170,33 +171,33 @@ const removeNodeFromTreeRecursive = (nodes: HierarchyNode[], idToRemove: string)
 
 
 // Recursive component to display tree nodes
-const TreeNodeDisplay: React.FC<{ 
-  node: HierarchyNode; 
-  level: number; 
+const TreeNodeDisplay: React.FC<{
+  node: HierarchyNode;
+  level: number;
   selectedParentNodeId: string | null;
   onSelectParent: (nodeId: string) => void;
-  onRemoveNode: (nodeId: string) => void; 
+  onRemoveNode: (nodeId: string) => void;
 }> = ({ node, level, selectedParentNodeId, onSelectParent, onRemoveNode }) => {
   const isSelectedParent = node.id === selectedParentNodeId;
   const canBeParent = node.segmentCode.summaryIndicator;
 
   return (
-    <div 
+    <div
       style={{ marginLeft: `${level * 20}px` }}
       className={`relative p-3 border rounded-md mb-2 shadow-sm ${isSelectedParent ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-card hover:bg-accent/50'}`}
       onClick={(e) => {
         if (canBeParent) {
-          e.stopPropagation(); 
+          e.stopPropagation();
           onSelectParent(node.id);
         }
       }}
     >
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         className="absolute top-1 right-1 h-6 w-6 text-destructive hover:text-destructive/80"
         onClick={(e) => {
-          e.stopPropagation(); 
+          e.stopPropagation();
           onRemoveNode(node.id);
         }}
         aria-label="Remove node"
@@ -221,13 +222,13 @@ const TreeNodeDisplay: React.FC<{
       {node.children && node.children.length > 0 && (
         <div className="mt-3 pl-4 border-l-2 border-blue-200">
           {node.children.map(child => (
-            <TreeNodeDisplay 
-              key={child.id} 
-              node={child} 
-              level={level + 1} 
+            <TreeNodeDisplay
+              key={child.id}
+              node={child}
+              level={level + 1}
               selectedParentNodeId={selectedParentNodeId}
               onSelectParent={onSelectParent}
-              onRemoveNode={onRemoveNode} 
+              onRemoveNode={onRemoveNode}
             />
           ))}
         </div>
@@ -247,13 +248,12 @@ export default function HierarchyBuildPage() {
   const [availableSummaryCodes, setAvailableSummaryCodes] = useState<SegmentCode[]>([]);
   const [availableDetailCodes, setAvailableDetailCodes] = useState<SegmentCode[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]); 
+
+  const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]);
   const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
-  
+
   const [rangeStartCode, setRangeStartCode] = useState('');
   const [rangeEndCode, setRangeEndCode] = useState('');
-
 
   const segmentId = searchParams.get('segmentId');
 
@@ -279,7 +279,7 @@ export default function HierarchyBuildPage() {
         setSelectedSegment(segment);
         const codesForSegment = mockSegmentCodesForBuilder[segment.id] || [];
         setAllSegmentCodes(codesForSegment.sort((a, b) => a.code.localeCompare(b.code))); // Sort all codes
-        
+
         const filteredCodes = searchTerm
           ? codesForSegment.filter(
               (code) =>
@@ -309,7 +309,7 @@ export default function HierarchyBuildPage() {
 
   const onSubmit = (values: HierarchyBuilderFormValues) => {
     console.log('Hierarchy Form Submitted:', values);
-    console.log('Current Tree Nodes:', JSON.stringify(treeNodes, null, 2)); 
+    console.log('Current Tree Nodes:', JSON.stringify(treeNodes, null, 2));
     alert(`Hierarchy "${values.hierarchyName}" save action placeholder. Tree structure logged to console. Full save logic not yet implemented.`);
     if (segmentId) {
         router.push(`/configure/hierarchies?segmentId=${segmentId}`);
@@ -317,7 +317,7 @@ export default function HierarchyBuildPage() {
         router.push('/configure/hierarchies');
     }
   };
-  
+
   const handleCancel = () => {
     if (segmentId) {
         router.push(`/configure/hierarchies?segmentId=${segmentId}`);
@@ -342,7 +342,7 @@ export default function HierarchyBuildPage() {
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault(); 
+    event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   };
 
@@ -353,25 +353,25 @@ export default function HierarchyBuildPage() {
 
     try {
       const droppedSegmentCode: SegmentCode = JSON.parse(codeDataString);
-      
+
       if (codeExistsInTree(treeNodes, droppedSegmentCode.id)) {
         alert(`Code ${droppedSegmentCode.code} already exists in the hierarchy.`);
         return;
       }
 
       const newNode: HierarchyNode = {
-        id: droppedSegmentCode.id, 
+        id: droppedSegmentCode.id,
         segmentCode: droppedSegmentCode,
         children: [],
       };
 
-      if (treeNodes.length === 0) { 
+      if (treeNodes.length === 0) {
         if (!newNode.segmentCode.summaryIndicator) {
           alert('The first node in a hierarchy must be a summary code.');
           return;
         }
         setTreeNodes([newNode]);
-        setSelectedParentNodeId(newNode.id); 
+        setSelectedParentNodeId(newNode.id);
       } else {
         if (selectedParentNodeId) {
           const parentNode = findNodeById(treeNodes, selectedParentNodeId);
@@ -386,7 +386,7 @@ export default function HierarchyBuildPage() {
             return;
           }
           setTreeNodes(prevNodes => [...prevNodes, newNode]);
-          setSelectedParentNodeId(newNode.id); 
+          setSelectedParentNodeId(newNode.id);
         }
       }
     } catch (e) {
@@ -394,7 +394,7 @@ export default function HierarchyBuildPage() {
       alert("Error processing dropped code.");
     }
   };
-  
+
   const handleSelectParent = (nodeId: string) => {
     const node = findNodeById(treeNodes, nodeId);
     if (node && node.segmentCode.summaryIndicator) {
@@ -448,7 +448,7 @@ export default function HierarchyBuildPage() {
     codesToAddInRange.forEach(code => {
       if (codeExistsInTree(newTreeNodes, code.id)) {
         codesSkipped.push(code.code);
-        return; 
+        return;
       }
       // Check if already child of current parent
       if (parentNode.children.some(child => child.id === code.id)) {
@@ -485,11 +485,10 @@ export default function HierarchyBuildPage() {
     if (!selectedParentNodeId) {
       return "Select a summary node from the tree to add children, or drag another SUMMARY code here to create a new root.";
     }
-    // const selectedNode = findNodeById(treeNodes, selectedParentNodeId); // Already available in selectedParentNodeDetails
     const selectedNodeName = selectedParentNodeDetails ? `${selectedParentNodeDetails.segmentCode.code} - ${selectedParentNodeDetails.segmentCode.description}` : 'the selected parent';
     return `Drag codes here to add as children to "${selectedNodeName}". You can also drag a new SUMMARY code to start another root.`;
   };
-  
+
 
   return (
     <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
@@ -543,10 +542,10 @@ export default function HierarchyBuildPage() {
                     </FormItem>
                   )}
                 />
-                 <FormItem>
-                    <FormLabel>Segment</FormLabel>
+                 <div className="space-y-2">
+                    <Label>Segment</Label>
                     <Input value={selectedSegment.displayName} disabled />
-                  </FormItem>
+                  </div>
               </div>
               <FormField
                 control={form.control}
@@ -577,8 +576,8 @@ export default function HierarchyBuildPage() {
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
             <div className="p-4 border-b">
-              <Input 
-                placeholder="Search codes..." 
+              <Input
+                placeholder="Search codes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -638,11 +637,11 @@ export default function HierarchyBuildPage() {
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
             className="lg:col-span-2 flex flex-col"
             onDragOver={handleDragOver}
             onDrop={handleDrop}
-        > 
+        >
           <CardHeader>
             <CardTitle>Hierarchy Structure</CardTitle>
           </CardHeader>
@@ -654,24 +653,24 @@ export default function HierarchyBuildPage() {
                   Add Codes to Parent: {selectedParentNodeDetails.segmentCode.code} - {selectedParentNodeDetails.segmentCode.description}
                 </h3>
                 <div className="flex items-end gap-2 mb-2">
-                  <FormItem className="flex-1">
-                    <FormLabel htmlFor="rangeStartCode">Start Code</FormLabel>
-                    <Input 
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="rangeStartCode">Start Code</Label>
+                    <Input
                       id="rangeStartCode"
-                      placeholder="Enter start code" 
-                      value={rangeStartCode} 
-                      onChange={(e) => setRangeStartCode(e.target.value)} 
+                      placeholder="Enter start code"
+                      value={rangeStartCode}
+                      onChange={(e) => setRangeStartCode(e.target.value)}
                     />
-                  </FormItem>
-                  <FormItem className="flex-1">
-                    <FormLabel htmlFor="rangeEndCode">End Code</FormLabel>
-                    <Input 
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="rangeEndCode">End Code</Label>
+                    <Input
                       id="rangeEndCode"
-                      placeholder="Enter end code" 
-                      value={rangeEndCode} 
-                      onChange={(e) => setRangeEndCode(e.target.value)} 
+                      placeholder="Enter end code"
+                      value={rangeEndCode}
+                      onChange={(e) => setRangeEndCode(e.target.value)}
                     />
-                  </FormItem>
+                  </div>
                   <Button onClick={handleAddRangeToParent} className="h-10">Add Range</Button>
                 </div>
                  <p className="text-xs text-muted-foreground">
@@ -679,7 +678,7 @@ export default function HierarchyBuildPage() {
                 </p>
               </Card>
             )}
-            
+
             <ScrollArea className="flex-1 min-h-0">
               {treeNodes.length === 0 ? (
                 <div className="text-center text-muted-foreground h-full flex flex-col items-center justify-center py-10">
@@ -690,13 +689,13 @@ export default function HierarchyBuildPage() {
               ) : (
                 <div className="space-y-2">
                   {treeNodes.map((rootNode) => (
-                    <TreeNodeDisplay 
-                      key={rootNode.id} 
-                      node={rootNode} 
-                      level={0} 
+                    <TreeNodeDisplay
+                      key={rootNode.id}
+                      node={rootNode}
+                      level={0}
                       selectedParentNodeId={selectedParentNodeId}
                       onSelectParent={handleSelectParent}
-                      onRemoveNode={handleRemoveNode} 
+                      onRemoveNode={handleRemoveNode}
                     />
                   ))}
                   {selectedParentNodeId && treeNodes.length > 0 && !selectedParentNodeDetails?.segmentCode.summaryIndicator && (
@@ -731,4 +730,3 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
-
