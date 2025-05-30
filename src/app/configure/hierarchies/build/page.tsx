@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label'; // Added import for Label
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -21,10 +21,10 @@ import {
   Form,
   FormControl,
   FormField,
-  // FormItem, // No longer needed for the range section's direct use here
-  // FormLabel, // No longer needed for the range section's direct use here
+  FormItem, // Re-added
+  FormLabel, // Re-added
   FormMessage,
-} from '@/components/ui/form'; // Kept for the main form
+} from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
