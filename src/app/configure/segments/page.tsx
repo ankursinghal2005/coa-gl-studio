@@ -47,12 +47,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { Label } from '@/components/ui/label';
 import { useSegments } from '@/contexts/SegmentsContext';
-import type { Segment } from '@/lib/segment-types';
+import type { Segment, DataType } from '@/lib/segment-types';
 
 const segmentFormSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
   segmentType: z.string().optional(), // This will be derived from displayName for custom, or fixed
-  regex: z.string().min(1, { message: 'RegEx Pattern is required.' }),
+  dataType: z.enum(['Alphanumeric', 'Numeric', 'Text'], { required_error: "Data Type is required." }),
+  maxLength: z.coerce.number({ required_error: "Max Length is required.", invalid_type_error: "Max Length must be a number." }).int().positive({ message: "Max Length must be a positive number." }),
+  specialCharsAllowed: z.string({required_error: "Special Characters Allowed is required."}).refine(value => value !== null, { message: "Special Characters Allowed cannot be null." }), // Empty string means none
   defaultCode: z.string().optional(),
   separator: z.enum(['-', '|', ',', '.'], { required_error: "Separator is required." }),
   isMandatoryForCoding: z.boolean().default(false),
@@ -74,18 +76,18 @@ const segmentFormSchema = z.object({
 
 type SegmentFormValues = z.infer<typeof segmentFormSchema>;
 
-const defaultFormValues: SegmentFormValues = {
+const defaultFormValues: Omit<SegmentFormValues, 'id' | 'segmentType' | 'isCore'> = {
   displayName: '',
-  segmentType: '',
-  regex: '',
+  dataType: 'Alphanumeric',
+  maxLength: 10,
+  specialCharsAllowed: '',
   defaultCode: '',
   separator: '-',
   isMandatoryForCoding: false,
   isActive: true,
-  validFrom: undefined,
+  validFrom: new Date(), // Set a default Date object
   validTo: undefined,
   isCustom: true,
-  isCore: false,
 };
 
 export default function SegmentsPage() {
@@ -96,23 +98,36 @@ export default function SegmentsPage() {
 
   const form = useForm<SegmentFormValues>({
     resolver: zodResolver(segmentFormSchema),
-    defaultValues: defaultFormValues,
+    defaultValues: {
+      ...defaultFormValues,
+      isCore: false, // default explicitly for the form
+    },
   });
 
   useEffect(() => {
     if (isDialogOpen) {
       if (dialogMode === 'add') {
-        form.reset(defaultFormValues);
+        form.reset({
+          ...defaultFormValues,
+          isCore: false, // ensure isCore is set for add mode
+          id: undefined, // no id for new segment
+          segmentType: '', // segmentType will be set from displayName
+        });
         setCurrentSegmentData(null);
       } else if ((dialogMode === 'view' || dialogMode === 'edit') && currentSegmentData) {
         form.reset({
           ...currentSegmentData,
-          validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : undefined,
+          validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(),
           validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
         });
       }
     } else {
-      form.reset(defaultFormValues);
+      form.reset({
+        ...defaultFormValues,
+        isCore: false,
+        id: undefined,
+        segmentType: '',
+      });
       setCurrentSegmentData(null);
       setDialogMode('add');
     }
@@ -125,7 +140,13 @@ export default function SegmentsPage() {
 
   const handleAddSegmentClick = () => {
     setDialogMode('add');
-    setCurrentSegmentData(null);
+    setCurrentSegmentData(null); // Clear any existing segment data
+    form.reset({ // Reset form with defaults for 'add' mode
+        ...defaultFormValues,
+        isCore: false, 
+        id: undefined,
+        segmentType: '' 
+    });
     setIsDialogOpen(true);
   };
 
@@ -145,11 +166,13 @@ export default function SegmentsPage() {
     if (dialogMode === 'add') {
       const newSegment: Segment = {
         id: crypto.randomUUID(),
-        isCore: false,
+        isCore: false, // Custom segments are not core
         isCustom: true,
         displayName: values.displayName,
         segmentType: values.displayName, // Set segmentType to displayName for custom segments
-        regex: values.regex,
+        dataType: values.dataType,
+        maxLength: values.maxLength,
+        specialCharsAllowed: values.specialCharsAllowed,
         defaultCode: values.defaultCode,
         separator: values.separator,
         isMandatoryForCoding: values.isMandatoryForCoding,
@@ -160,13 +183,22 @@ export default function SegmentsPage() {
       addSegment(newSegment);
     } else if (dialogMode === 'edit' && currentSegmentData) {
       const updatedSegment: Segment = {
-        ...currentSegmentData,
-        ...values,
-        segmentType: currentSegmentData.segmentType, // Keep original segmentType, don't change on edit
+        ...currentSegmentData, // Preserve id, isCore, isCustom, segmentType
+        displayName: values.displayName, // DisplayName can be edited
+        // segmentType remains unchanged for existing segments
+        dataType: values.dataType,
+        maxLength: values.maxLength,
+        specialCharsAllowed: values.specialCharsAllowed,
+        defaultCode: values.defaultCode,
+        separator: values.separator,
+        isMandatoryForCoding: values.isMandatoryForCoding,
+        isActive: values.isActive,
+        validFrom: values.validFrom,
+        validTo: values.validTo,
       };
       updateSegment(updatedSegment);
-      setCurrentSegmentData(updatedSegment);
-      setDialogMode('view');
+      setCurrentSegmentData(updatedSegment); // Update currentSegmentData to reflect changes
+      setDialogMode('view'); // Switch back to view mode after saving
       return; 
     }
     
@@ -178,10 +210,15 @@ export default function SegmentsPage() {
     { label: 'Segments' }
   ];
   
-  const isFieldDisabled = (isCoreSegment: boolean | undefined, isCustomSegment: boolean | undefined) => {
+  const isFieldDisabled = (isCoreSegment: boolean | undefined, isCustomSegment: boolean | undefined, fieldName?: keyof SegmentFormValues) => {
     if (dialogMode === 'view') return true;
     if (dialogMode === 'edit') {
-      return isCoreSegment;
+      // For core segments, nearly all fields are disabled.
+      // For custom segments, displayName and segmentType are typically not editable after creation or have special rules.
+      // For this implementation, allow displayName editing for custom segments. segmentType is derived and not directly editable.
+      if (isCoreSegment) return true; // Disable all fields for core segments in edit mode.
+      if (fieldName === 'segmentType') return true; // SegmentType is not directly editable
+      if (fieldName === 'displayName' && !isCustomSegment) return true; // Don't allow editing display name for non-custom (standard) segments.
     }
     return false;
   };
@@ -238,7 +275,7 @@ export default function SegmentsPage() {
                     <FormItem>
                       <FormLabel>Display Name *</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom) || (dialogMode==='edit' && currentSegmentData?.isCore) || (dialogMode==='edit' && !currentSegmentData?.isCustom)} />
+                        <Input {...field} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'displayName')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -260,35 +297,75 @@ export default function SegmentsPage() {
                     )}
                   />
                 )}
+
+                <FormField
+                  control={form.control}
+                  name="dataType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data Type *</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                        disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'dataType')}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a data type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Alphanumeric">Alphanumeric</SelectItem>
+                          <SelectItem value="Numeric">Numeric</SelectItem>
+                          <SelectItem value="Text">Text</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="maxLength"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Maximum Character Length *</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} onChange={event => field.onChange(+event.target.value)} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'maxLength')} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="specialCharsAllowed"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Special Characters Allowed *</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ''} placeholder="e.g., -_ (empty for none)" disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'specialCharsAllowed')} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="regex"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>RegEx Pattern *</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value ?? ''} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="defaultCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Default Code</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value ?? ''} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="defaultCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Default Code</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ''} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'defaultCode')} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
@@ -301,7 +378,7 @@ export default function SegmentsPage() {
                           value={field.value}
                           onValueChange={field.onChange}
                           placeholder="Select start date"
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom) || (currentSegmentData?.isCore && dialogMode === 'edit')}
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'validFrom')}
                         />
                         <FormMessage />
                       </FormItem>
@@ -317,7 +394,7 @@ export default function SegmentsPage() {
                           value={field.value}
                           onValueChange={field.onChange}
                           placeholder="Select end date"
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom) || (currentSegmentData?.isCore && dialogMode === 'edit')}
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'validTo')}
                           disableDates={(date) => {
                             const validFrom = form.getValues("validFrom");
                             return validFrom instanceof Date ? date < validFrom : false;
@@ -337,8 +414,8 @@ export default function SegmentsPage() {
                         <FormLabel>Separator *</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
-                          value={field.value ?? '-'} // Ensure a default value for the Select component
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
+                          value={field.value ?? '-'} 
+                          disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'separator')}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -370,7 +447,7 @@ export default function SegmentsPage() {
                             <Switch
                               checked={field.value}
                               onCheckedChange={field.onChange}
-                              disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
+                              disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom, 'isMandatoryForCoding')}
                             />
                           </FormControl>
                         </FormItem>
@@ -428,7 +505,7 @@ export default function SegmentsPage() {
                           if(currentSegmentData) {
                             form.reset({ 
                                 ...currentSegmentData,
-                                validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : undefined,
+                                validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(),
                                 validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
                             }); 
                           }
@@ -506,6 +583,3 @@ export default function SegmentsPage() {
     </div>
   );
 }
-
-
-    
