@@ -27,7 +27,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, FolderTree, AlertTriangle } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
 import type { Segment } from '@/lib/segment-types';
 
@@ -37,6 +37,13 @@ interface SegmentCode {
   code: string;
   description: string;
   summaryIndicator: boolean;
+}
+
+// Interface for a node in our hierarchy tree
+interface HierarchyNode {
+  id: string; // Unique ID for this node instance in the tree (can be segmentCode.id if codes are unique in tree)
+  segmentCode: SegmentCode;
+  children: HierarchyNode[];
 }
 
 // Updated mock data for segment codes, specific to this builder page
@@ -92,6 +99,92 @@ const hierarchyBuilderFormSchema = z.object({
 
 type HierarchyBuilderFormValues = z.infer<typeof hierarchyBuilderFormSchema>;
 
+// Helper to check if a code already exists anywhere in the tree
+const codeExistsInTree = (nodes: HierarchyNode[], codeId: string): boolean => {
+  for (const node of nodes) {
+    if (node.id === codeId) return true;
+    if (node.children && node.children.length > 0) {
+      if (codeExistsInTree(node.children, codeId)) return true;
+    }
+  }
+  return false;
+};
+
+// Helper function to recursively find a node by ID and add a child
+const addChildToNode = (nodes: HierarchyNode[], parentId: string, childNode: HierarchyNode): HierarchyNode[] => {
+  return nodes.map(node => {
+    if (node.id === parentId) {
+      if (!node.segmentCode.summaryIndicator) {
+        alert(`Cannot add child to detail code "${node.segmentCode.code}". Select a summary code.`);
+        return node;
+      }
+      if (node.children.find(c => c.id === childNode.id)) {
+          alert(`Code ${childNode.segmentCode.code} already exists under this parent.`);
+          return node;
+      }
+      if (childNode.segmentCode.summaryIndicator && !node.segmentCode.summaryIndicator) {
+        alert(`Summary code ${childNode.segmentCode.code} cannot be child of detail code ${node.segmentCode.code}.`);
+        return node;
+      }
+      return { ...node, children: [...node.children, childNode] };
+    }
+    if (node.children && node.children.length > 0) {
+      return { ...node, children: addChildToNode(node.children, parentId, childNode) };
+    }
+    return node;
+  });
+};
+
+
+// Recursive component to display tree nodes
+const TreeNodeDisplay: React.FC<{ 
+  node: HierarchyNode; 
+  level: number; 
+  selectedParentNodeId: string | null;
+  onSelectParent: (nodeId: string) => void;
+}> = ({ node, level, selectedParentNodeId, onSelectParent }) => {
+  const isSelectedParent = node.id === selectedParentNodeId;
+  const canBeParent = node.segmentCode.summaryIndicator;
+
+  return (
+    <div 
+      style={{ marginLeft: `${level * 20}px` }}
+      className={`p-3 border rounded-md mb-2 shadow-sm ${isSelectedParent ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-card hover:bg-accent/50'}`}
+      onClick={() => canBeParent && onSelectParent(node.id)}
+    >
+      <div className="font-medium text-primary flex items-center">
+        {node.segmentCode.code} - {node.segmentCode.description}
+      </div>
+      <div className="text-xs text-muted-foreground mt-1">
+        Type: {node.segmentCode.summaryIndicator ? 'Summary (Parent)' : 'Detail (Child)'}
+      </div>
+      {canBeParent && (
+        <div className="text-xs mt-1">
+          {isSelectedParent ? (
+            <span className="text-green-600 font-semibold">(Selected as Parent for new children)</span>
+          ) : (
+            <span className="text-blue-600 cursor-pointer hover:underline">(Click to select as parent)</span>
+          )}
+        </div>
+      )}
+      {node.children && node.children.length > 0 && (
+        <div className="mt-3 pl-4 border-l-2 border-blue-200">
+          {node.children.map(child => (
+            <TreeNodeDisplay 
+              key={child.id} 
+              node={child} 
+              level={level + 1} 
+              selectedParentNodeId={selectedParentNodeId}
+              onSelectParent={onSelectParent}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 export default function HierarchyBuildPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -101,7 +194,10 @@ export default function HierarchyBuildPage() {
   const [availableSummaryCodes, setAvailableSummaryCodes] = useState<SegmentCode[]>([]);
   const [availableDetailCodes, setAvailableDetailCodes] = useState<SegmentCode[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [treeNodes, setTreeNodes] = useState<SegmentCode[]>([]); // State for dropped nodes
+  
+  const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]); 
+  const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
+
 
   const segmentId = searchParams.get('segmentId');
 
@@ -123,9 +219,11 @@ export default function HierarchyBuildPage() {
         setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator));
         setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator));
       } else {
+        // If segment not found, redirect or handle error
         router.push('/configure/hierarchies');
       }
     } else {
+      // If no segmentId, redirect or handle error
       router.push('/configure/hierarchies');
     }
   }, [segmentId, getSegmentById, router, searchTerm]);
@@ -141,8 +239,8 @@ export default function HierarchyBuildPage() {
 
   const onSubmit = (values: HierarchyBuilderFormValues) => {
     console.log('Hierarchy Form Submitted:', values);
-    console.log('Current Tree Nodes:', treeNodes);
-    alert(`Hierarchy "${values.hierarchyName}" save action placeholder. Tree building logic not yet implemented. See console for data.`);
+    console.log('Current Tree Nodes:', JSON.stringify(treeNodes, null, 2)); // Pretty print tree
+    alert(`Hierarchy "${values.hierarchyName}" save action placeholder. Tree structure logged to console. Full save logic not yet implemented.`);
     if (segmentId) {
         router.push(`/configure/hierarchies?segmentId=${segmentId}`);
     } else {
@@ -162,7 +260,8 @@ export default function HierarchyBuildPage() {
     form.reset();
     setSearchTerm('');
     setTreeNodes([]);
-    alert('Reset Hierarchy action placeholder. Form and tree structure (if any) cleared.');
+    setSelectedParentNodeId(null);
+    alert('Reset Hierarchy action placeholder. Form and tree structure cleared.');
   };
 
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>, code: SegmentCode) => {
@@ -171,26 +270,58 @@ export default function HierarchyBuildPage() {
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault(); // Necessary to allow dropping
+    event.preventDefault(); 
     event.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const codeDataString = event.dataTransfer.getData('application/json');
-    if (codeDataString) {
-      try {
-        const code: SegmentCode = JSON.parse(codeDataString);
-        // Basic check to prevent duplicates, more complex logic needed for real tree
-        if (!treeNodes.find(node => node.id === code.id)) {
-            setTreeNodes(prevNodes => [...prevNodes, code]);
-        } else {
-            alert(`Code ${code.code} is already in the hierarchy.`);
-        }
-      } catch (e) {
-        console.error("Failed to parse dropped data:", e);
+    if (!codeDataString) return;
+
+    try {
+      const droppedSegmentCode: SegmentCode = JSON.parse(codeDataString);
+      
+      if (codeExistsInTree(treeNodes, droppedSegmentCode.id)) {
+        alert(`Code ${droppedSegmentCode.code} already exists in the hierarchy.`);
+        return;
       }
+
+      const newNode: HierarchyNode = {
+        id: droppedSegmentCode.id, // Use segment code ID as node ID
+        segmentCode: droppedSegmentCode,
+        children: [],
+      };
+
+      if (treeNodes.length === 0) { // First node being added
+        if (!newNode.segmentCode.summaryIndicator) {
+          alert('The first node in a hierarchy must be a summary code.');
+          return;
+        }
+        setTreeNodes([newNode]);
+        setSelectedParentNodeId(newNode.id); // Auto-select the first root as parent
+      } else {
+        if (selectedParentNodeId) {
+          // Add as child to the selected parent
+          setTreeNodes(prevNodes => addChildToNode(prevNodes, selectedParentNodeId, newNode));
+        } else {
+          // No parent selected, attempt to add as a new root
+          if (!newNode.segmentCode.summaryIndicator) {
+            alert('Cannot add a detail code as a new root. Select a summary parent or add a summary code as a new root.');
+            return;
+          }
+          setTreeNodes(prevNodes => [...prevNodes, newNode]);
+          setSelectedParentNodeId(newNode.id); // Auto-select new root as parent
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse dropped data or add to tree:", e);
+      alert("Error processing dropped code.");
     }
+  };
+  
+  const handleSelectParent = (nodeId: string) => {
+    setSelectedParentNodeId(nodeId);
   };
 
 
@@ -207,6 +338,20 @@ export default function HierarchyBuildPage() {
     { label: 'Hierarchies', href: `/configure/hierarchies?segmentId=${selectedSegment.id}` },
     { label: 'Build Hierarchy' },
   ];
+
+  const getDropZoneMessage = () => {
+    if (treeNodes.length === 0) {
+      return "Drag a SUMMARY code here from the left panel to start building your hierarchy root.";
+    }
+    if (!selectedParentNodeId) {
+      return "Select a summary node from the tree to add children, or drag another SUMMARY code here to create a new root.";
+    }
+    // Find selected parent details (optional, for more specific message)
+    // const findNode = (nodes: HierarchyNode[], id: string | null): HierarchyNode | null => { ... }
+    // const parent = findNode(treeNodes, selectedParentNodeId);
+    // if (parent) return `Drag codes here to add as children to ${parent.segmentCode.code}.`;
+    return "Drag codes here to add as children to the selected parent node. You can also drag a new SUMMARY code to start another root.";
+  };
 
   return (
     <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
@@ -314,18 +459,18 @@ export default function HierarchyBuildPage() {
                       key={code.id}
                       draggable="true"
                       onDragStart={(e) => handleDragStart(e, code)}
-                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab"
+                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
                     >
-                      <GripVertical className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <div>
+                      <GripVertical className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-grow">
                         <div className="font-medium">{code.code}</div>
                         <div className="text-xs text-muted-foreground">{code.description}</div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground px-2 py-1">
-                    {searchTerm ? 'No matching summary codes found.' : 'No summary codes available for this segment.'}
+                   <p className="text-sm text-muted-foreground px-2 py-1">
+                    {searchTerm ? 'No matching summary codes found.' : 'No summary codes available.'}
                   </p>
                 )}
               </ScrollArea>
@@ -339,10 +484,10 @@ export default function HierarchyBuildPage() {
                       key={code.id}
                       draggable="true"
                       onDragStart={(e) => handleDragStart(e, code)}
-                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab"
+                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
                     >
-                      <GripVertical className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <div>
+                      <GripVertical className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-grow">
                         <div className="font-medium">{code.code}</div>
                         <div className="text-xs text-muted-foreground">{code.description}</div>
                       </div>
@@ -350,7 +495,7 @@ export default function HierarchyBuildPage() {
                   ))
                 ) : (
                   <p className="text-sm text-muted-foreground px-2 py-1">
-                     {searchTerm ? 'No matching detail codes found.' : 'No detail codes available for this segment.'}
+                     {searchTerm ? 'No matching detail codes found.' : 'No detail codes available.'}
                   </p>
                 )}
               </ScrollArea>
@@ -367,23 +512,29 @@ export default function HierarchyBuildPage() {
           <CardHeader>
             <CardTitle>Hierarchy Structure</CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 p-6 overflow-y-auto">
+          <CardContent className="flex-1 p-6 overflow-y-auto bg-slate-50"> {/* Added bg-slate-50 for dropzone distinction */}
             {treeNodes.length === 0 ? (
-              <div className="text-center text-muted-foreground">
-                <p className="text-lg mb-2">Drag summary and detail codes here from the left panel to build your hierarchy.</p>
-                <p className="text-sm">(Full interactive tree builder will be implemented in a future step.)</p>
+              <div className="text-center text-muted-foreground h-full flex flex-col items-center justify-center">
+                <FolderTree className="w-16 h-16 text-slate-400 mb-4" />
+                <p className="text-lg mb-2">{getDropZoneMessage()}</p>
+                <p className="text-sm">(Only SUMMARY codes can be parents. Click a summary node in the tree to select it as the parent for new children.)</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {treeNodes.map((node, index) => (
-                  <div key={`${node.id}-${index}`} className="p-3 border rounded-md bg-card shadow-sm">
-                    <div className="font-medium text-primary">{node.code} - {node.description}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Type: {node.summaryIndicator ? 'Summary (Parent)' : 'Detail (Child)'}
-                    </div>
-                    {/* Placeholder for child nodes and further tree structure */}
-                  </div>
+                {treeNodes.map((rootNode) => (
+                  <TreeNodeDisplay 
+                    key={rootNode.id} 
+                    node={rootNode} 
+                    level={0} 
+                    selectedParentNodeId={selectedParentNodeId}
+                    onSelectParent={handleSelectParent}
+                  />
                 ))}
+                 {selectedParentNodeId && (
+                    <div className="mt-4 p-3 border border-dashed border-green-500 rounded-md bg-green-50 text-center text-sm text-green-700">
+                        New children will be added to the selected parent. Drag and drop here.
+                    </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -405,4 +556,6 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
+    
+
     
