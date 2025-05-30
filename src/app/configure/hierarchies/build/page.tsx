@@ -103,7 +103,7 @@ type HierarchyBuilderFormValues = z.infer<typeof hierarchyBuilderFormSchema>;
 // Helper to check if a code already exists anywhere in the tree
 const codeExistsInTree = (nodes: HierarchyNode[], codeId: string): boolean => {
   for (const node of nodes) {
-    if (node.id === codeId) return true;
+    if (node.segmentCode.id === codeId) return true; // Check against segmentCode.id
     if (node.children && node.children.length > 0) {
       if (codeExistsInTree(node.children, codeId)) return true;
     }
@@ -144,7 +144,8 @@ const addChildToNode = (nodes: HierarchyNode[], parentId: string, childNode: Hie
         alert(`Cannot add child to detail code "${node.segmentCode.code}". Select a summary code.`);
         return node;
       }
-      if (node.children.find(c => c.id === childNode.id)) {
+      // Check if the child segmentCode.id already exists under this parent
+      if (node.children.find(c => c.segmentCode.id === childNode.segmentCode.id)) {
           alert(`Code ${childNode.segmentCode.code} already exists under this parent.`);
           return node;
       }
@@ -187,7 +188,7 @@ const TreeNodeDisplay: React.FC<{
       className={`relative p-3 border rounded-md mb-2 shadow-sm ${isSelectedParent ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-card hover:bg-accent/50'}`}
       onClick={(e) => {
         if (canBeParent) {
-          e.stopPropagation();
+          e.stopPropagation(); // Prevent event bubbling if needed
           onSelectParent(node.id);
         }
       }}
@@ -197,7 +198,7 @@ const TreeNodeDisplay: React.FC<{
         size="icon"
         className="absolute top-1 right-1 h-6 w-6 text-destructive hover:text-destructive/80"
         onClick={(e) => {
-          e.stopPropagation();
+          e.stopPropagation(); // Prevent event bubbling to the parent div's onClick
           onRemoveNode(node.id);
         }}
         aria-label="Remove node"
@@ -243,7 +244,6 @@ export default function HierarchyBuildPage() {
   const searchParams = useSearchParams();
   const { getSegmentById } = useSegments();
 
-  // Moved useState declarations for treeNodes and selectedParentNodeId up
   const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]);
   const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
 
@@ -277,9 +277,11 @@ export default function HierarchyBuildPage() {
       const segment = getSegmentById(segmentId);
       if (segment) {
         setSelectedSegment(segment);
-        const codesForSegment = mockSegmentCodesForBuilder[segment.id] || [];
-        // Sort all codes numerically for robust range selection
-        setAllSegmentCodes(codesForSegment.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })));
+        // Sort all codes numerically for robust range selection, then filter based on search
+        const codesForSegment = (mockSegmentCodesForBuilder[segment.id] || [])
+          .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+        
+        setAllSegmentCodes(codesForSegment); // Store all sorted codes for range functionality
 
         const filteredCodes = searchTerm
           ? codesForSegment.filter(
@@ -289,8 +291,8 @@ export default function HierarchyBuildPage() {
             )
           : codesForSegment;
 
-        setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator).sort((a,b) => a.code.localeCompare(b.code, undefined, {numeric: true})));
-        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator).sort((a,b) => a.code.localeCompare(b.code, undefined, {numeric: true})));
+        setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator)); // No need to re-sort here
+        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator)); // No need to re-sort here
       } else {
         router.push('/configure/hierarchies');
       }
@@ -356,12 +358,12 @@ export default function HierarchyBuildPage() {
       const droppedSegmentCode: SegmentCode = JSON.parse(codeDataString);
 
       if (codeExistsInTree(treeNodes, droppedSegmentCode.id)) {
-        alert(`Code ${droppedSegmentCode.code} already exists in the hierarchy.`);
+        alert(`Code ${droppedSegmentCode.code} (ID: ${droppedSegmentCode.id}) already exists anywhere in the hierarchy.`);
         return;
       }
 
       const newNode: HierarchyNode = {
-        id: droppedSegmentCode.id,
+        id: crypto.randomUUID(), // Ensure unique node ID for tree operations
         segmentCode: droppedSegmentCode,
         children: [],
       };
@@ -387,7 +389,7 @@ export default function HierarchyBuildPage() {
             return;
           }
           setTreeNodes(prevNodes => [...prevNodes, newNode]);
-          setSelectedParentNodeId(newNode.id);
+          setSelectedParentNodeId(newNode.id); // Select new root as parent
         }
       }
     } catch (e) {
@@ -400,6 +402,9 @@ export default function HierarchyBuildPage() {
     const node = findNodeById(treeNodes, nodeId);
     if (node && node.segmentCode.summaryIndicator) {
       setSelectedParentNodeId(nodeId);
+    } else if (node && !node.segmentCode.summaryIndicator) {
+        setSelectedParentNodeId(null); // Clear parent if a detail node somehow gets clicked (though it shouldn't be selectable)
+        alert("Detail codes cannot be selected as parents.");
     } else {
       setSelectedParentNodeId(null); 
     }
@@ -421,7 +426,7 @@ export default function HierarchyBuildPage() {
     }
     const parentNode = findNodeById(treeNodes, selectedParentNodeId);
     if (!parentNode || !parentNode.segmentCode.summaryIndicator) {
-      alert('Selected parent is not a valid summary code.');
+      alert('Selected parent is not a valid summary code or not found.');
       return;
     }
     if (!rangeStartCode || !rangeEndCode) {
@@ -442,36 +447,58 @@ export default function HierarchyBuildPage() {
     }
 
     const codesToAddInRange = allSegmentCodes.slice(startIndex, endIndex + 1);
-    let newTreeNodes = [...treeNodes];
+    let newTreeNodesState = [...treeNodes]; // Work with a mutable copy for this iteration
     let codesAddedCount = 0;
-    const codesSkipped: string[] = [];
+    const codesSkippedGlobally: string[] = [];
+    const codesSkippedLocally: string[] = [];
+
 
     codesToAddInRange.forEach(code => {
-      if (codeExistsInTree(newTreeNodes, code.id)) { 
-        codesSkipped.push(code.code);
-        return;
+      if (codeExistsInTree(newTreeNodesState, code.id)) { 
+        codesSkippedGlobally.push(code.code);
+        return; // Skip if code already exists anywhere in the tree
       }
       
       const newNode: HierarchyNode = {
-        id: code.id,
+        id: crypto.randomUUID(), // Unique ID for the new node instance
         segmentCode: code,
         children: [],
       };
       
-      const previousNodeCount = (findNodeById(newTreeNodes, selectedParentNodeId)?.children || []).length;
-      const tempTree = addChildToNode(newTreeNodes, selectedParentNodeId, newNode);
-      const currentNodeCount = (findNodeById(tempTree, selectedParentNodeId)?.children || []).length;
+      // Temporarily simulate adding to a copy to check if addChildToNode would succeed
+      // by checking if the children count changes for the selected parent.
+      const parentNodeBeforeAdd = findNodeById(newTreeNodesState, selectedParentNodeId);
+      const childrenCountBefore = parentNodeBeforeAdd?.children.length ?? 0;
 
-      if (currentNodeCount > previousNodeCount) {
-         newTreeNodes = tempTree;
+      const tempTreeWithPotentiallyNewChild = addChildToNode(newTreeNodesState, selectedParentNodeId, newNode);
+      
+      const parentNodeAfterAdd = findNodeById(tempTreeWithPotentiallyNewChild, selectedParentNodeId);
+      const childrenCountAfter = parentNodeAfterAdd?.children.length ?? 0;
+
+      if (childrenCountAfter > childrenCountBefore) {
+         newTreeNodesState = tempTreeWithPotentiallyNewChild; // Commit the change
          codesAddedCount++;
-      } 
+      } else {
+        // addChildToNode might have alerted and not added (e.g. duplicate under parent)
+        // We need to know if it was skipped due to local duplicate vs global.
+        // If it wasn't skipped globally, but didn't add, it was likely a local duplicate.
+        if (!codesSkippedGlobally.includes(code.code)) {
+            codesSkippedLocally.push(code.code);
+        }
+      }
     });
 
-    setTreeNodes(newTreeNodes);
+    setTreeNodes(newTreeNodesState); // Set the final state once after processing all codes
     setRangeStartCode('');
     setRangeEndCode('');
-    alert(`${codesAddedCount} codes added to parent "${parentNode.segmentCode.code}". ${codesSkipped.length > 0 ? `Skipped existing codes (globally): ${codesSkipped.join(', ')}` : ''}`);
+    let message = `${codesAddedCount} codes added to parent "${parentNode.segmentCode.code}".`;
+    if (codesSkippedGlobally.length > 0) {
+        message += ` Skipped globally existing codes: ${codesSkippedGlobally.join(', ')}.`;
+    }
+    if (codesSkippedLocally.length > 0) {
+        message += ` Skipped codes already under this parent: ${codesSkippedLocally.join(', ')}.`;
+    }
+    alert(message.trim());
   };
 
 
@@ -589,7 +616,7 @@ export default function HierarchyBuildPage() {
               <div className="px-4 pt-4 pb-2">
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Summary Codes (Parents)</h4>
               </div>
-              <ScrollArea className="flex-1 min-h-0 px-4">
+              <ScrollArea className="min-h-0 px-4 max-h-48">
                 {availableSummaryCodes.length > 0 ? (
                   availableSummaryCodes.map(code => (
                     <div
@@ -614,7 +641,7 @@ export default function HierarchyBuildPage() {
                <div className="px-4 pt-2 border-t">
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Detail Codes (Children)</h4>
               </div>
-              <ScrollArea className="flex-1 min-h-0 px-4 pb-1">
+              <ScrollArea className="min-h-0 px-4 pb-1 max-h-48">
                  {availableDetailCodes.length > 0 ? (
                   availableDetailCodes.map(code => (
                     <div
@@ -700,18 +727,23 @@ export default function HierarchyBuildPage() {
                       onRemoveNode={handleRemoveNode}
                     />
                   ))}
-                  {selectedParentNodeId && treeNodes.length > 0 && !selectedParentNodeDetails?.segmentCode.summaryIndicator && (
-                     <div className="mt-4 p-3 border border-dashed border-destructive rounded-md bg-red-50 text-center text-sm text-destructive flex items-center justify-center">
+                  {selectedParentNodeId && treeNodes.length > 0 && selectedParentNodeDetails && !selectedParentNodeDetails.segmentCode.summaryIndicator && (
+                     <div className="mt-4 p-3 border border-dashed border-destructive rounded-md bg-red-50/70 text-center text-sm text-destructive flex items-center justify-center">
                         <AlertTriangle className="h-4 w-4 mr-2"/>
-                        The selected node is a DETAIL code. You cannot add children to it. Please select a SUMMARY node.
+                        The selected node ('{selectedParentNodeDetails.segmentCode.code}') is a DETAIL code. You cannot add children to it. Please select a SUMMARY node.
                     </div>
                   )}
                 </div>
               )}
             </ScrollArea>
              {selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
-                <div className="mt-4 p-3 border border-dashed border-green-500 rounded-md bg-green-50 text-center text-sm text-green-700">
+                <div className="mt-4 p-3 border border-dashed border-green-500 rounded-md bg-green-50/70 text-center text-sm text-green-700">
                     New children will be added to parent: '{selectedParentNodeDetails.segmentCode.code} - {selectedParentNodeDetails.segmentCode.description}'. Drag and drop or use 'Add Range'.
+                </div>
+            )}
+             {!selectedParentNodeId && treeNodes.length > 0 && (
+                <div className="mt-4 p-3 border border-dashed border-blue-500 rounded-md bg-blue-50/70 text-center text-sm text-blue-700">
+                    No parent selected. Drag a new SUMMARY code to create another root, or click an existing SUMMARY node to select it as parent.
                 </div>
             )}
           </CardContent>
@@ -732,3 +764,5 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
+
+    
