@@ -120,7 +120,10 @@ export default function SegmentCodesPage() {
     });
     if (data['fund']) {
       data['fund'] = [
-        { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail", external3: "Ref1", external4: "Ref2", external5: "Ref3", availableForTransactionCoding: true, availableForBudgeting: true },
+        { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: true, external1: "GF-001", external2: "Summary", external3: "Ref1", external4: "Ref2", external5: "Ref3", availableForTransactionCoding: false, availableForBudgeting: true },
+        { id: 'fund-code-3', code: '101', description: 'Special Revenue Fund A', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "SRFA-001", availableForTransactionCoding: true, availableForBudgeting: true },
+        { id: 'fund-code-4', code: '102', description: 'Capital Projects Fund B', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "CPFB-001", availableForTransactionCoding: true, availableForBudgeting: true },
+        { id: 'fund-code-5', code: '103', description: 'Debt Service Fund C', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "DSFC-001", availableForTransactionCoding: true, availableForBudgeting: true },
         { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary", external3: "RefA", availableForTransactionCoding: false, availableForBudgeting: true },
       ];
     }
