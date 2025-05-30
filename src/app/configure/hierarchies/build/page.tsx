@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -26,8 +27,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { GripVertical } from 'lucide-react'; // For drag handle icon
+import { GripVertical } from 'lucide-react'; 
 import { useSegments } from '@/contexts/SegmentsContext';
 import type { Segment } from '@/lib/segment-types';
 
@@ -39,31 +39,31 @@ interface SegmentCode {
   summaryIndicator: boolean;
 }
 
-// Mock data for segment codes, specific to this builder page for demonstration
-// This would ideally come from a shared context or be fetched for the selectedSegment
+// Updated mock data for segment codes, specific to this builder page
 const mockSegmentCodesForBuilder: Record<string, SegmentCode[]> = {
   'fund': [
-    { id: 'f-100', code: '100', description: 'General Fund', summaryIndicator: true },
-    { id: 'f-110', code: '110', description: 'Restricted Fund', summaryIndicator: true },
-    { id: 'f-111', code: '111', description: 'Grant A Revenue', summaryIndicator: false },
-    { id: 'f-112', code: '112', description: 'Grant B Revenue', summaryIndicator: false },
-    { id: 'f-120', code: '120', description: 'Donation Revenue', summaryIndicator: false },
-    { id: 'f-200', code: '200', description: 'Capital Projects Fund', summaryIndicator: true },
-    { id: 'f-201', code: '201', description: 'Building Project', summaryIndicator: false },
+    { id: 'fb-f-100', code: '100', description: 'General Fund (Summary)', summaryIndicator: true },
+    { id: 'fb-f-101', code: '101', description: 'Operating Sub-Fund A (Detail)', summaryIndicator: false },
+    { id: 'fb-f-102', code: '102', description: 'Operating Sub-Fund B (Detail)', summaryIndicator: false },
+    { id: 'fb-f-200', code: '200', description: 'Restricted Funds (Summary)', summaryIndicator: true },
+    { id: 'fb-f-210', code: '210', description: 'Grant Fund X (Detail)', summaryIndicator: false },
+    { id: 'fb-f-220', code: '220', description: 'Donation Fund Y (Detail)', summaryIndicator: false },
+    { id: 'fb-f-300', code: '300', description: 'Capital Projects (Summary)', summaryIndicator: true },
+    { id: 'fb-f-301', code: '301', description: 'Building Project Z (Detail)', summaryIndicator: false },
   ],
   'department': [
-    { id: 'd-FIN', code: 'FIN', description: 'Finance Department', summaryIndicator: true },
-    { id: 'd-HR', code: 'HR', description: 'Human Resources', summaryIndicator: true },
-    { id: 'd-FIN-ACC', code: 'FIN-ACC', description: 'Accounting', summaryIndicator: false },
-    { id: 'd-FIN-BUD', code: 'FIN-BUD', description: 'Budgeting', summaryIndicator: false },
-    { id: 'd-IT', code: 'IT', description: 'IT Department', summaryIndicator: false },
+    { id: 'fb-d-FIN', code: 'FIN', description: 'Finance Department (Summary)', summaryIndicator: true },
+    { id: 'fb-d-HR', code: 'HR', description: 'Human Resources (Summary)', summaryIndicator: true },
+    { id: 'fb-d-FIN-ACC', code: 'FIN-ACC', description: 'Accounting (Detail)', summaryIndicator: false },
+    { id: 'fb-d-FIN-BUD', code: 'FIN-BUD', description: 'Budgeting (Detail)', summaryIndicator: false },
+    { id: 'fb-d-IT', code: 'IT', description: 'IT Department (Detail)', summaryIndicator: false },
   ],
   'object': [
-    { id: 'o-5000', code: '5000', description: 'Salaries & Wages', summaryIndicator: true },
-    { id: 'o-5100', code: '5100', description: 'Full-time Salaries', summaryIndicator: false },
-    { id: 'o-5200', code: '5200', description: 'Part-time Salaries', summaryIndicator: false },
-    { id: 'o-6000', code: '6000', description: 'Operating Expenses', summaryIndicator: true },
-    { id: 'o-6100', code: '6100', description: 'Office Supplies', summaryIndicator: false },
+    { id: 'fb-o-5000', code: '5000', description: 'Salaries & Wages (Summary)', summaryIndicator: true },
+    { id: 'fb-o-5100', code: '5100', description: 'Full-time Salaries (Detail)', summaryIndicator: false },
+    { id: 'fb-o-5200', code: '5200', description: 'Part-time Salaries (Detail)', summaryIndicator: false },
+    { id: 'fb-o-6000', code: '6000', description: 'Operating Expenses (Summary)', summaryIndicator: true },
+    { id: 'fb-o-6100', code: '6100', description: 'Office Supplies (Detail)', summaryIndicator: false },
   ]
 };
 
@@ -299,8 +299,8 @@ export default function HierarchyBuildPage() {
           </CardContent>
         </Card>
 
-        {/* Center Panel - Assignment Tools */}
-        <Card className="lg:col-span-2 flex flex-col"> {/* Combined Center and Right for now */}
+        {/* Center Panel - Assignment Tools & Right Panel - Live Tree Preview (Combined) */}
+        <Card className="lg:col-span-2 flex flex-col"> 
           <CardHeader>
             <CardTitle>Hierarchy Structure</CardTitle>
           </CardHeader>
