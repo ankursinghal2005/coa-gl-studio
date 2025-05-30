@@ -51,7 +51,7 @@ import type { Segment, DataType } from '@/lib/segment-types';
 
 const segmentFormSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
-  segmentType: z.string().optional(), 
+  segmentType: z.string().optional(),
   dataType: z.enum(['Alphanumeric', 'Numeric', 'Text'], { required_error: "Data Type is required." }),
   maxLength: z.coerce.number({ required_error: "Max Length is required.", invalid_type_error: "Max Length must be a number." }).int().positive({ message: "Max Length must be a positive number." }),
   specialCharsAllowed: z.string({required_error: "Special Characters Allowed is required."}).refine(value => value !== null, { message: "Special Characters Allowed cannot be null." }),
@@ -213,18 +213,10 @@ export default function SegmentsPage() {
     if (dialogMode === 'view') return true;
 
     if (dialogMode === 'edit') {
-      // DisplayName is editable for ALL segments in edit mode.
-      if (fieldName === 'displayName') return false;
-
-      // For other fields:
-      // Core segments: all other fields are disabled.
-      if (isCoreSegment) return true;
-      
-      // SegmentType is not directly editable for any segment (custom or standard).
-      if (fieldName === 'segmentType') return true;
+      if (fieldName === 'displayName') return false; // DisplayName always editable in edit mode
+      if (isCoreSegment) return true; // All other fields for core segments are disabled in edit mode
+      if (fieldName === 'segmentType') return true; // SegmentType is not directly editable
     }
-    // Default to enabled for non-core segments for fields other than displayName & segmentType in edit mode,
-    // and for all relevant fields in add mode.
     return false; 
   };
   
@@ -498,7 +490,7 @@ export default function SegmentsPage() {
                   {dialogMode === 'view' && currentSegmentData && (
                     <>
                       <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Close</Button>
-                      <Button type="button" onClick={handleEditSegmentClick}>Edit</Button>
+                      {currentSegmentData && <Button type="button" onClick={handleEditSegmentClick}>Edit</Button>}
                     </>
                   )}
                   {dialogMode === 'edit' && (
@@ -546,13 +538,6 @@ export default function SegmentsPage() {
                       >
                         {segment.displayName}
                       </span>
-                      {(segment.validFrom || segment.validTo) && (
-                        <p className="text-xs text-muted-foreground">
-                          {segment.validFrom && format(new Date(segment.validFrom), "MMM d, yyyy")}
-                          {segment.validFrom && segment.validTo && " - "}
-                          {segment.validTo && format(new Date(segment.validTo), "MMM d, yyyy")}
-                        </p>
-                      )}
                     </TableCell>
                     <TableCell>{segment.segmentType}</TableCell>
                     <TableCell className="text-right">
