@@ -43,15 +43,23 @@ interface SegmentCode {
 const mockSegmentCodesForBuilder: Record<string, SegmentCode[]> = {
   'fund': [
     { id: 'fb-f-100', code: '100', description: 'General Fund', summaryIndicator: true },
-    { id: 'fb-f-101', code: '101', description: 'Special Revenue Fund A', summaryIndicator: false },
-    { id: 'fb-f-102', code: '102', description: 'Capital Projects Fund B', summaryIndicator: false },
-    { id: 'fb-f-103', code: '103', description: 'Debt Service Fund C', summaryIndicator: false },
-    { id: 'fb-f-200', code: '200', description: 'Grant Fund', summaryIndicator: true },
-    { id: 'fb-f-201', code: '201', description: 'Special Revenue Fund D', summaryIndicator: false },
-    { id: 'fb-f-202', code: '202', description: 'Capital Projects Fund E', summaryIndicator: false },
-    { id: 'fb-f-203', code: '203', description: 'Debt Service Fund F', summaryIndicator: false },
-    { id: 'fb-f-300', code: '300', description: 'Capital Projects (Summary)', summaryIndicator: true }, // Example from previous
-    { id: 'fb-f-301', code: '301', description: 'Building Project Z (Detail)', summaryIndicator: false }, // Example from previous
+    { id: 'fb-f-101', code: '101', description: 'Governmental Operating Fund', summaryIndicator: false },
+    { id: 'fb-f-102', code: '102', description: 'Enterprise Parking Fund', summaryIndicator: false },
+    { id: 'fb-f-103', code: '103', description: 'Special Revenue Fund - Grants', summaryIndicator: false },
+    { id: 'fb-f-104', code: '104', description: 'Capital Projects Fund - Infrastructure', summaryIndicator: false },
+    { id: 'fb-f-105', code: '105', description: 'Debt Service Fund - Bonds', summaryIndicator: false },
+    { id: 'fb-f-106', code: '106', description: 'Internal Service Fund - IT', summaryIndicator: false },
+    { id: 'fb-f-107', code: '107', description: 'Trust Fund - Pension', summaryIndicator: false },
+    { id: 'fb-f-108', code: '108', description: 'Agency Fund - Payroll Deductions', summaryIndicator: false },
+    { id: 'fb-f-109', code: '109', description: 'Permanent Fund - Library Endowment', summaryIndicator: false },
+    { id: 'fb-f-200', code: '200', description: 'Grants & Donations Fund', summaryIndicator: true },
+    { id: 'fb-f-210', code: '210', description: 'Federal Grant A', summaryIndicator: false },
+    { id: 'fb-f-220', code: '220', description: 'State Grant B', summaryIndicator: false },
+    { id: 'fb-f-230', code: '230', description: 'Private Donation C', summaryIndicator: false },
+    { id: 'fb-f-300', code: '300', description: 'Capital Outlay Fund', summaryIndicator: true },
+    { id: 'fb-f-301', code: '301', description: 'Building Project Z (Detail)', summaryIndicator: false },
+    { id: 'fb-f-310', code: '310', description: 'Equipment Purchase X', summaryIndicator: false },
+    { id: 'fb-f-320', code: '320', description: 'Infrastructure Upgrade Y', summaryIndicator: false },
   ],
   'department': [
     { id: 'fb-d-FIN', code: 'FIN', description: 'Finance Department (Summary)', summaryIndicator: true },
@@ -59,6 +67,9 @@ const mockSegmentCodesForBuilder: Record<string, SegmentCode[]> = {
     { id: 'fb-d-FIN-ACC', code: 'FIN-ACC', description: 'Accounting (Detail)', summaryIndicator: false },
     { id: 'fb-d-FIN-BUD', code: 'FIN-BUD', description: 'Budgeting (Detail)', summaryIndicator: false },
     { id: 'fb-d-IT', code: 'IT', description: 'IT Department (Detail)', summaryIndicator: false },
+    { id: 'fb-d-PD', code: 'PD', description: 'Police Department', summaryIndicator: false },
+    { id: 'fb-d-FD', code: 'FD', description: 'Fire Department', summaryIndicator: false },
+    { id: 'fb-d-PW', code: 'PW', description: 'Public Works', summaryIndicator: false },
   ],
   'object': [
     { id: 'fb-o-5000', code: '5000', description: 'Salaries & Wages (Summary)', summaryIndicator: true },
@@ -66,6 +77,7 @@ const mockSegmentCodesForBuilder: Record<string, SegmentCode[]> = {
     { id: 'fb-o-5200', code: '5200', description: 'Part-time Salaries (Detail)', summaryIndicator: false },
     { id: 'fb-o-6000', code: '6000', description: 'Operating Expenses (Summary)', summaryIndicator: true },
     { id: 'fb-o-6100', code: '6100', description: 'Office Supplies (Detail)', summaryIndicator: false },
+    { id: 'fb-o-6200', code: '6200', description: 'Utilities (Detail)', summaryIndicator: false },
   ]
 };
 
@@ -88,6 +100,7 @@ export default function HierarchyBuildPage() {
   const [selectedSegment, setSelectedSegment] = useState<Segment | null>(null);
   const [availableSummaryCodes, setAvailableSummaryCodes] = useState<SegmentCode[]>([]);
   const [availableDetailCodes, setAvailableDetailCodes] = useState<SegmentCode[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const segmentId = searchParams.get('segmentId');
 
@@ -96,16 +109,27 @@ export default function HierarchyBuildPage() {
       const segment = getSegmentById(segmentId);
       if (segment) {
         setSelectedSegment(segment);
-        const codes = mockSegmentCodesForBuilder[segment.id] || [];
-        setAvailableSummaryCodes(codes.filter(c => c.summaryIndicator));
-        setAvailableDetailCodes(codes.filter(c => !c.summaryIndicator));
+        const allCodesForSegment = mockSegmentCodesForBuilder[segment.id] || [];
+        
+        const filteredCodes = searchTerm
+          ? allCodesForSegment.filter(
+              (code) =>
+                code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                code.description.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+          : allCodesForSegment;
+
+        setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator));
+        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator));
       } else {
+        // Segment ID is invalid or segment not found, redirect
         router.push('/configure/hierarchies');
       }
     } else {
+      // No segment ID provided, redirect
       router.push('/configure/hierarchies');
     }
-  }, [segmentId, getSegmentById, router]);
+  }, [segmentId, getSegmentById, router, searchTerm]);
 
   const form = useForm<HierarchyBuilderFormValues>({
     resolver: zodResolver(hierarchyBuilderFormSchema),
@@ -136,6 +160,7 @@ export default function HierarchyBuildPage() {
 
   const handleReset = () => {
     form.reset();
+    setSearchTerm('');
     // Future: Reset tree structure as well
     alert('Reset Hierarchy action placeholder.');
   };
@@ -248,7 +273,11 @@ export default function HierarchyBuildPage() {
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
             <div className="p-4 border-b">
-              <Input placeholder="Search codes..." disabled />
+              <Input 
+                placeholder="Search codes..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="p-4">
@@ -271,7 +300,9 @@ export default function HierarchyBuildPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">No summary codes available for this segment.</p>
+                  <p className="text-sm text-muted-foreground">
+                    {searchTerm ? 'No matching summary codes found.' : 'No summary codes available for this segment.'}
+                  </p>
                 )}
               </ScrollArea>
                <div className="p-4 border-t">
@@ -294,7 +325,9 @@ export default function HierarchyBuildPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">No detail codes available for this segment.</p>
+                  <p className="text-sm text-muted-foreground">
+                     {searchTerm ? 'No matching detail codes found.' : 'No detail codes available for this segment.'}
+                  </p>
                 )}
               </ScrollArea>
             </div>
