@@ -120,14 +120,14 @@ export default function SegmentCodesPage() {
     });
     if (data['fund']) {
       data['fund'] = [
-        { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: true, external1: "GF-001", external2: "Summary", external3: "Ref1", external4: "Ref2", external5: "Ref3", availableForTransactionCoding: false, availableForBudgeting: true },
-        { id: 'fund-code-3', code: '101', description: 'Special Revenue Fund A', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "SRFA-001", availableForTransactionCoding: true, availableForBudgeting: true },
-        { id: 'fund-code-4', code: '102', description: 'Capital Projects Fund B', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "CPFB-001", availableForTransactionCoding: true, availableForBudgeting: true },
-        { id: 'fund-code-5', code: '103', description: 'Debt Service Fund C', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "DSFC-001", availableForTransactionCoding: true, availableForBudgeting: true },
-        { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary", external3: "RefA", availableForTransactionCoding: false, availableForBudgeting: true },
-        { id: 'fund-code-6', code: '201', description: 'Special Revenue Fund D', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "SRFD-001", availableForTransactionCoding: true, availableForBudgeting: true },
-        { id: 'fund-code-7', code: '202', description: 'Capital Projects Fund E', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "CPFE-001", availableForTransactionCoding: true, availableForBudgeting: true },
-        { id: 'fund-code-8', code: '203', description: 'Debt Service Fund F', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "DSFF-001", availableForTransactionCoding: true, availableForBudgeting: true },
+        { id: 'fund-code-100', code: '100', description: 'General Fund', summaryIndicator: true, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: false, availableForBudgeting: true, external1: "GF-001" },
+        { id: 'fund-code-101', code: '101', description: 'Special Revenue Fund A', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "SRFA-001" },
+        { id: 'fund-code-102', code: '102', description: 'Capital Projects Fund B', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "CPFB-001" },
+        { id: 'fund-code-103', code: '103', description: 'Debt Service Fund C', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "DSFC-001" },
+        { id: 'fund-code-200', code: '200', description: 'Grant Fund', summaryIndicator: true, isActive: true, validFrom: new Date(2023, 6, 1), validTo: new Date(2024, 11, 31), availableForTransactionCoding: false, availableForBudgeting: true, external2: "Summary" },
+        { id: 'fund-code-201', code: '201', description: 'Special Revenue Fund D', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "SRFD-001" },
+        { id: 'fund-code-202', code: '202', description: 'Capital Projects Fund E', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "CPFE-001" },
+        { id: 'fund-code-203', code: '203', description: 'Debt Service Fund F', summaryIndicator: false, isActive: true, validFrom: new Date(2023, 0, 1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "DSFF-001" },
       ];
     }
     if (data['object']) {

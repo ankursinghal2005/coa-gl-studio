@@ -42,14 +42,16 @@ interface SegmentCode {
 // Updated mock data for segment codes, specific to this builder page
 const mockSegmentCodesForBuilder: Record<string, SegmentCode[]> = {
   'fund': [
-    { id: 'fb-f-100', code: '100', description: 'General Fund (Summary)', summaryIndicator: true },
-    { id: 'fb-f-101', code: '101', description: 'Operating Sub-Fund A (Detail)', summaryIndicator: false },
-    { id: 'fb-f-102', code: '102', description: 'Operating Sub-Fund B (Detail)', summaryIndicator: false },
-    { id: 'fb-f-200', code: '200', description: 'Restricted Funds (Summary)', summaryIndicator: true },
-    { id: 'fb-f-210', code: '210', description: 'Grant Fund X (Detail)', summaryIndicator: false },
-    { id: 'fb-f-220', code: '220', description: 'Donation Fund Y (Detail)', summaryIndicator: false },
-    { id: 'fb-f-300', code: '300', description: 'Capital Projects (Summary)', summaryIndicator: true },
-    { id: 'fb-f-301', code: '301', description: 'Building Project Z (Detail)', summaryIndicator: false },
+    { id: 'fb-f-100', code: '100', description: 'General Fund', summaryIndicator: true },
+    { id: 'fb-f-101', code: '101', description: 'Special Revenue Fund A', summaryIndicator: false },
+    { id: 'fb-f-102', code: '102', description: 'Capital Projects Fund B', summaryIndicator: false },
+    { id: 'fb-f-103', code: '103', description: 'Debt Service Fund C', summaryIndicator: false },
+    { id: 'fb-f-200', code: '200', description: 'Grant Fund', summaryIndicator: true },
+    { id: 'fb-f-201', code: '201', description: 'Special Revenue Fund D', summaryIndicator: false },
+    { id: 'fb-f-202', code: '202', description: 'Capital Projects Fund E', summaryIndicator: false },
+    { id: 'fb-f-203', code: '203', description: 'Debt Service Fund F', summaryIndicator: false },
+    { id: 'fb-f-300', code: '300', description: 'Capital Projects (Summary)', summaryIndicator: true }, // Example from previous
+    { id: 'fb-f-301', code: '301', description: 'Building Project Z (Detail)', summaryIndicator: false }, // Example from previous
   ],
   'department': [
     { id: 'fb-d-FIN', code: 'FIN', description: 'Finance Department (Summary)', summaryIndicator: true },
