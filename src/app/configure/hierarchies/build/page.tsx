@@ -280,10 +280,10 @@ export default function HierarchyBuildPage() {
               />
             </div>
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="p-4">
+              <div className="px-4 pt-4 pb-2">
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Summary Codes (Parents)</h4>
               </div>
-              <ScrollArea className="flex-1 min-h-0 px-4 pb-2"> {/* Changed pb-4 to pb-2 */}
+              <ScrollArea className="flex-1 min-h-0 px-4"> {/* Removed pb-2 */}
                 {availableSummaryCodes.length > 0 ? (
                   availableSummaryCodes.map(code => (
                     <div
@@ -300,15 +300,15 @@ export default function HierarchyBuildPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground px-2 py-1">
                     {searchTerm ? 'No matching summary codes found.' : 'No summary codes available for this segment.'}
                   </p>
                 )}
               </ScrollArea>
-               <div className="px-4 pt-2 border-t"> {/* Changed p-4 to px-4 pt-2 */}
+               <div className="px-4 pt-2 border-t">
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Detail Codes (Children)</h4>
               </div>
-              <ScrollArea className="flex-1 min-h-0 px-4 pb-4">
+              <ScrollArea className="flex-1 min-h-0 px-4 pb-1"> {/* Changed pb-4 to pb-1 */}
                  {availableDetailCodes.length > 0 ? (
                   availableDetailCodes.map(code => (
                     <div
@@ -325,7 +325,7 @@ export default function HierarchyBuildPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground px-2 py-1">
                      {searchTerm ? 'No matching detail codes found.' : 'No detail codes available for this segment.'}
                   </p>
                 )}
@@ -373,4 +373,4 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
-
+    
