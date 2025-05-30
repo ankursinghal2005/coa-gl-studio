@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from "date-fns";
+import { useSearchParams } from 'next/navigation'; // Added import
 import {
   Table,
   TableHeader,
@@ -42,12 +43,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useSegments } from '@/contexts/SegmentsContext'; // Import useSegments
-import type { Segment } from '@/lib/segment-types'; // Import Segment type
+import { useSegments } from '@/contexts/SegmentsContext';
+import type { Segment } from '@/lib/segment-types';
 
-// Segment interface is now imported
-
-// SegmentCode definition remains local to this page as it's specific to segment codes
 interface SegmentCode {
   id: string;
   code: string;
@@ -110,19 +108,16 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
 
 
 export default function SegmentCodesPage() {
-  const { segments: allAvailableSegments } = useSegments(); // Use segments from context
+  const { segments: allAvailableSegments } = useSegments();
+  const searchParams = useSearchParams();
   
-  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(
-    allAvailableSegments.length > 0 ? allAvailableSegments[0].id : null
-  );
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
 
-  // Initialize segmentCodesData dynamically based on segments from context
   const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>(() => {
     const data: Record<string, SegmentCode[]> = {};
     allAvailableSegments.forEach(segment => {
       data[segment.id] = []; 
     });
-    // Add some mock data for specific segments for demonstration, if segments exist
     if (data['fund']) {
       data['fund'] = [
         { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail", external3: "Ref1", external4: "Ref2", external5: "Ref3", availableForTransactionCoding: true, availableForBudgeting: true },
@@ -148,10 +143,17 @@ export default function SegmentCodesPage() {
   });
 
   useEffect(() => {
-    if (allAvailableSegments.length > 0 && !selectedSegmentId) {
+    const querySegmentId = searchParams.get('segmentId');
+    if (querySegmentId && allAvailableSegments.some(s => s.id === querySegmentId)) {
+      if (selectedSegmentId !== querySegmentId) {
+        setSelectedSegmentId(querySegmentId);
+      }
+    } else if (!selectedSegmentId && allAvailableSegments.length > 0) {
       setSelectedSegmentId(allAvailableSegments[0].id);
+    } else if (selectedSegmentId && !allAvailableSegments.some(s => s.id === selectedSegmentId)) {
+      setSelectedSegmentId(allAvailableSegments.length > 0 ? allAvailableSegments[0].id : null);
     }
-  }, [allAvailableSegments, selectedSegmentId]);
+  }, [searchParams, allAvailableSegments, selectedSegmentId, setSelectedSegmentId]);
 
   useEffect(() => {
     if (isCodeFormOpen) {
