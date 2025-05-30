@@ -27,7 +27,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { GripVertical } from 'lucide-react'; 
+import { GripVertical } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
 import type { Segment } from '@/lib/segment-types';
 
@@ -101,6 +101,7 @@ export default function HierarchyBuildPage() {
   const [availableSummaryCodes, setAvailableSummaryCodes] = useState<SegmentCode[]>([]);
   const [availableDetailCodes, setAvailableDetailCodes] = useState<SegmentCode[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [treeNodes, setTreeNodes] = useState<SegmentCode[]>([]); // State for dropped nodes
 
   const segmentId = searchParams.get('segmentId');
 
@@ -122,11 +123,9 @@ export default function HierarchyBuildPage() {
         setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator));
         setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator));
       } else {
-        // Segment ID is invalid or segment not found, redirect
         router.push('/configure/hierarchies');
       }
     } else {
-      // No segment ID provided, redirect
       router.push('/configure/hierarchies');
     }
   }, [segmentId, getSegmentById, router, searchTerm]);
@@ -142,6 +141,7 @@ export default function HierarchyBuildPage() {
 
   const onSubmit = (values: HierarchyBuilderFormValues) => {
     console.log('Hierarchy Form Submitted:', values);
+    console.log('Current Tree Nodes:', treeNodes);
     alert(`Hierarchy "${values.hierarchyName}" save action placeholder. Tree building logic not yet implemented. See console for data.`);
     if (segmentId) {
         router.push(`/configure/hierarchies?segmentId=${segmentId}`);
@@ -161,14 +161,38 @@ export default function HierarchyBuildPage() {
   const handleReset = () => {
     form.reset();
     setSearchTerm('');
-    // Future: Reset tree structure as well
-    alert('Reset Hierarchy action placeholder.');
+    setTreeNodes([]);
+    alert('Reset Hierarchy action placeholder. Form and tree structure (if any) cleared.');
   };
 
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>, code: SegmentCode) => {
     event.dataTransfer.setData('application/json', JSON.stringify(code));
     event.dataTransfer.effectAllowed = 'move';
   };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault(); // Necessary to allow dropping
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const codeDataString = event.dataTransfer.getData('application/json');
+    if (codeDataString) {
+      try {
+        const code: SegmentCode = JSON.parse(codeDataString);
+        // Basic check to prevent duplicates, more complex logic needed for real tree
+        if (!treeNodes.find(node => node.id === code.id)) {
+            setTreeNodes(prevNodes => [...prevNodes, code]);
+        } else {
+            alert(`Code ${code.code} is already in the hierarchy.`);
+        }
+      } catch (e) {
+        console.error("Failed to parse dropped data:", e);
+      }
+    }
+  };
+
 
   if (!selectedSegment) {
     return (
@@ -283,7 +307,7 @@ export default function HierarchyBuildPage() {
               <div className="px-4 pt-4 pb-2">
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Summary Codes (Parents)</h4>
               </div>
-              <ScrollArea className="flex-1 min-h-0 px-4"> {/* Removed pb-2 */}
+              <ScrollArea className="flex-1 min-h-0 px-4">
                 {availableSummaryCodes.length > 0 ? (
                   availableSummaryCodes.map(code => (
                     <div
@@ -308,7 +332,7 @@ export default function HierarchyBuildPage() {
                <div className="px-4 pt-2 border-t">
                 <h4 className="text-md font-semibold mb-2 text-muted-foreground">Detail Codes (Children)</h4>
               </div>
-              <ScrollArea className="flex-1 min-h-0 px-4 pb-1"> {/* Changed pb-4 to pb-1 */}
+              <ScrollArea className="flex-1 min-h-0 px-4 pb-1">
                  {availableDetailCodes.length > 0 ? (
                   availableDetailCodes.map(code => (
                     <div
@@ -335,25 +359,33 @@ export default function HierarchyBuildPage() {
         </Card>
 
         {/* Center Panel - Assignment Tools & Right Panel - Live Tree Preview (Combined) */}
-        <Card className="lg:col-span-2 flex flex-col"> 
+        <Card 
+            className="lg:col-span-2 flex flex-col"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+        > 
           <CardHeader>
             <CardTitle>Hierarchy Structure</CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 flex items-center justify-center p-6">
-            <div className="text-center text-muted-foreground">
-              <p className="text-lg mb-2">Drag summary and detail codes here from the left panel to build your hierarchy.</p>
-              <p className="text-sm">(Full interactive tree builder and assignment tools will be implemented in a future step.)</p>
-              <div className="mt-4 p-4 border border-dashed rounded-md text-left bg-muted/50">
-                <p className="font-mono text-xs">Example Structure (Static):</p>
-                <pre className="text-xs">
-{`  100 (Summary)
-  └── 110 (Summary)
-      ├── 111 (Detail)
-      └── 112 (Detail)
-  └── 120 (Detail)`}
-                </pre>
+          <CardContent className="flex-1 p-6 overflow-y-auto">
+            {treeNodes.length === 0 ? (
+              <div className="text-center text-muted-foreground">
+                <p className="text-lg mb-2">Drag summary and detail codes here from the left panel to build your hierarchy.</p>
+                <p className="text-sm">(Full interactive tree builder will be implemented in a future step.)</p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                {treeNodes.map((node, index) => (
+                  <div key={`${node.id}-${index}`} className="p-3 border rounded-md bg-card shadow-sm">
+                    <div className="font-medium text-primary">{node.code} - {node.description}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Type: {node.summaryIndicator ? 'Summary (Parent)' : 'Detail (Child)'}
+                    </div>
+                    {/* Placeholder for child nodes and further tree structure */}
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
