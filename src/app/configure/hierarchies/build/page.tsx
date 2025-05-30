@@ -257,6 +257,21 @@ export default function HierarchyBuildPage() {
 
   const segmentId = searchParams.get('segmentId');
 
+  const form = useForm<HierarchyBuilderFormValues>({
+    resolver: zodResolver(hierarchyBuilderFormSchema),
+    defaultValues: {
+      hierarchyName: '',
+      status: 'Active',
+      description: '',
+    },
+  });
+
+  // Moved useMemo hook to the top level, before any conditional returns.
+  const selectedParentNodeDetails = useMemo(() => {
+    if (!selectedParentNodeId) return null;
+    return findNodeById(treeNodes, selectedParentNodeId);
+  }, [selectedParentNodeId, treeNodes]);
+
   useEffect(() => {
     if (segmentId) {
       const segment = getSegmentById(segmentId);
@@ -283,14 +298,14 @@ export default function HierarchyBuildPage() {
     }
   }, [segmentId, getSegmentById, router, searchTerm]);
 
-  const form = useForm<HierarchyBuilderFormValues>({
-    resolver: zodResolver(hierarchyBuilderFormSchema),
-    defaultValues: {
-      hierarchyName: '',
-      status: 'Active',
-      description: '',
-    },
-  });
+
+  if (!selectedSegment) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading segment information...</p>
+      </div>
+    );
+  }
 
   const onSubmit = (values: HierarchyBuilderFormValues) => {
     console.log('Hierarchy Form Submitted:', values);
@@ -457,14 +472,6 @@ export default function HierarchyBuildPage() {
   };
 
 
-  if (!selectedSegment) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Loading segment information...</p>
-      </div>
-    );
-  }
-
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
     { label: 'Hierarchies', href: `/configure/hierarchies?segmentId=${selectedSegment.id}` },
@@ -478,15 +485,11 @@ export default function HierarchyBuildPage() {
     if (!selectedParentNodeId) {
       return "Select a summary node from the tree to add children, or drag another SUMMARY code here to create a new root.";
     }
-    const selectedNode = findNodeById(treeNodes, selectedParentNodeId);
-    const selectedNodeName = selectedNode ? `${selectedNode.segmentCode.code} - ${selectedNode.segmentCode.description}` : 'the selected parent';
+    // const selectedNode = findNodeById(treeNodes, selectedParentNodeId); // Already available in selectedParentNodeDetails
+    const selectedNodeName = selectedParentNodeDetails ? `${selectedParentNodeDetails.segmentCode.code} - ${selectedParentNodeDetails.segmentCode.description}` : 'the selected parent';
     return `Drag codes here to add as children to "${selectedNodeName}". You can also drag a new SUMMARY code to start another root.`;
   };
   
-  const selectedParentNodeDetails = useMemo(() => {
-    if (!selectedParentNodeId) return null;
-    return findNodeById(treeNodes, selectedParentNodeId);
-  }, [selectedParentNodeId, treeNodes]);
 
   return (
     <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
@@ -728,3 +731,4 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
+
