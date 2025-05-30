@@ -43,7 +43,7 @@ import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
-// Re-using Segment definition from Segments page for consistency
+// Consistent Segment definition
 interface Segment {
   id: string;
   displayName: string;
@@ -59,16 +59,16 @@ interface Segment {
   validTo?: Date;
 }
 
-// Data that would typically come from an API or shared state
+// This list should ideally be in sync with initialSegmentsData from SegmentsPage or a shared source
 const allAvailableSegments: Segment[] = [
-  { id: 'fund', displayName: 'Fund', segmentType: 'Fund', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', },
-  { id: 'object', displayName: 'Object', segmentType: 'Object', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', },
-  { id: 'department', displayName: 'Department', segmentType: 'Department', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', },
-  { id: 'project', displayName: 'Project', segmentType: 'Project', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', },
-  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', },
-  { id: 'function', displayName: 'Function', segmentType: 'Function', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', },
-  { id: 'location', displayName: 'Location', segmentType: 'Location', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', },
-  { id: 'program', displayName: 'Program', segmentType: 'Program', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', },
+  { id: 'fund', displayName: 'Fund', segmentType: 'Fund', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
+  { id: 'object', displayName: 'Object', segmentType: 'Object', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
+  { id: 'department', displayName: 'Department', segmentType: 'Department', isActive: true, isCore: true, isCustom: false, isMandatoryForCoding: true, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
+  { id: 'project', displayName: 'Project', segmentType: 'Project', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
+  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
+  { id: 'function', displayName: 'Function', segmentType: 'Function', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
+  { id: 'location', displayName: 'Location', segmentType: 'Location', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
+  { id: 'program', displayName: 'Program', segmentType: 'Program', isActive: true, isCore: false, isCustom: false, isMandatoryForCoding: false, separator: '-', regex: undefined, defaultCode: undefined, validFrom: undefined, validTo: undefined },
 ];
 
 
@@ -132,22 +132,31 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   availableForBudgeting: false,
 };
 
+// Initialize segmentCodesData dynamically based on allAvailableSegments
+const initialSegmentCodesData = (): Record<string, SegmentCode[]> => {
+  const data: Record<string, SegmentCode[]> = {};
+  allAvailableSegments.forEach(segment => {
+    data[segment.id] = []; // Start with empty codes for all segments
+  });
+  // Add some mock data for specific segments for demonstration
+  data['fund'] = [
+    { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail", external3: "Ref1", external4: "Ref2", external5: "Ref3", availableForTransactionCoding: true, availableForBudgeting: true },
+    { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary", external3: "RefA", availableForTransactionCoding: false, availableForBudgeting: true },
+  ];
+  data['object'] = [
+    { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external4: "DeptXYZ", availableForTransactionCoding: true, availableForBudgeting: true },
+    { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, validFrom: new Date(2022, 5, 1), validTo: new Date(2023, 4, 30), summaryIndicator: false, availableForTransactionCoding: false, availableForBudgeting: false },
+  ];
+  return data;
+};
+
+
 export default function SegmentCodesPage() {
   const [segments] = useState<Segment[]>(allAvailableSegments);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(
-    allAvailableSegments.length > 0 ? allAvailableSegments[0].id : null
+    segments.length > 0 ? segments[0].id : null
   );
-  const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>({
-    'fund': [
-      { id: 'fund-code-1', code: '100', description: 'General Fund', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external1: "GF-001", external2: "Detail", external3: "Ref1", external4: "Ref2", external5: "Ref3", availableForTransactionCoding: true, availableForBudgeting: true },
-      { id: 'fund-code-2', code: '200', description: 'Grant Fund', isActive: true, validTo: new Date(2024, 11, 31), validFrom: new Date(2023, 6, 1), summaryIndicator: true, external2: "Summary", external3: "RefA", availableForTransactionCoding: false, availableForBudgeting: true },
-    ],
-    'object': [
-      { id: 'object-code-1', code: '51000', description: 'Salaries & Wages', isActive: true, validFrom: new Date(2023, 0, 1), summaryIndicator: false, external4: "DeptXYZ", availableForTransactionCoding: true, availableForBudgeting: true },
-      { id: 'object-code-2', code: '52000', description: 'Office Supplies', isActive: false, validFrom: new Date(2022, 5, 1), validTo: new Date(2023, 4, 30), summaryIndicator: false, availableForTransactionCoding: false, availableForBudgeting: false },
-    ],
-    'department': [], 'project': [], 'grant': [], 'function': [], 'location': [], 'program': [],
-  });
+  const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>(initialSegmentCodesData());
 
   const [isCodeFormOpen, setIsCodeFormOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'view' | 'edit'>('add');
@@ -612,3 +621,6 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
+
+
+    
