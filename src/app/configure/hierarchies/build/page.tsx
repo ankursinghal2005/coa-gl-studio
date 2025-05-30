@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/ui/label'; // Imported Label
 import {
   Select,
   SelectContent,
@@ -21,8 +21,8 @@ import {
   Form,
   FormControl,
   FormField,
-  FormItem,
-  FormLabel,
+  FormItem, // Restored import
+  FormLabel, // Restored import
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -619,12 +619,12 @@ export default function HierarchyBuildPage() {
                       key={code.id}
                       draggable="true"
                       onDragStart={(e) => handleDragStart(e, code)}
-                      className="flex items-center p-1.5 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
+                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
                     >
-                      <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-grow text-xs overflow-hidden">
-                        <span className="font-semibold text-primary">{code.code}</span>
-                        <span className="text-muted-foreground ml-1 truncate"> - {code.description}</span>
+                      <GripVertical className="h-5 w-5 mr-2 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-grow">
+                        <div className="font-semibold">{code.code}</div>
+                        <div className="text-sm text-muted-foreground">{code.description}</div>
                       </div>
                     </div>
                   ))
@@ -640,16 +640,16 @@ export default function HierarchyBuildPage() {
               <ScrollArea className="min-h-0 px-4 pb-1 max-h-48">
                  {availableDetailCodes.length > 0 ? (
                   availableDetailCodes.map(code => (
-                    <div
+                     <div
                       key={code.id}
                       draggable="true"
                       onDragStart={(e) => handleDragStart(e, code)}
-                      className="flex items-center p-1.5 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
+                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
                     >
-                      <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
-                       <div className="flex-grow text-xs overflow-hidden">
-                        <span className="font-semibold text-primary">{code.code}</span>
-                        <span className="text-muted-foreground ml-1 truncate"> - {code.description}</span>
+                      <GripVertical className="h-5 w-5 mr-2 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-grow">
+                        <div className="font-semibold">{code.code}</div>
+                        <div className="text-sm text-muted-foreground">{code.description}</div>
                       </div>
                     </div>
                   ))
@@ -760,5 +760,3 @@ export default function HierarchyBuildPage() {
     </div>
   );
 }
-
-    
