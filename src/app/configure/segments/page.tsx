@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from "date-fns";
-import Link from 'next/link'; // Added Link import
+import Link from 'next/link';
 import {
   Table,
   TableHeader,
@@ -25,8 +25,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogClose,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -53,13 +51,13 @@ import type { Segment } from '@/lib/segment-types';
 
 const segmentFormSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
-  segmentType: z.string().optional(),
-  regex: z.string().optional(),
+  segmentType: z.string().optional(), // This will be derived from displayName for custom, or fixed
+  regex: z.string().min(1, { message: 'RegEx Pattern is required.' }),
   defaultCode: z.string().optional(),
-  separator: z.enum(['-', '|', ',', '.']).optional().default('-'),
+  separator: z.enum(['-', '|', ',', '.'], { required_error: "Separator is required." }),
   isMandatoryForCoding: z.boolean().default(false),
   isActive: z.boolean().default(true),
-  validFrom: z.date().optional(),
+  validFrom: z.date({ required_error: "Valid From date is required." }),
   validTo: z.date().optional(),
   isCustom: z.boolean().default(true),
   isCore: z.boolean().default(false),
@@ -147,10 +145,10 @@ export default function SegmentsPage() {
     if (dialogMode === 'add') {
       const newSegment: Segment = {
         id: crypto.randomUUID(),
-        segmentType: values.displayName,
         isCore: false,
         isCustom: true,
         displayName: values.displayName,
+        segmentType: values.displayName, // Set segmentType to displayName for custom segments
         regex: values.regex,
         defaultCode: values.defaultCode,
         separator: values.separator,
@@ -164,12 +162,12 @@ export default function SegmentsPage() {
       const updatedSegment: Segment = {
         ...currentSegmentData,
         ...values,
-        segmentType: currentSegmentData.segmentType,
+        segmentType: currentSegmentData.segmentType, // Keep original segmentType, don't change on edit
       };
       updateSegment(updatedSegment);
       setCurrentSegmentData(updatedSegment);
       setDialogMode('view');
-      return; // Return early to prevent closing dialog if it was an edit
+      return; 
     }
     
     setIsDialogOpen(false);
@@ -269,7 +267,7 @@ export default function SegmentsPage() {
                     name="regex"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>RegEx Pattern</FormLabel>
+                        <FormLabel>RegEx Pattern *</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value ?? ''} disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)} />
                         </FormControl>
@@ -298,7 +296,7 @@ export default function SegmentsPage() {
                     name="validFrom"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel>Valid From</FormLabel>
+                        <FormLabel>Valid From *</FormLabel>
                         <DatePicker
                           value={field.value}
                           onValueChange={field.onChange}
@@ -336,10 +334,10 @@ export default function SegmentsPage() {
                     name="separator"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Separator</FormLabel>
+                        <FormLabel>Separator *</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
-                          value={field.value ?? '-'}
+                          value={field.value ?? '-'} // Ensure a default value for the Select component
                           disabled={isFieldDisabled(currentSegmentData?.isCore, currentSegmentData?.isCustom)}
                         >
                           <FormControl>
@@ -366,7 +364,7 @@ export default function SegmentsPage() {
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2 shadow-sm">
                           <div className="space-y-0.5">
-                            <FormLabel>Mandatory for Coding</FormLabel>
+                            <FormLabel>Mandatory for Coding *</FormLabel>
                           </div>
                           <FormControl>
                             <Switch
@@ -384,7 +382,7 @@ export default function SegmentsPage() {
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2 shadow-sm">
                           <div className="space-y-0.5">
-                            <FormLabel>Active</FormLabel>
+                            <FormLabel>Active *</FormLabel>
                           </div>
                           <FormControl>
                             <Switch
@@ -508,3 +506,6 @@ export default function SegmentsPage() {
     </div>
   );
 }
+
+
+    
