@@ -9,42 +9,48 @@ const configItems = [
     title: 'Segments',
     icon: LayoutGrid,
     description: 'Define your chart of accounts structure.',
-    dataAiHint: 'chart structure'
+    dataAiHint: 'chart structure',
+    href: '/configure/segments',
   },
   {
     id: 'segment-codes',
     title: 'Segment Codes',
     icon: Code2,
     description: 'Manage codes for each segment.',
-    dataAiHint: 'code list'
+    dataAiHint: 'code list',
+    href: '/configure/segment-codes',
   },
   {
     id: 'hierarchies',
     title: 'Hierarchies',
     icon: Network,
     description: 'Organize segment codes into hierarchies.',
-    dataAiHint: 'organization chart'
+    dataAiHint: 'organization chart',
+    href: '/configure/hierarchies',
   },
   {
     id: 'combination-rules',
     title: 'Combination Rules',
     icon: Shuffle,
     description: 'Set up rules for valid account combinations.',
-    dataAiHint: 'rules logic'
+    dataAiHint: 'rules logic',
+    href: '/configure/combination-rules',
   },
   {
-    id: 'account-access',
+    id: 'account-access-control', // Changed id
     title: 'Account Access Control',
     icon: ShieldCheck,
     description: 'Control user access to accounts.',
-    dataAiHint: 'security access'
+    dataAiHint: 'security access',
+    href: '/configure/account-access-control', // Updated href
   },
   {
     id: 'settings',
     title: 'Settings',
     icon: SettingsIcon,
     description: 'Configure application-wide settings.',
-    dataAiHint: 'cogwheel gear'
+    dataAiHint: 'cogwheel gear',
+    href: '/configure/settings', // Assuming a future settings page
   },
 ];
 
@@ -68,7 +74,7 @@ export default function HomePage() {
               icon={item.icon}
               title={item.title}
               description={item.description}
-              href={`/configure/${item.id}`}
+              href={item.href} // Use updated href
               data-ai-hint={item.dataAiHint}
             />
           ))}

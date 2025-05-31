@@ -6,7 +6,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { SegmentsProvider } from '@/contexts/SegmentsContext';
 import { HierarchiesProvider } from '@/contexts/HierarchiesContext';
-import { CombinationRulesProvider } from '@/contexts/CombinationRulesContext'; // Added import
+import { CombinationRulesProvider } from '@/contexts/CombinationRulesContext';
+import { AccountAccessControlProvider } from '@/contexts/AccountAccessControlContext'; // Added import
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -32,8 +33,10 @@ export default function RootLayout({
       )}>
         <SegmentsProvider>
           <HierarchiesProvider>
-            <CombinationRulesProvider> {/* Wrapped children with CombinationRulesProvider */}
-              {children}
+            <CombinationRulesProvider>
+              <AccountAccessControlProvider> {/* Wrapped children with AccountAccessControlProvider */}
+                {children}
+              </AccountAccessControlProvider>
             </CombinationRulesProvider>
           </HierarchiesProvider>
         </SegmentsProvider>
