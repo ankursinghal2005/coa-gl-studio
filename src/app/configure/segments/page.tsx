@@ -231,17 +231,14 @@ export default function SegmentsPage() {
   const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, segmentId: string) => {
     setDraggedSegmentId(segmentId);
     e.dataTransfer.effectAllowed = "move";
-    // Optionally, add a class to the row for visual feedback
-    e.currentTarget.classList.add("opacity-50", "shadow-lg");
   };
 
   const handleDragEnd = (e: React.DragEvent<HTMLTableRowElement>) => {
     setDraggedSegmentId(null);
-    e.currentTarget.classList.remove("opacity-50", "shadow-lg");
   };
   
   const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>) => {
-    e.preventDefault(); // Necessary to allow dropping
+    e.preventDefault(); 
     e.dataTransfer.dropEffect = "move";
   };
 
@@ -252,17 +249,24 @@ export default function SegmentsPage() {
       return;
     }
 
-    const draggedIndex = segments.findIndex(s => s.id === draggedSegmentId);
-    const droppedOnIndex = segments.findIndex(s => s.id === droppedOnSegmentId);
+    const coreSegments = segments.filter(s => s.isCore);
+    const nonCoreSegments = segments.filter(s => !s.isCore);
 
-    if (draggedIndex === -1 || droppedOnIndex === -1) return;
+    const nonCoreDraggedIndex = nonCoreSegments.findIndex(s => s.id === draggedSegmentId);
+    const nonCoreDroppedOnIndex = nonCoreSegments.findIndex(s => s.id === droppedOnSegmentId);
 
-    const reorderedSegments = [...segments];
-    const [draggedItem] = reorderedSegments.splice(draggedIndex, 1);
-    reorderedSegments.splice(droppedOnIndex, 0, draggedItem);
+    if (nonCoreDraggedIndex === -1 || nonCoreDroppedOnIndex === -1) {
+      setDraggedSegmentId(null);
+      return;
+    }
     
-    // Persist the new order
-    setOrderedSegments(reorderedSegments);
+    const reorderedNonCoreSegments = [...nonCoreSegments];
+    const [draggedItem] = reorderedNonCoreSegments.splice(nonCoreDraggedIndex, 1);
+    reorderedNonCoreSegments.splice(nonCoreDroppedOnIndex, 0, draggedItem);
+    
+    const finalOrderedSegments = [...coreSegments, ...reorderedNonCoreSegments];
+    setOrderedSegments(finalOrderedSegments);
+    
     setDraggedSegmentId(null);
   };
 
@@ -598,10 +602,10 @@ export default function SegmentsPage() {
                 {segments.map((segment, index) => (
                   <TableRow 
                     key={segment.id}
-                    draggable={!segment.isCore} // Core segments are not draggable
+                    draggable={!segment.isCore} 
                     onDragStart={(e) => !segment.isCore && handleDragStart(e, segment.id)}
-                    onDragEnd={(e) => !segment.isCore && handleDragEnd(e)}
-                    onDragOver={(e) => !segment.isCore && handleDragOver(e)}
+                    onDragEnd={handleDragEnd} 
+                    onDragOver={handleDragOver} 
                     onDrop={(e) => !segment.isCore && handleDrop(e, segment.id)}
                     className={cn(
                       segment.isCore ? "bg-muted/30 cursor-not-allowed" : "cursor-grab active:cursor-grabbing",
@@ -661,3 +665,4 @@ export default function SegmentsPage() {
     </div>
   );
 }
+
