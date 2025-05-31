@@ -235,10 +235,10 @@ export default function SegmentsPage() {
     const segment = segments.find(s => s.id === segmentId);
     if (segment && !segment.isCore) {
       setDraggedSegmentId(segmentId);
-      e.dataTransfer.setData('text/plain', segmentId); // Recommended for cross-browser compatibility
+      e.dataTransfer.setData('text/plain', segmentId); 
       e.dataTransfer.effectAllowed = "move";
     } else {
-      e.preventDefault(); // Prevent dragging core segments
+      e.preventDefault(); 
     }
   };
 
@@ -252,7 +252,7 @@ export default function SegmentsPage() {
     const hoverSegment = segments.find(s => s.id === hoverSegmentId);
     if (hoverSegment && !hoverSegment.isCore && hoverSegment.id !== draggedSegmentId) {
       setDropTargetId(hoverSegmentId);
-    } else if (dropTargetId !== null) { // Clear if not a valid target or dragging over itself
+    } else if (dropTargetId !== null) { 
       setDropTargetId(null);
     }
     e.dataTransfer.dropEffect = "move";
@@ -260,14 +260,18 @@ export default function SegmentsPage() {
 
   const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, droppedOnSegmentId: string) => {
     e.preventDefault();
-    const currentDraggedId = draggedSegmentId; // Capture value before state reset
+    const currentDraggedId = draggedSegmentId; 
 
     if (!currentDraggedId || currentDraggedId === droppedOnSegmentId) {
+      setDraggedSegmentId(null);
+      setDropTargetId(null);
       return;
     }
 
     const droppedOnSegment = segments.find(s => s.id === droppedOnSegmentId);
-    if (!droppedOnSegment || droppedOnSegment.isCore) { // Cannot drop on core segments
+    if (!droppedOnSegment || droppedOnSegment.isCore) { 
+      setDraggedSegmentId(null);
+      setDropTargetId(null);
       return;
     }
     
@@ -278,7 +282,9 @@ export default function SegmentsPage() {
     const nonCoreDroppedOnIndex = nonCoreSegments.findIndex(s => s.id === droppedOnSegmentId);
 
     if (nonCoreDraggedIndex === -1 || nonCoreDroppedOnIndex === -1) {
-      return; // Should not happen if IDs are valid
+      setDraggedSegmentId(null);
+      setDropTargetId(null);
+      return; 
     }
     
     const reorderedNonCoreSegments = [...nonCoreSegments];
@@ -287,18 +293,20 @@ export default function SegmentsPage() {
     
     const finalOrderedSegments = [...coreSegments, ...reorderedNonCoreSegments];
     setOrderedSegments(finalOrderedSegments);
+    setDraggedSegmentId(null);
+    setDropTargetId(null);
   };
 
-  const accountCodePreview = useMemo(() => {
-    let preview = "";
-    segments.forEach((segment, index) => {
+  const accountCodePreviewStructure = useMemo(() => {
+    return segments.map((segment, index) => {
       const codePart = segment.defaultCode || "X".repeat(segment.maxLength > 0 ? Math.min(segment.maxLength, 4) : 4);
-      preview += codePart;
-      if (index < segments.length - 1) {
-        preview += segment.separator;
-      }
+      return {
+        id: segment.id,
+        codePart: codePart,
+        displayName: segment.displayName,
+        separator: index < segments.length - 1 ? segment.separator : null,
+      };
     });
-    return preview;
   }, [segments]);
 
 
@@ -309,18 +317,48 @@ export default function SegmentsPage() {
         <header className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-primary">Manage Segments</h1>
           <p className="text-md text-muted-foreground mt-2">
-            Configure the building blocks of your chart of accounts. Define core and standard segments. Drag to reorder.
+            Configure the building blocks of your chart of accounts. Define core and standard segments. Drag non-core segments to reorder.
           </p>
         </header>
 
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Account Code String Preview</CardTitle>
-             <CardDescriptionComponent>This is an example of how your account code string will look based on the current segment order and separators.</CardDescriptionComponent>
+             <CardDescriptionComponent>
+                This is an example of how your account code string will look based on the current segment order and separators. 
+                The example uses the segment's default code if defined, or "XXXX" as a placeholder.
+             </CardDescriptionComponent>
           </CardHeader>
           <CardContent>
-            <div className="p-4 bg-muted rounded-md text-center font-mono text-lg tracking-wider text-foreground">
-              {accountCodePreview || "No segments configured yet."}
+            <div className="p-3 bg-muted rounded-md flex flex-wrap items-start justify-center min-h-[70px]">
+              {accountCodePreviewStructure.length > 0 ? (
+                accountCodePreviewStructure.map((item) => (
+                  <React.Fragment key={item.id}>
+                    <div className="flex flex-col items-center text-center px-1 py-1">
+                      <span className="font-mono text-lg tracking-wider text-foreground">
+                        {item.codePart}
+                      </span>
+                      <span className="text-xs text-muted-foreground mt-0.5">
+                        {item.displayName}
+                      </span>
+                    </div>
+                    {item.separator && (
+                      <div className="flex flex-col items-center text-center px-1 py-1">
+                        <span className="font-mono text-lg tracking-wider text-foreground">
+                          {item.separator}
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-0.5 invisible">
+                          X
+                        </span>
+                      </div>
+                    )}
+                  </React.Fragment>
+                ))
+              ) : (
+                <p className="text-center font-mono text-lg tracking-wider text-foreground self-center">
+                  No segments configured yet.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
