@@ -62,6 +62,7 @@ const combinationRuleFormSchema = z.object({
 type CombinationRuleFormValues = z.infer<typeof combinationRuleFormSchema>;
 
 interface MappingEntryFormState {
+  behavior: 'Include' | 'Exclude';
   segmentACriterionType: CombinationRuleCriterionType | '';
   segmentACodeValue: string;
   segmentARangeStart: string;
@@ -78,6 +79,7 @@ interface MappingEntryFormState {
 }
 
 const initialMappingEntryFormState: MappingEntryFormState = {
+  behavior: 'Include',
   segmentACriterionType: '',
   segmentACodeValue: '',
   segmentARangeStart: '',
@@ -144,11 +146,16 @@ export default function CombinationRuleBuildPage() {
     } else {
         setIsEditMode(false);
         setCurrentRuleId(null);
+        form.reset(); // Ensure form is clean for new rule
         setMappingEntries([]);
     }
   }, [ruleIdQueryParam, getCombinationRuleById, form, router]);
 
   const onSubmit = (values: CombinationRuleFormValues) => {
+    if (mappingEntries.length === 0) {
+        alert("Please define at least one valid combination mapping entry.");
+        return;
+    }
     const ruleData = {
       name: values.name,
       status: values.status,
@@ -191,7 +198,7 @@ export default function CombinationRuleBuildPage() {
   ];
 
   const handleOpenAddMappingEntryDialog = () => {
-    setMappingEntryFormState(initialMappingEntryFormState);
+    setMappingEntryFormState(initialMappingEntryFormState); // Reset dialog form
     setIsMappingEntryDialogOpen(true);
   };
 
@@ -201,6 +208,7 @@ export default function CombinationRuleBuildPage() {
 
   const handleSaveMappingEntry = () => {
     const {
+      behavior,
       segmentACriterionType, segmentACodeValue, segmentARangeStart, segmentARangeEnd, segmentAHierarchyNodeId, segmentAIncludeChildren,
       segmentBCriterionType, segmentBCodeValue, segmentBRangeStart, segmentBRangeEnd, segmentBHierarchyNodeId, segmentBIncludeChildren
     } = mappingEntryFormState;
@@ -226,13 +234,14 @@ export default function CombinationRuleBuildPage() {
     if (critA && critB) {
       const newEntry: CombinationRuleMappingEntry = {
         id: crypto.randomUUID(),
+        behavior: behavior,
         segmentACriterion: critA,
         segmentBCriterion: critB,
       };
       setMappingEntries(prev => [...prev, newEntry]);
       setIsMappingEntryDialogOpen(false);
     } else {
-      alert("Please complete all required fields for both Segment A and Segment B criteria.");
+      alert("Please complete all required fields for both Segment A and Segment B criteria, and select a behavior.");
     }
   };
 
@@ -300,7 +309,7 @@ export default function CombinationRuleBuildPage() {
                           }
                         }} 
                         value={field.value}
-                        disabled={isEditMode}
+                        disabled={isEditMode && mappingEntries.length > 0} // Disable if editing and mappings exist
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -315,6 +324,7 @@ export default function CombinationRuleBuildPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {(isEditMode && mappingEntries.length > 0) && <FormDescription className="text-xs">Segments cannot be changed if mapping entries exist.</FormDescription>}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -328,7 +338,7 @@ export default function CombinationRuleBuildPage() {
                       <Select 
                         onValueChange={field.onChange} 
                         value={field.value}
-                        disabled={isEditMode || !segmentAValue}
+                        disabled={(isEditMode && mappingEntries.length > 0) || !segmentAValue}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -393,7 +403,8 @@ export default function CombinationRuleBuildPage() {
             <CardHeader>
               <CardTitle>Define Valid Combinations</CardTitle>
               <CardDescription>
-                Specify which codes (or ranges/hierarchy nodes) from Segment A are valid with which codes from Segment B.
+                Specify which codes (or ranges/hierarchy nodes) from Segment A are valid with which codes from Segment B,
+                and whether each mapping should 'Include' or 'Exclude' the combination.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -415,11 +426,14 @@ export default function CombinationRuleBuildPage() {
                 {mappingEntries.map(entry => (
                   <div key={entry.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/50">
                     <div className="space-y-1">
+                       <p className={`text-sm font-semibold ${entry.behavior === 'Include' ? 'text-green-600' : 'text-red-600'}`}>
+                         [{entry.behavior.toUpperCase()}]
+                       </p>
                       <p className="text-sm font-medium">
-                        {renderCriterionDisplay(entry.segmentACriterion)}
+                        {renderCriterionDisplay(entry.segmentACriterion, selectedSegmentA?.displayName)}
                       </p>
                       <p className="text-sm font-medium">
-                        {renderCriterionDisplay(entry.segmentBCriterion)}
+                        {renderCriterionDisplay(entry.segmentBCriterion, selectedSegmentB?.displayName)}
                       </p>
                     </div>
                     <Button 
@@ -449,18 +463,38 @@ export default function CombinationRuleBuildPage() {
         </form>
       </Form>
 
-      {/* Dialog for Adding/Editing Mapping Entry */}
       <Dialog open={isMappingEntryDialogOpen} onOpenChange={setIsMappingEntryDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add New Mapping Entry</DialogTitle>
             <DialogDescription>
-              Define the criteria for Segment A ({selectedSegmentA?.displayName || 'N/A'}) and Segment B ({selectedSegmentB?.displayName || 'N/A'}).
+              Define the criteria for Segment A ({selectedSegmentA?.displayName || 'N/A'}) and Segment B ({selectedSegmentB?.displayName || 'N/A'}), and its behavior.
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] p-1">
             <div className="space-y-6 py-4 pr-4">
-              {/* Segment A Criterion */}
+              <Card>
+                <CardHeader><CardTitle className="text-lg">Mapping Behavior</CardTitle></CardHeader>
+                <CardContent>
+                  <Label htmlFor="mappingBehavior">Behavior Type</Label>
+                  <Select
+                    value={mappingEntryFormState.behavior}
+                    onValueChange={(value) => handleMappingEntryFormChange('behavior', value as 'Include' | 'Exclude')}
+                  >
+                    <SelectTrigger id="mappingBehavior">
+                      <SelectValue placeholder="Select behavior" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Include">Include (Allow this combination)</SelectItem>
+                      <SelectItem value="Exclude">Exclude (Disallow this combination)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    'Include' allows the specified combination. 'Exclude' disallows it.
+                  </p>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader><CardTitle className="text-lg">Segment A Criterion: {selectedSegmentA?.displayName || 'N/A'}</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
@@ -505,14 +539,13 @@ export default function CombinationRuleBuildPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <Checkbox id="segmentAIncludeChildren" checked={mappingEntryFormState.segmentAIncludeChildren} onCheckedChange={(checked) => handleMappingEntryFormChange('segmentAIncludeChildren', !!checked)} />
-                        <Label htmlFor="segmentAIncludeChildren" className="text-sm font-normal">Include Children</Label>
+                        <Label htmlFor="segmentAIncludeChildren" className="text-sm font-normal">Include Children Nodes</Label>
                       </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Segment B Criterion */}
               <Card>
                 <CardHeader><CardTitle className="text-lg">Segment B Criterion: {selectedSegmentB?.displayName || 'N/A'}</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
@@ -557,7 +590,7 @@ export default function CombinationRuleBuildPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <Checkbox id="segmentBIncludeChildren" checked={mappingEntryFormState.segmentBIncludeChildren} onCheckedChange={(checked) => handleMappingEntryFormChange('segmentBIncludeChildren', !!checked)} />
-                        <Label htmlFor="segmentBIncludeChildren" className="text-sm font-normal">Include Children</Label>
+                        <Label htmlFor="segmentBIncludeChildren" className="text-sm font-normal">Include Children Nodes</Label>
                       </div>
                     </div>
                   )}
@@ -577,4 +610,3 @@ export default function CombinationRuleBuildPage() {
     </div>
   );
 }
-
