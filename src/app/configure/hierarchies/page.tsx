@@ -24,14 +24,14 @@ import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useSegments } from '@/contexts/SegmentsContext';
-import { useHierarchies } from '@/contexts/HierarchiesContext'; // Added import
+import { useHierarchies } from '@/contexts/HierarchiesContext';
 import type { Segment } from '@/lib/segment-types';
-import type { Hierarchy } from '@/lib/hierarchy-types'; // Added import
+import type { Hierarchy } from '@/lib/hierarchy-types';
 
 
 export default function HierarchiesPage() {
   const { segments: allAvailableSegments } = useSegments();
-  const { hierarchies: allHierarchies } = useHierarchies(); // Use context
+  const { hierarchies: allHierarchies } = useHierarchies();
   const searchParams = useSearchParams();
   const router = useRouter();
   
@@ -39,21 +39,47 @@ export default function HierarchiesPage() {
   const querySegmentIdParam = searchParams.get('segmentId');
 
   useEffect(() => {
-    let targetSegmentId: string | null = null;
-    if (querySegmentIdParam && allAvailableSegments.some(s => s.id === querySegmentIdParam)) {
-      targetSegmentId = querySegmentIdParam;
-    } else if (allAvailableSegments.length > 0) {
-      targetSegmentId = allAvailableSegments[0].id;
-    }
-    // Only update if the target is different from current to prevent unnecessary re-renders/navigation
-    if (selectedSegmentId !== targetSegmentId) {
-      setSelectedSegmentId(targetSegmentId);
-      // If targetSegmentId is determined and different, or if query param isn't current, update URL
-      if (targetSegmentId && querySegmentIdParam !== targetSegmentId) {
-         router.replace(`/configure/hierarchies?segmentId=${targetSegmentId}`, { scroll: false });
-      } else if (!targetSegmentId && querySegmentIdParam) { // No valid segment, but URL has one (e.g. invalid)
-         router.replace('/configure/hierarchies', { scroll: false });
+    // Wait until segments are loaded
+    if (allAvailableSegments.length === 0) {
+      // If there was a segmentId in query, but no segments loaded yet,
+      // we might want to clear selectedSegmentId or just wait.
+      // If selectedSegmentId is already set from a previous render with segments,
+      // and now segments become empty, we might clear it.
+      if (selectedSegmentId !== null) {
+          setSelectedSegmentId(null);
+          // If URL had a param, and now there are no segments, clear URL param.
+          if (querySegmentIdParam) {
+            router.replace('/configure/hierarchies', { scroll: false });
+          }
       }
+      return;
+    }
+
+    let determinedSegmentId: string | null = null;
+
+    // Try to use the segment ID from the URL if it's valid
+    if (querySegmentIdParam && allAvailableSegments.some(s => s.id === querySegmentIdParam)) {
+      determinedSegmentId = querySegmentIdParam;
+    } else {
+      // Fallback to the first available segment if URL param is invalid or missing
+      determinedSegmentId = allAvailableSegments[0].id;
+    }
+
+    // Update the selectedSegmentId state only if it's different
+    if (selectedSegmentId !== determinedSegmentId) {
+      setSelectedSegmentId(determinedSegmentId);
+    }
+
+    // Synchronize the URL:
+    // If we have a valid determinedSegmentId and the URL doesn't match it, update the URL.
+    if (determinedSegmentId && querySegmentIdParam !== determinedSegmentId) {
+      router.replace(`/configure/hierarchies?segmentId=${determinedSegmentId}`, { scroll: false });
+    } 
+    // If we determined no segment should be selected (e.g., determinedSegmentId became null, though current logic always picks one if available)
+    // or if the query param was present but invalid and no fallback was determined (less likely with current logic)
+    // then clear the segmentId from URL. This condition might need refinement if `determinedSegmentId` could truly be null while `allAvailableSegments` is not empty.
+    else if (!determinedSegmentId && querySegmentIdParam) { 
+      router.replace('/configure/hierarchies', { scroll: false });
     }
   }, [querySegmentIdParam, allAvailableSegments, router, selectedSegmentId]);
 
@@ -100,8 +126,11 @@ export default function HierarchiesPage() {
   };
 
   const handleSegmentSelect = (segmentIdToSelect: string) => {
-    //setSelectedSegmentId(segmentIdToSelect); // State will update via useEffect reacting to URL change
-    router.push(`/configure/hierarchies?segmentId=${segmentIdToSelect}`);
+    // Update state, which will trigger useEffect to sync URL if needed
+    if (selectedSegmentId !== segmentIdToSelect) {
+        setSelectedSegmentId(segmentIdToSelect);
+        router.push(`/configure/hierarchies?segmentId=${segmentIdToSelect}`, { scroll: false });
+    }
   };
 
   const breadcrumbItems = [
