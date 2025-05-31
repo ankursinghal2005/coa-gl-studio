@@ -105,7 +105,7 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   validTo: undefined,
   availableForTransactionCoding: false,
   availableForBudgeting: false,
-  allowedSubmodules: [],
+  allowedSubmodules: [...submoduleOptions], // All submodules selected by default for new codes
 };
 
 
@@ -666,5 +666,3 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
-
-    
