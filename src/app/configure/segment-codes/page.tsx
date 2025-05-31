@@ -448,6 +448,7 @@ export default function SegmentCodesPage() {
                                           field.onChange(currentSelection.filter((item) => item !== option));
                                         }
                                       }}
+                                      onSelect={(e) => e.preventDefault()} // Prevent menu closing on select
                                       disabled={isFieldDisabled}
                                     >
                                       {option}
@@ -666,3 +667,4 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
+
