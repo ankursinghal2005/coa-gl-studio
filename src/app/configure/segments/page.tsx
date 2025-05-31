@@ -96,7 +96,10 @@ export default function SegmentsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'view' | 'edit'>('add');
   const [currentSegmentData, setCurrentSegmentData] = useState<Segment | null>(null);
+  
   const [draggedSegmentId, setDraggedSegmentId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
 
   const form = useForm<SegmentFormValues>({
     resolver: zodResolver(segmentFormSchema),
@@ -229,35 +232,53 @@ export default function SegmentsPage() {
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, segmentId: string) => {
-    setDraggedSegmentId(segmentId);
-    e.dataTransfer.effectAllowed = "move";
+    const segment = segments.find(s => s.id === segmentId);
+    if (segment && !segment.isCore) {
+      setDraggedSegmentId(segmentId);
+      e.dataTransfer.setData('text/plain', segmentId); // Recommended for cross-browser compatibility
+      e.dataTransfer.effectAllowed = "move";
+    } else {
+      e.preventDefault(); // Prevent dragging core segments
+    }
   };
 
-  const handleDragEnd = (e: React.DragEvent<HTMLTableRowElement>) => {
+  const handleDragEnd = () => {
     setDraggedSegmentId(null);
+    setDropTargetId(null);
   };
   
-  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>) => {
+  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, hoverSegmentId: string) => {
     e.preventDefault(); 
+    const hoverSegment = segments.find(s => s.id === hoverSegmentId);
+    if (hoverSegment && !hoverSegment.isCore && hoverSegment.id !== draggedSegmentId) {
+      setDropTargetId(hoverSegmentId);
+    } else if (dropTargetId !== null) { // Clear if not a valid target or dragging over itself
+      setDropTargetId(null);
+    }
     e.dataTransfer.dropEffect = "move";
   };
 
   const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, droppedOnSegmentId: string) => {
     e.preventDefault();
-    if (!draggedSegmentId || draggedSegmentId === droppedOnSegmentId) {
-      setDraggedSegmentId(null);
+    const currentDraggedId = draggedSegmentId; // Capture value before state reset
+
+    if (!currentDraggedId || currentDraggedId === droppedOnSegmentId) {
       return;
     }
 
+    const droppedOnSegment = segments.find(s => s.id === droppedOnSegmentId);
+    if (!droppedOnSegment || droppedOnSegment.isCore) { // Cannot drop on core segments
+      return;
+    }
+    
     const coreSegments = segments.filter(s => s.isCore);
     const nonCoreSegments = segments.filter(s => !s.isCore);
 
-    const nonCoreDraggedIndex = nonCoreSegments.findIndex(s => s.id === draggedSegmentId);
+    const nonCoreDraggedIndex = nonCoreSegments.findIndex(s => s.id === currentDraggedId);
     const nonCoreDroppedOnIndex = nonCoreSegments.findIndex(s => s.id === droppedOnSegmentId);
 
     if (nonCoreDraggedIndex === -1 || nonCoreDroppedOnIndex === -1) {
-      setDraggedSegmentId(null);
-      return;
+      return; // Should not happen if IDs are valid
     }
     
     const reorderedNonCoreSegments = [...nonCoreSegments];
@@ -266,8 +287,6 @@ export default function SegmentsPage() {
     
     const finalOrderedSegments = [...coreSegments, ...reorderedNonCoreSegments];
     setOrderedSegments(finalOrderedSegments);
-    
-    setDraggedSegmentId(null);
   };
 
   const accountCodePreview = useMemo(() => {
@@ -603,13 +622,14 @@ export default function SegmentsPage() {
                   <TableRow 
                     key={segment.id}
                     draggable={!segment.isCore} 
-                    onDragStart={(e) => !segment.isCore && handleDragStart(e, segment.id)}
+                    onDragStart={(e) => handleDragStart(e, segment.id)}
                     onDragEnd={handleDragEnd} 
-                    onDragOver={handleDragOver} 
-                    onDrop={(e) => !segment.isCore && handleDrop(e, segment.id)}
+                    onDragOver={(e) => handleDragOver(e, segment.id)} 
+                    onDrop={(e) => handleDrop(e, segment.id)}
                     className={cn(
-                      segment.isCore ? "bg-muted/30 cursor-not-allowed" : "cursor-grab active:cursor-grabbing",
-                      draggedSegmentId === segment.id && "opacity-50 shadow-xl"
+                      segment.isCore ? "bg-muted/30 cursor-not-allowed" : "cursor-grab active:cursor-grabbing transition-all duration-150 ease-in-out",
+                      draggedSegmentId === segment.id && "opacity-50 shadow-2xl ring-2 ring-primary z-10 relative",
+                      dropTargetId === segment.id && !segment.isCore && draggedSegmentId !== segment.id && "outline outline-2 outline-accent outline-offset-[-2px]"
                     )}
                   >
                     <TableCell className="text-center">
