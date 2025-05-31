@@ -87,7 +87,6 @@ export default function CombinationRulesPage() {
                     <TableHead className="min-w-[150px]">Segment A</TableHead>
                     <TableHead className="min-w-[150px]">Segment B</TableHead>
                     <TableHead className="min-w-[100px]">Status</TableHead>
-                    <TableHead className="min-w-[150px]">Last Modified</TableHead>
                     <TableHead className="text-center w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -108,12 +107,6 @@ export default function CombinationRulesPage() {
                         <TableCell>{segmentA?.displayName || 'N/A'}</TableCell>
                         <TableCell>{segmentB?.displayName || 'N/A'}</TableCell>
                         <TableCell>{rule.status}</TableCell>
-                        <TableCell>
-                          {rule.lastModifiedDate
-                            ? new Date(rule.lastModifiedDate).toLocaleDateString()
-                            : 'N/A'}
-                          {' by '}{rule.lastModifiedBy || 'N/A'}
-                        </TableCell>
                         <TableCell className="text-center">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
