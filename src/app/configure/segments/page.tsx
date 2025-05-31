@@ -99,6 +99,11 @@ export default function SegmentsPage() {
   
   const [draggedSegmentId, setDraggedSegmentId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [isClientMounted, setIsClientMounted] = useState(false);
+
+  useEffect(() => {
+    setIsClientMounted(true);
+  }, []);
 
 
   const form = useForm<SegmentFormValues>({
@@ -298,6 +303,9 @@ export default function SegmentsPage() {
   };
 
   const accountCodePreviewStructure = useMemo(() => {
+    if (!isClientMounted || !segments || segments.length === 0) {
+      return [];
+    }
     return segments.map((segment, index) => {
       const codePart = segment.defaultCode || "X".repeat(segment.maxLength > 0 ? Math.min(segment.maxLength, 4) : 4);
       return {
@@ -307,7 +315,7 @@ export default function SegmentsPage() {
         separator: index < segments.length - 1 ? segment.separator : null,
       };
     });
-  }, [segments]);
+  }, [segments, isClientMounted]);
 
 
   return (
@@ -331,7 +339,11 @@ export default function SegmentsPage() {
           </CardHeader>
           <CardContent>
             <div className="p-3 bg-muted rounded-md flex flex-wrap items-start justify-center min-h-[70px]">
-              {accountCodePreviewStructure.length > 0 ? (
+            {!isClientMounted ? (
+                <p className="text-center font-mono text-lg tracking-wider text-muted-foreground self-center">
+                  Loading preview...
+                </p>
+              ) : accountCodePreviewStructure.length > 0 ? (
                 accountCodePreviewStructure.map((item) => (
                   <React.Fragment key={item.id}>
                     <div className="flex flex-col items-center text-center px-1 py-1">
