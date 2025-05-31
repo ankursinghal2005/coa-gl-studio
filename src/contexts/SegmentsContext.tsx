@@ -12,6 +12,7 @@ interface SegmentsContextType {
   updateSegment: (updatedSegment: Segment) => void;
   toggleSegmentStatus: (segmentId: string) => void;
   getSegmentById: (segmentId: string) => Segment | undefined;
+  setOrderedSegments: (orderedSegments: Segment[]) => void; // New function for reordering
 }
 
 const SegmentsContext = createContext<SegmentsContextType | undefined>(undefined);
@@ -20,27 +21,21 @@ export const SegmentsProvider = ({ children }: { children: ReactNode }) => {
   const [segments, setSegments] = useState<Segment[]>(defaultInitialSegments);
 
   const addSegment = useCallback((newSegment: Segment) => {
-    setSegments(prevSegments => 
+    setSegments(prevSegments =>
       [...prevSegments, newSegment].sort((a, b) => {
-        // Keep core segments first
         if (a.isCore && !b.isCore) return -1;
         if (!a.isCore && b.isCore) return 1;
         
-        // Then, sort by original order if both are original, or one is original
         const indexOfAInDefault = defaultInitialSegments.findIndex(s => s.id === a.id);
         const indexOfBInDefault = defaultInitialSegments.findIndex(s => s.id === b.id);
 
-        if (indexOfAInDefault !== -1 && indexOfBInDefault !== -1) { // Both are original segments
+        if (indexOfAInDefault !== -1 && indexOfBInDefault !== -1) {
           return indexOfAInDefault - indexOfBInDefault;
         }
-        if (indexOfAInDefault !== -1) return -1; // a is original, b is custom
-        if (indexOfBInDefault !== -1) return 1;  // b is original, a is custom
+        if (indexOfAInDefault !== -1) return -1;
+        if (indexOfBInDefault !== -1) return 1;
         
-        // If both are custom, sort by displayName, or maintain add order (current sort does not specify for two custom)
-        // For now, let's maintain add order for custom segments relative to each other (which default sort does)
-        // or sort by name for consistency if ids are UUIDs.
-        // For simplicity, current sort after core/original distinction will effectively be add order.
-        return 0; 
+        return 0;
       })
     );
   }, []);
@@ -63,8 +58,16 @@ export const SegmentsProvider = ({ children }: { children: ReactNode }) => {
     return segments.find(s => s.id === segmentId);
   }, [segments]);
 
+  const setOrderedSegments = useCallback((orderedSegments: Segment[]) => {
+    // Ensure core segments remain at the top if that's a hard rule,
+    // or allow free reordering if that's intended.
+    // For now, this function will trust the incoming order.
+    // If core segments need to be fixed, further logic would be needed here or in the calling component.
+    setSegments(orderedSegments);
+  }, []);
+
   return (
-    <SegmentsContext.Provider value={{ segments, addSegment, updateSegment, toggleSegmentStatus, getSegmentById }}>
+    <SegmentsContext.Provider value={{ segments, addSegment, updateSegment, toggleSegmentStatus, getSegmentById, setOrderedSegments }}>
       {children}
     </SegmentsContext.Provider>
   );
@@ -77,3 +80,4 @@ export const useSegments = (): SegmentsContextType => {
   }
   return context;
 };
+

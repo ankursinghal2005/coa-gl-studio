@@ -1,11 +1,10 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from "date-fns";
 import Link from 'next/link';
 import {
   Table,
@@ -42,12 +41,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { PlusCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PlusCircle, GripVertical } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescriptionComponent } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { Label } from '@/components/ui/label';
 import { useSegments } from '@/contexts/SegmentsContext';
-import type { Segment, DataType } from '@/lib/segment-types';
+import type { Segment } from '@/lib/segment-types';
+import { cn } from '@/lib/utils';
+
 
 const segmentFormSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
@@ -91,10 +92,11 @@ const defaultFormValues: Omit<SegmentFormValues, 'id' | 'segmentType' | 'isCore'
 };
 
 export default function SegmentsPage() {
-  const { segments, addSegment, updateSegment, toggleSegmentStatus } = useSegments();
+  const { segments, addSegment, updateSegment, toggleSegmentStatus, setOrderedSegments } = useSegments();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'view' | 'edit'>('add');
   const [currentSegmentData, setCurrentSegmentData] = useState<Segment | null>(null);
+  const [draggedSegmentId, setDraggedSegmentId] = useState<string | null>(null);
 
   const form = useForm<SegmentFormValues>({
     resolver: zodResolver(segmentFormSchema),
@@ -213,9 +215,9 @@ export default function SegmentsPage() {
     if (dialogMode === 'view') return true;
 
     if (dialogMode === 'edit') {
-      if (fieldName === 'displayName') return false; // DisplayName always editable in edit mode
-      if (isCoreSegment) return true; // All other fields for core segments are disabled in edit mode
-      if (fieldName === 'segmentType') return true; // SegmentType is not directly editable
+      if (fieldName === 'displayName') return false; 
+      if (isCoreSegment) return true; 
+      if (fieldName === 'segmentType') return true; 
     }
     return false; 
   };
@@ -226,6 +228,57 @@ export default function SegmentsPage() {
     return false;
   };
 
+  const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, segmentId: string) => {
+    setDraggedSegmentId(segmentId);
+    e.dataTransfer.effectAllowed = "move";
+    // Optionally, add a class to the row for visual feedback
+    e.currentTarget.classList.add("opacity-50", "shadow-lg");
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLTableRowElement>) => {
+    setDraggedSegmentId(null);
+    e.currentTarget.classList.remove("opacity-50", "shadow-lg");
+  };
+  
+  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>) => {
+    e.preventDefault(); // Necessary to allow dropping
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, droppedOnSegmentId: string) => {
+    e.preventDefault();
+    if (!draggedSegmentId || draggedSegmentId === droppedOnSegmentId) {
+      setDraggedSegmentId(null);
+      return;
+    }
+
+    const draggedIndex = segments.findIndex(s => s.id === draggedSegmentId);
+    const droppedOnIndex = segments.findIndex(s => s.id === droppedOnSegmentId);
+
+    if (draggedIndex === -1 || droppedOnIndex === -1) return;
+
+    const reorderedSegments = [...segments];
+    const [draggedItem] = reorderedSegments.splice(draggedIndex, 1);
+    reorderedSegments.splice(droppedOnIndex, 0, draggedItem);
+    
+    // Persist the new order
+    setOrderedSegments(reorderedSegments);
+    setDraggedSegmentId(null);
+  };
+
+  const accountCodePreview = useMemo(() => {
+    let preview = "";
+    segments.forEach((segment, index) => {
+      const codePart = segment.defaultCode || "X".repeat(segment.maxLength > 0 ? Math.min(segment.maxLength, 4) : 4);
+      preview += codePart;
+      if (index < segments.length - 1) {
+        preview += segment.separator;
+      }
+    });
+    return preview;
+  }, [segments]);
+
+
   return (
     <div className="flex flex-col items-center justify-start min-h-screen p-4 py-8 sm:p-8 bg-background">
       <div className="w-full max-w-4xl">
@@ -233,9 +286,21 @@ export default function SegmentsPage() {
         <header className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-primary">Manage Segments</h1>
           <p className="text-md text-muted-foreground mt-2">
-            Configure the building blocks of your chart of accounts. Define core and standard segments.
+            Configure the building blocks of your chart of accounts. Define core and standard segments. Drag to reorder.
           </p>
         </header>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Account Code String Preview</CardTitle>
+             <CardDescriptionComponent>This is an example of how your account code string will look based on the current segment order and separators.</CardDescriptionComponent>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 bg-muted rounded-md text-center font-mono text-lg tracking-wider text-foreground">
+              {accountCodePreview || "No segments configured yet."}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="mb-6 flex justify-end">
           <Button onClick={handleAddSegmentClick}>
@@ -522,6 +587,7 @@ export default function SegmentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px] text-center">Order</TableHead>
                   <TableHead className="w-[250px] sm:w-[300px]">Display Name</TableHead>
                   <TableHead>Segment Type</TableHead>
                   <TableHead className="text-right w-[150px] sm:w-[180px]">Status</TableHead>
@@ -529,8 +595,26 @@ export default function SegmentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {segments.map(segment => (
-                  <TableRow key={segment.id}>
+                {segments.map((segment, index) => (
+                  <TableRow 
+                    key={segment.id}
+                    draggable={!segment.isCore} // Core segments are not draggable
+                    onDragStart={(e) => !segment.isCore && handleDragStart(e, segment.id)}
+                    onDragEnd={(e) => !segment.isCore && handleDragEnd(e)}
+                    onDragOver={(e) => !segment.isCore && handleDragOver(e)}
+                    onDrop={(e) => !segment.isCore && handleDrop(e, segment.id)}
+                    className={cn(
+                      segment.isCore ? "bg-muted/30 cursor-not-allowed" : "cursor-grab active:cursor-grabbing",
+                      draggedSegmentId === segment.id && "opacity-50 shadow-xl"
+                    )}
+                  >
+                    <TableCell className="text-center">
+                      {!segment.isCore ? (
+                        <GripVertical className="inline-block h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <span className="text-sm text-muted-foreground">{index + 1}</span>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">
                       <span
                         className="text-primary hover:underline cursor-pointer"
@@ -538,6 +622,7 @@ export default function SegmentsPage() {
                       >
                         {segment.displayName}
                       </span>
+                       {segment.isCore && <span className="ml-2 text-xs text-muted-foreground">(Core)</span>}
                     </TableCell>
                     <TableCell>{segment.segmentType}</TableCell>
                     <TableCell className="text-right">
@@ -565,6 +650,11 @@ export default function SegmentsPage() {
                 ))}
               </TableBody>
             </Table>
+             {segments.length === 0 && (
+              <p className="py-8 text-center text-muted-foreground">
+                No segments configured. Click "Add Custom Segment" to get started.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
