@@ -37,12 +37,12 @@ const configItems = [
     href: '/configure/combination-rules',
   },
   {
-    id: 'account-access-control', // Changed id
+    id: 'account-access-control',
     title: 'Account Access Control',
     icon: ShieldCheck,
     description: 'Control user access to accounts.',
     dataAiHint: 'security access',
-    href: '/configure/account-access-control', // Updated href
+    href: '/configure/account-access-control',
   },
   {
     id: 'settings',
@@ -50,7 +50,7 @@ const configItems = [
     icon: SettingsIcon,
     description: 'Configure application-wide settings.',
     dataAiHint: 'cogwheel gear',
-    href: '/configure/settings', // Assuming a future settings page
+    href: '/configure/settings',
   },
 ];
 
@@ -63,8 +63,11 @@ export default function HomePage() {
         <Breadcrumbs items={breadcrumbItems} />
         <header className="mb-10 sm:mb-16 text-center">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-primary">
-            Opengov | General Ledger
+            Chart of Accounts Configuration
           </h1>
+          <p className="text-lg sm:text-xl text-muted-foreground mt-2">
+            For the General Ledger Module of Opengov Financials
+          </p>
         </header>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -74,7 +77,7 @@ export default function HomePage() {
               icon={item.icon}
               title={item.title}
               description={item.description}
-              href={item.href} // Use updated href
+              href={item.href}
               data-ai-hint={item.dataAiHint}
             />
           ))}

@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { SegmentsProvider } from '@/contexts/SegmentsContext';
 import { HierarchiesProvider } from '@/contexts/HierarchiesContext';
 import { CombinationRulesProvider } from '@/contexts/CombinationRulesContext';
-import { AccountAccessControlProvider } from '@/contexts/AccountAccessControlContext'; // Added import
+import { AccountAccessControlProvider } from '@/contexts/AccountAccessControlContext';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -16,8 +16,8 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Opengov | General Ledger',
-  description: 'Configuration portal for Opengov General Ledger',
+  title: 'Opengov Financials | COA Configuration',
+  description: 'Chart of Accounts (COA) Configuration for the General Ledger module of Opengov Financials.',
 };
 
 export default function RootLayout({
@@ -34,7 +34,7 @@ export default function RootLayout({
         <SegmentsProvider>
           <HierarchiesProvider>
             <CombinationRulesProvider>
-              <AccountAccessControlProvider> {/* Wrapped children with AccountAccessControlProvider */}
+              <AccountAccessControlProvider>
                 {children}
               </AccountAccessControlProvider>
             </CombinationRulesProvider>
