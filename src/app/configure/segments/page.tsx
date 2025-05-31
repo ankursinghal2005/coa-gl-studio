@@ -306,13 +306,16 @@ export default function SegmentsPage() {
     if (!isClientMounted || !segments || segments.length === 0) {
       return [];
     }
-    return segments.map((segment, index) => {
+    // Filter for active segments first
+    const activeSegments = segments.filter(segment => segment.isActive);
+    
+    return activeSegments.map((segment, index) => {
       const codePart = segment.defaultCode || "X".repeat(segment.maxLength > 0 ? Math.min(segment.maxLength, 4) : 4);
       return {
         id: segment.id,
         codePart: codePart,
         displayName: segment.displayName,
-        separator: index < segments.length - 1 ? segment.separator : null,
+        separator: index < activeSegments.length - 1 ? segment.separator : null,
       };
     });
   }, [segments, isClientMounted]);
@@ -334,7 +337,7 @@ export default function SegmentsPage() {
             <CardTitle>Account Code String Preview</CardTitle>
              <CardDescriptionComponent>
                 This is an example of how your account code string will look based on the current segment order and separators. 
-                The example uses the segment's default code if defined, or "XXXX" as a placeholder.
+                The example uses the segment's default code if defined, or "XXXX" as a placeholder. Only active segments are shown.
              </CardDescriptionComponent>
           </CardHeader>
           <CardContent>
@@ -368,7 +371,7 @@ export default function SegmentsPage() {
                 ))
               ) : (
                 <p className="text-center font-mono text-lg tracking-wider text-foreground self-center">
-                  No segments configured yet.
+                  No active segments configured yet.
                 </p>
               )}
             </div>
