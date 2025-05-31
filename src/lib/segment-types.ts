@@ -45,13 +45,14 @@ export interface SegmentCode {
   validTo?: Date;
   availableForTransactionCoding: boolean;
   availableForBudgeting: boolean;
+  allowedSubmodules?: string[]; // New field for allowed submodules
 }
 
 // Shared mock segment codes data
 export const mockSegmentCodesData: Record<string, SegmentCode[]> = {
   'fund': [
-    { id: 'fb-f-100', code: '100', description: 'General Fund', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true, external1: "GF-001" },
-    { id: 'fb-f-101', code: '101', description: 'Governmental Operating Fund', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "SRFA-001"},
+    { id: 'fb-f-100', code: '100', description: 'General Fund', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true, external1: "GF-001", allowedSubmodules: ['General Ledger', 'Accounts Payable'] },
+    { id: 'fb-f-101', code: '101', description: 'Governmental Operating Fund', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "SRFA-001", allowedSubmodules: ['General Ledger'] },
     { id: 'fb-f-102', code: '102', description: 'Enterprise Parking Fund', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "CPFB-001" },
     { id: 'fb-f-103', code: '103', description: 'Special Revenue Fund - Grants', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, external1: "DSFC-001" },
     { id: 'fb-f-104', code: '104', description: 'Capital Projects Fund - Infrastructure', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
@@ -70,8 +71,8 @@ export const mockSegmentCodesData: Record<string, SegmentCode[]> = {
     { id: 'fb-f-320', code: '320', description: 'Infrastructure Upgrade Y', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
   ],
   'department': [
-    { id: 'fb-d-FIN', code: 'FIN', description: 'Finance Department (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true },
-    { id: 'fb-d-HR', code: 'HR', description: 'Human Resources (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true },
+    { id: 'fb-d-FIN', code: 'FIN', description: 'Finance Department (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true, allowedSubmodules: ['General Ledger'] },
+    { id: 'fb-d-HR', code: 'HR', description: 'Human Resources (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true, allowedSubmodules: ['Payroll'] },
     { id: 'fb-d-FIN-ACC', code: 'FIN-ACC', description: 'Accounting (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
     { id: 'fb-d-FIN-BUD', code: 'FIN-BUD', description: 'Budgeting (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
     { id: 'fb-d-IT', code: 'IT', description: 'IT Department (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
@@ -80,19 +81,21 @@ export const mockSegmentCodesData: Record<string, SegmentCode[]> = {
     { id: 'fb-d-PW', code: 'PW', description: 'Public Works', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
   ],
   'object': [
-    { id: 'fb-o-5000', code: '5000', description: 'Salaries & Wages (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true },
+    { id: 'fb-o-5000', code: '5000', description: 'Salaries & Wages (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true, allowedSubmodules: ['Payroll', 'General Ledger'] },
     { id: 'fb-o-5100', code: '5100', description: 'Full-time Salaries (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
     { id: 'fb-o-5200', code: '5200', description: 'Part-time Salaries (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
     { id: 'fb-o-6000', code: '6000', description: 'Operating Expenses (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: false, availableForBudgeting: true },
-    { id: 'fb-o-6100', code: '6100', description: 'Office Supplies (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
-    { id: 'fb-o-6200', code: '6200', description: 'Utilities (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
+    { id: 'fb-o-6100', code: '6100', description: 'Office Supplies (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['Accounts Payable'] },
+    { id: 'fb-o-6200', code: '6200', description: 'Utilities (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['Accounts Payable'] },
   ],
   'project': [
-    { id: 'proj-001', code: 'P001', description: 'City Hall Renovation', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
+    { id: 'proj-001', code: 'P001', description: 'City Hall Renovation', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Accounts Payable'] },
     { id: 'proj-002', code: 'P002', description: 'Park Improvement Project', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
   ],
    'grant': [
-    { id: 'grant-A', code: 'GR-A', description: 'Federal Infrastructure Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
+    { id: 'grant-A', code: 'GR-A', description: 'Federal Infrastructure Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Cash Receipts'] },
   ],
   // Add more mock codes for other segments as needed
 };
+
+    

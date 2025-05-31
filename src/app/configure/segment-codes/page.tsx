@@ -30,6 +30,14 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Form,
   FormControl,
   FormField,
@@ -38,14 +46,22 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { DatePicker } from "@/components/ui/date-picker";
-import { PlusCircle, ListFilter, CheckCircle, XCircle } from 'lucide-react';
+import { PlusCircle, ListFilter, CheckCircle, XCircle, ChevronsUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useSegments } from '@/contexts/SegmentsContext';
-import type { Segment, SegmentCode } from '@/lib/segment-types'; // Updated import
-import { mockSegmentCodesData } from '@/lib/segment-types'; // Import shared mock data
+import type { Segment, SegmentCode } from '@/lib/segment-types';
+import { mockSegmentCodesData } from '@/lib/segment-types';
+
+const submoduleOptions = [
+  'General Ledger', 
+  'Accounts Payable', 
+  'Accounts Receivables', 
+  'Cash Receipts', 
+  'Payroll'
+] as const;
 
 const segmentCodeFormSchema = z.object({
   id: z.string().optional(),
@@ -62,6 +78,7 @@ const segmentCodeFormSchema = z.object({
   validTo: z.date().optional(),
   availableForTransactionCoding: z.boolean().default(false),
   availableForBudgeting: z.boolean().default(false),
+  allowedSubmodules: z.array(z.string()).optional(),
 }).refine(data => {
   if (data.validFrom && data.validTo) {
     return data.validTo >= data.validFrom;
@@ -88,6 +105,7 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   validTo: undefined,
   availableForTransactionCoding: false,
   availableForBudgeting: false,
+  allowedSubmodules: [],
 };
 
 
@@ -98,14 +116,11 @@ export default function SegmentCodesPage() {
   
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
 
-  // Use the shared mockSegmentCodesData and allow local modifications
   const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>(() => {
-    // Deep copy initial mock data to prevent modifying the shared source directly
     const initialData: Record<string, SegmentCode[]> = {};
     for (const segmentKey in mockSegmentCodesData) {
       initialData[segmentKey] = mockSegmentCodesData[segmentKey].map(code => ({...code}));
     }
-    // Ensure all segments from context have an entry, even if empty
     allAvailableSegments.forEach(segment => {
       if (!initialData[segment.id]) {
         initialData[segment.id] = [];
@@ -152,6 +167,7 @@ export default function SegmentCodesPage() {
           ...currentEditingCode,
           validFrom: currentEditingCode.validFrom ? new Date(currentEditingCode.validFrom) : new Date(),
           validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
+          allowedSubmodules: currentEditingCode.allowedSubmodules || [],
         });
       }
     } else {
@@ -176,17 +192,22 @@ export default function SegmentCodesPage() {
   const handleSaveCodeSubmit = (values: SegmentCodeFormValues) => {
     if (!selectedSegmentId) return;
 
+    const dataToSave = {
+      ...values,
+      allowedSubmodules: values.allowedSubmodules || [],
+    };
+
     if (dialogMode === 'add') {
       const newCode: SegmentCode = {
-        id: `${selectedSegmentId}-code-${crypto.randomUUID()}`, // Ensure unique ID
-        ...values,
+        id: `${selectedSegmentId}-code-${crypto.randomUUID()}`,
+        ...dataToSave,
       };
       setSegmentCodesData(prev => ({
         ...prev,
         [selectedSegmentId]: [...(prev[selectedSegmentId] || []), newCode],
       }));
     } else if (dialogMode === 'edit' && currentEditingCode) {
-      const updatedCode = { ...currentEditingCode, ...values };
+      const updatedCode = { ...currentEditingCode, ...dataToSave };
       setSegmentCodesData(prev => ({
         ...prev,
         [selectedSegmentId]: (prev[selectedSegmentId] || []).map(code =>
@@ -391,6 +412,55 @@ export default function SegmentCodesPage() {
                           />
                         </div>
 
+                        <FormField
+                          control={form.control}
+                          name="allowedSubmodules"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Allowed Submodules</FormLabel>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild disabled={isFieldDisabled}>
+                                  <Button
+                                    variant="outline"
+                                    className="w-full justify-between"
+                                    disabled={isFieldDisabled}
+                                  >
+                                    <span>
+                                      {field.value && field.value.length > 0
+                                        ? `${field.value.length} selected`
+                                        : "Select submodules"}
+                                    </span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                                  <DropdownMenuLabel>Allowed Submodules</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  {submoduleOptions.map((option) => (
+                                    <DropdownMenuCheckboxItem
+                                      key={option}
+                                      checked={field.value?.includes(option) ?? false}
+                                      onCheckedChange={(checked) => {
+                                        const currentSelection = field.value || [];
+                                        if (checked) {
+                                          field.onChange([...currentSelection, option]);
+                                        } else {
+                                          field.onChange(currentSelection.filter((item) => item !== option));
+                                        }
+                                      }}
+                                      disabled={isFieldDisabled}
+                                    >
+                                      {option}
+                                    </DropdownMenuCheckboxItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
@@ -520,6 +590,7 @@ export default function SegmentCodesPage() {
                                   ...currentEditingCode,
                                   validFrom: currentEditingCode.validFrom ? new Date(currentEditingCode.validFrom) : new Date(),
                                   validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
+                                  allowedSubmodules: currentEditingCode.allowedSubmodules || [],
                                 });
                               }}>Cancel</Button>
                               <Button type="submit">Save Changes</Button>
@@ -595,3 +666,5 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
+
+    
