@@ -9,7 +9,9 @@ import { initialHierarchiesData as defaultInitialHierarchies } from '@/lib/hiera
 interface HierarchiesContextType {
   hierarchies: Hierarchy[];
   addHierarchy: (newHierarchy: Hierarchy) => void;
-  // Future: updateHierarchy, deleteHierarchy
+  updateHierarchy: (updatedHierarchy: Hierarchy) => void;
+  getHierarchyById: (hierarchyId: string) => Hierarchy | undefined;
+  // Future: deleteHierarchy
 }
 
 const HierarchiesContext = createContext<HierarchiesContextType | undefined>(undefined);
@@ -21,17 +23,22 @@ export const HierarchiesProvider = ({ children }: { children: ReactNode }) => {
     setHierarchies(prevHierarchies => [...prevHierarchies, newHierarchy]);
   }, []);
 
-  // Placeholder for future update/delete functions
-  // const updateHierarchy = useCallback((updatedHierarchy: Hierarchy) => {
-  //   setHierarchies(prev => prev.map(h => h.id === updatedHierarchy.id ? updatedHierarchy : h));
-  // }, []);
+  const updateHierarchy = useCallback((updatedHierarchy: Hierarchy) => {
+    setHierarchies(prev => 
+      prev.map(h => (h.id === updatedHierarchy.id ? updatedHierarchy : h))
+    );
+  }, []);
+
+  const getHierarchyById = useCallback((hierarchyId: string): Hierarchy | undefined => {
+    return hierarchies.find(h => h.id === hierarchyId);
+  }, [hierarchies]);
 
   // const deleteHierarchy = useCallback((hierarchyId: string) => {
   //   setHierarchies(prev => prev.filter(h => h.id !== hierarchyId));
   // }, []);
 
   return (
-    <HierarchiesContext.Provider value={{ hierarchies, addHierarchy }}>
+    <HierarchiesContext.Provider value={{ hierarchies, addHierarchy, updateHierarchy, getHierarchyById }}>
       {children}
     </HierarchiesContext.Provider>
   );

@@ -9,8 +9,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } 
-from '@/components/ui/label';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -31,10 +30,10 @@ import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { GripVertical, FolderTree, Trash2, AlertTriangle } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
-import { useHierarchies } from '@/contexts/HierarchiesContext'; // Added import
-import type { Segment, SegmentCode } from '@/lib/segment-types'; // Updated import
-import { mockSegmentCodesData } from '@/lib/segment-types'; // Import shared mock data
-import type { HierarchyNode, Hierarchy } from '@/lib/hierarchy-types'; // Added import
+import { useHierarchies } from '@/contexts/HierarchiesContext';
+import type { Segment, SegmentCode } from '@/lib/segment-types';
+import { mockSegmentCodesData } from '@/lib/segment-types';
+import type { HierarchyNode, Hierarchy } from '@/lib/hierarchy-types';
 
 
 const hierarchyBuilderFormSchema = z.object({
@@ -181,11 +180,16 @@ export default function HierarchyBuildPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getSegmentById } = useSegments();
-  const { addHierarchy } = useHierarchies(); // Added
+  const { addHierarchy, updateHierarchy, getHierarchyById } = useHierarchies();
   
+  const segmentId = searchParams.get('segmentId');
+  const hierarchyIdQueryParam = searchParams.get('hierarchyId');
+
   const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]);
   const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
-  
+  const [currentHierarchyId, setCurrentHierarchyId] = useState<string | null>(hierarchyIdQueryParam);
+  const [isEditMode, setIsEditMode] = useState<boolean>(!!hierarchyIdQueryParam);
+
   const selectedParentNodeDetails = useMemo(() => {
     if (!selectedParentNodeId) return null;
     return findNodeById(treeNodes, selectedParentNodeId);
@@ -199,8 +203,6 @@ export default function HierarchyBuildPage() {
 
   const [rangeStartCode, setRangeStartCode] = useState('');
   const [rangeEndCode, setRangeEndCode] = useState('');
-
-  const segmentId = searchParams.get('segmentId');
 
   const form = useForm<HierarchyBuilderFormValues>({
     resolver: zodResolver(hierarchyBuilderFormSchema),
@@ -230,14 +232,45 @@ export default function HierarchyBuildPage() {
           : codesForSegment;
 
         setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator)); 
-        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator)); 
+        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator));
+
+        if (currentHierarchyId) {
+          const existingHierarchy = getHierarchyById(currentHierarchyId);
+          if (existingHierarchy && existingHierarchy.segmentId === segmentId) {
+            form.reset({
+              hierarchyName: existingHierarchy.name,
+              status: existingHierarchy.status,
+              description: existingHierarchy.description || '',
+            });
+            setTreeNodes(existingHierarchy.treeNodes);
+            setIsEditMode(true);
+          } else if (existingHierarchy) {
+            // Hierarchy ID belongs to a different segment, treat as error or new
+            alert("Error: Hierarchy ID does not match the selected segment. Starting new hierarchy.");
+            setCurrentHierarchyId(null);
+            setIsEditMode(false);
+            form.reset();
+            setTreeNodes([]);
+          } else {
+             // Hierarchy ID not found, treat as new
+            setCurrentHierarchyId(null);
+            setIsEditMode(false);
+          }
+        } else {
+          setIsEditMode(false);
+          // form.reset(); // Reset only if not edit mode and no hierarchyId was ever set.
+          // setTreeNodes([]); // Reset only if not edit mode
+        }
+
       } else {
+        alert('Segment not found.');
         router.push('/configure/hierarchies');
       }
     } else {
+      alert('Segment ID is required.');
       router.push('/configure/hierarchies');
     }
-  }, [segmentId, getSegmentById, router, searchTerm]);
+  }, [segmentId, getSegmentById, router, searchTerm, currentHierarchyId, getHierarchyById, form]);
 
 
   if (!selectedSegment) {
@@ -258,19 +291,33 @@ export default function HierarchyBuildPage() {
         return;
     }
 
-    const newHierarchy: Hierarchy = {
-        id: crypto.randomUUID(),
-        name: values.hierarchyName,
-        segmentId: segmentId,
-        status: values.status,
-        description: values.description,
-        treeNodes: treeNodes,
-        lastModifiedDate: new Date(),
-        lastModifiedBy: "Current User", // Placeholder
-    };
-
-    addHierarchy(newHierarchy);
-    alert(`Hierarchy "${values.hierarchyName}" saved successfully!`);
+    if (isEditMode && currentHierarchyId) {
+        const updatedHierarchy: Hierarchy = {
+            id: currentHierarchyId,
+            name: values.hierarchyName,
+            segmentId: segmentId,
+            status: values.status,
+            description: values.description,
+            treeNodes: treeNodes,
+            lastModifiedDate: new Date(),
+            lastModifiedBy: "Current User (Updated)", // Placeholder
+        };
+        updateHierarchy(updatedHierarchy);
+        alert(`Hierarchy "${values.hierarchyName}" updated successfully!`);
+    } else {
+        const newHierarchy: Hierarchy = {
+            id: crypto.randomUUID(),
+            name: values.hierarchyName,
+            segmentId: segmentId,
+            status: values.status,
+            description: values.description,
+            treeNodes: treeNodes,
+            lastModifiedDate: new Date(),
+            lastModifiedBy: "Current User (Created)", // Placeholder
+        };
+        addHierarchy(newHierarchy);
+        alert(`Hierarchy "${values.hierarchyName}" saved successfully!`);
+    }
     router.push(`/configure/hierarchies?segmentId=${segmentId}`);
   };
 
@@ -285,7 +332,16 @@ export default function HierarchyBuildPage() {
   const handleReset = () => {
     form.reset();
     setSearchTerm('');
-    setTreeNodes([]);
+    if (isEditMode && currentHierarchyId) {
+        const existingHierarchy = getHierarchyById(currentHierarchyId);
+        if (existingHierarchy) {
+            setTreeNodes(existingHierarchy.treeNodes); // Reset tree to original edit state
+        } else {
+            setTreeNodes([]); // Fallback if something went wrong
+        }
+    } else {
+        setTreeNodes([]); // Reset tree for new hierarchy
+    }
     setSelectedParentNodeId(null);
     setRangeStartCode('');
     setRangeEndCode('');
@@ -453,7 +509,7 @@ export default function HierarchyBuildPage() {
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
     { label: 'Hierarchies', href: `/configure/hierarchies?segmentId=${selectedSegment.id}` },
-    { label: 'Build Hierarchy' },
+    { label: isEditMode ? 'Edit Hierarchy' : 'Build Hierarchy' },
   ];
 
   const getDropZoneMessage = () => {
@@ -473,7 +529,7 @@ export default function HierarchyBuildPage() {
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-primary">
-          Create Hierarchy for: {selectedSegment.displayName}
+          {isEditMode ? 'Edit Hierarchy for: ' : 'Create Hierarchy for: '} {selectedSegment.displayName}
         </h1>
       </header>
 
@@ -707,7 +763,7 @@ export default function HierarchyBuildPage() {
           Reset Hierarchy
         </Button>
         <Button type="button" onClick={form.handleSubmit(onSubmit)}>
-          Save Hierarchy
+          {isEditMode ? 'Update Hierarchy' : 'Save Hierarchy'}
         </Button>
       </div>
     </div>

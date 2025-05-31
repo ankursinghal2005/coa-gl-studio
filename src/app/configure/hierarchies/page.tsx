@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Table,
   TableHeader,
@@ -39,15 +40,9 @@ export default function HierarchiesPage() {
   const querySegmentIdParam = searchParams.get('segmentId');
 
   useEffect(() => {
-    // Wait until segments are loaded
     if (allAvailableSegments.length === 0) {
-      // If there was a segmentId in query, but no segments loaded yet,
-      // we might want to clear selectedSegmentId or just wait.
-      // If selectedSegmentId is already set from a previous render with segments,
-      // and now segments become empty, we might clear it.
       if (selectedSegmentId !== null) {
           setSelectedSegmentId(null);
-          // If URL had a param, and now there are no segments, clear URL param.
           if (querySegmentIdParam) {
             router.replace('/configure/hierarchies', { scroll: false });
           }
@@ -57,27 +52,19 @@ export default function HierarchiesPage() {
 
     let determinedSegmentId: string | null = null;
 
-    // Try to use the segment ID from the URL if it's valid
     if (querySegmentIdParam && allAvailableSegments.some(s => s.id === querySegmentIdParam)) {
       determinedSegmentId = querySegmentIdParam;
-    } else {
-      // Fallback to the first available segment if URL param is invalid or missing
+    } else if (allAvailableSegments.length > 0) {
       determinedSegmentId = allAvailableSegments[0].id;
     }
 
-    // Update the selectedSegmentId state only if it's different
     if (selectedSegmentId !== determinedSegmentId) {
       setSelectedSegmentId(determinedSegmentId);
     }
 
-    // Synchronize the URL:
-    // If we have a valid determinedSegmentId and the URL doesn't match it, update the URL.
     if (determinedSegmentId && querySegmentIdParam !== determinedSegmentId) {
       router.replace(`/configure/hierarchies?segmentId=${determinedSegmentId}`, { scroll: false });
     } 
-    // If we determined no segment should be selected (e.g., determinedSegmentId became null, though current logic always picks one if available)
-    // or if the query param was present but invalid and no fallback was determined (less likely with current logic)
-    // then clear the segmentId from URL. This condition might need refinement if `determinedSegmentId` could truly be null while `allAvailableSegments` is not empty.
     else if (!determinedSegmentId && querySegmentIdParam) { 
       router.replace('/configure/hierarchies', { scroll: false });
     }
@@ -109,9 +96,7 @@ export default function HierarchiesPage() {
   };
 
   const handleEditHierarchy = (hierarchy: Hierarchy) => {
-    console.log('Edit Hierarchy:', hierarchy.name);
-    alert('Hierarchy edit UI not yet implemented.');
-    // Future: router.push(`/configure/hierarchies/build?segmentId=${hierarchy.segmentId}&hierarchyId=${hierarchy.id}`);
+    router.push(`/configure/hierarchies/build?segmentId=${hierarchy.segmentId}&hierarchyId=${hierarchy.id}`);
   };
 
   const handleCopyHierarchy = (hierarchy: Hierarchy) => {
@@ -126,7 +111,6 @@ export default function HierarchiesPage() {
   };
 
   const handleSegmentSelect = (segmentIdToSelect: string) => {
-    // Update state, which will trigger useEffect to sync URL if needed
     if (selectedSegmentId !== segmentIdToSelect) {
         setSelectedSegmentId(segmentIdToSelect);
         router.push(`/configure/hierarchies?segmentId=${segmentIdToSelect}`, { scroll: false });
@@ -204,7 +188,12 @@ export default function HierarchiesPage() {
                         {currentSegmentHierarchies.map(hierarchy => (
                           <TableRow key={hierarchy.id}>
                             <TableCell className="font-medium">
-                              {hierarchy.name}
+                              <Link
+                                href={`/configure/hierarchies/build?segmentId=${hierarchy.segmentId}&hierarchyId=${hierarchy.id}`}
+                                className="text-primary hover:underline"
+                              >
+                                {hierarchy.name}
+                              </Link>
                             </TableCell>
                             <TableCell>{hierarchy.status}</TableCell>
                             <TableCell>{hierarchy.lastModifiedBy || 'N/A'}</TableCell>
