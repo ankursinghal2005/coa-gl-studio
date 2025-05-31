@@ -5,7 +5,8 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { SegmentsProvider } from '@/contexts/SegmentsContext';
-import { HierarchiesProvider } from '@/contexts/HierarchiesContext'; // Added import
+import { HierarchiesProvider } from '@/contexts/HierarchiesContext';
+import { CombinationRulesProvider } from '@/contexts/CombinationRulesContext'; // Added import
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -30,8 +31,10 @@ export default function RootLayout({
         dmSans.variable
       )}>
         <SegmentsProvider>
-          <HierarchiesProvider> {/* Wrapped children with HierarchiesProvider */}
-            {children}
+          <HierarchiesProvider>
+            <CombinationRulesProvider> {/* Wrapped children with CombinationRulesProvider */}
+              {children}
+            </CombinationRulesProvider>
           </HierarchiesProvider>
         </SegmentsProvider>
         <Toaster />
