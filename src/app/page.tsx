@@ -21,7 +21,7 @@ const configItems = [
   {
     id: 'hierarchies',
     title: 'Hierarchies',
-    icon: Network, // Using Network icon as previously decided
+    icon: Network,
     description: 'Organize segment codes into hierarchies.',
     dataAiHint: 'organization chart'
   },
@@ -69,6 +69,7 @@ export default function HomePage() {
               title={item.title}
               description={item.description}
               href={`/configure/${item.id}`}
+              data-ai-hint={item.dataAiHint}
             />
           ))}
         </div>
