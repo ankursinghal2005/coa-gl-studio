@@ -1,7 +1,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react'; // Added useState
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -20,23 +20,25 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PlusCircle, Eye, Edit2, Trash2, MoreHorizontal } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Added CardDescription
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCombinationRules } from '@/contexts/CombinationRulesContext';
-import { useSegments } from '@/contexts/SegmentsContext'; // To get segment names
+import { useSegments } from '@/contexts/SegmentsContext';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'; // Added imports
+import { Label } from '@/components/ui/label'; // Added imports
 
 export default function CombinationRulesPage() {
   const router = useRouter();
   const { combinationRules } = useCombinationRules();
   const { getSegmentById } = useSegments();
+  const [defaultUnmatchedBehavior, setDefaultUnmatchedBehavior] = useState<'Allowed' | 'Not Allowed'>('Not Allowed');
 
   const handleCreateRule = () => {
     router.push('/configure/combination-rules/build');
   };
 
   const handleViewRule = (ruleId: string) => {
-    // For now, viewing will be same as editing
     router.push(`/configure/combination-rules/build?ruleId=${ruleId}`);
   };
 
@@ -47,7 +49,6 @@ export default function CombinationRulesPage() {
   const handleDeleteRule = (ruleId: string) => {
     console.log('Delete Combination Rule ID:', ruleId);
     alert('Combination rule deletion logic not yet implemented.');
-    // Future: call a deleteCombinationRule function from context
   };
 
   const breadcrumbItems = [
@@ -72,6 +73,35 @@ export default function CombinationRulesPage() {
           Create Rule
         </Button>
       </header>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Default Behavior for Unmatched Combinations</CardTitle>
+          <CardDescription>
+            Select what happens to segment code combinations that are not explicitly covered by any rule.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RadioGroup
+            value={defaultUnmatchedBehavior}
+            onValueChange={(value: 'Allowed' | 'Not Allowed') => setDefaultUnmatchedBehavior(value)}
+            className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-6"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="Allowed" id="unmatched-allowed" />
+              <Label htmlFor="unmatched-allowed">Allowed</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="Not Allowed" id="unmatched-not-allowed" />
+              <Label htmlFor="unmatched-not-allowed">Not Allowed (Recommended)</Label>
+            </div>
+          </RadioGroup>
+          <p className="text-xs text-muted-foreground mt-3">
+            This setting determines if combinations are permitted or denied by default if no specific rule applies to them.
+            Choosing 'Not Allowed' provides a more restrictive setup.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
