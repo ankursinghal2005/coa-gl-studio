@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label'; // Direct import for non-form use
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -26,13 +26,23 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
 import { useCombinationRules } from '@/contexts/CombinationRulesContext';
-import type { CombinationRule, CombinationRuleMappingEntry, CombinationRuleCriterion } from '@/lib/combination-rule-types';
+import type { CombinationRule, CombinationRuleMappingEntry, CombinationRuleCriterion, CombinationRuleCriterionType } from '@/lib/combination-rule-types';
 import type { Segment } from '@/lib/segment-types';
 
 
@@ -44,26 +54,58 @@ const combinationRuleFormSchema = z.object({
   description: z.string().optional(),
   segmentAId: z.string().min(1, { message: 'Segment A is required.' }),
   segmentBId: z.string().min(1, { message: 'Segment B is required.' }),
-  // mappingEntries will be handled separately for now, not directly in the Zod schema for the main form
 }).refine(data => data.segmentAId !== data.segmentBId, {
   message: "Segment A and Segment B must be different.",
-  path: ["segmentBId"], // Attach error to segmentBId for convenience
+  path: ["segmentBId"],
 });
 
 type CombinationRuleFormValues = z.infer<typeof combinationRuleFormSchema>;
 
+interface MappingEntryFormState {
+  segmentACriterionType: CombinationRuleCriterionType | '';
+  segmentACodeValue: string;
+  segmentARangeStart: string;
+  segmentARangeEnd: string;
+  segmentAHierarchyNodeId: string;
+  segmentAIncludeChildren: boolean;
+
+  segmentBCriterionType: CombinationRuleCriterionType | '';
+  segmentBCodeValue: string;
+  segmentBRangeStart: string;
+  segmentBRangeEnd: string;
+  segmentBHierarchyNodeId: string;
+  segmentBIncludeChildren: boolean;
+}
+
+const initialMappingEntryFormState: MappingEntryFormState = {
+  segmentACriterionType: '',
+  segmentACodeValue: '',
+  segmentARangeStart: '',
+  segmentARangeEnd: '',
+  segmentAHierarchyNodeId: '',
+  segmentAIncludeChildren: false,
+  segmentBCriterionType: '',
+  segmentBCodeValue: '',
+  segmentBRangeStart: '',
+  segmentBRangeEnd: '',
+  segmentBHierarchyNodeId: '',
+  segmentBIncludeChildren: false,
+};
+
+
 export default function CombinationRuleBuildPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { segments } = useSegments();
+  const { segments, getSegmentById } = useSegments();
   const { addCombinationRule, updateCombinationRule, getCombinationRuleById } = useCombinationRules();
 
   const ruleIdQueryParam = searchParams.get('ruleId');
   const [currentRuleId, setCurrentRuleId] = useState<string | null>(ruleIdQueryParam);
   const [isEditMode, setIsEditMode] = useState<boolean>(!!ruleIdQueryParam);
   
-  // State for managing mapping entries (to be expanded later)
   const [mappingEntries, setMappingEntries] = useState<CombinationRuleMappingEntry[]>([]);
+  const [isMappingEntryDialogOpen, setIsMappingEntryDialogOpen] = useState(false);
+  const [mappingEntryFormState, setMappingEntryFormState] = useState<MappingEntryFormState>(initialMappingEntryFormState);
 
 
   const form = useForm<CombinationRuleFormValues>({
@@ -102,7 +144,6 @@ export default function CombinationRuleBuildPage() {
     } else {
         setIsEditMode(false);
         setCurrentRuleId(null);
-        // form.reset(); // form has default values
         setMappingEntries([]);
     }
   }, [ruleIdQueryParam, getCombinationRuleById, form, router]);
@@ -114,9 +155,9 @@ export default function CombinationRuleBuildPage() {
       description: values.description,
       segmentAId: values.segmentAId,
       segmentBId: values.segmentBId,
-      mappingEntries: mappingEntries, // Use current state for mappingEntries
+      mappingEntries: mappingEntries,
       lastModifiedDate: new Date(),
-      lastModifiedBy: "Current User", // Placeholder
+      lastModifiedBy: "Current User", 
     };
 
     if (isEditMode && currentRuleId) {
@@ -137,10 +178,11 @@ export default function CombinationRuleBuildPage() {
   const segmentAValue = form.watch("segmentAId");
   const segmentBValue = form.watch("segmentBId");
 
+  const selectedSegmentA = useMemo(() => segmentAValue ? getSegmentById(segmentAValue) : null, [segmentAValue, getSegmentById]);
+  const selectedSegmentB = useMemo(() => segmentBValue ? getSegmentById(segmentBValue) : null, [segmentBValue, getSegmentById]);
+
   const availableSegmentsForA = segments;
   const availableSegmentsForB = segments.filter(s => s.id !== segmentAValue);
-  // const availableSegmentsForA = segments.filter(s => s.id !== segmentBValue);
-
 
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
@@ -148,22 +190,68 @@ export default function CombinationRuleBuildPage() {
     { label: isEditMode ? 'Edit Combination Rule' : 'Create Combination Rule' },
   ];
 
-  // Placeholder for adding/managing mapping entries
-  const handleAddMappingEntry = () => {
-    // This will be expanded later to open a modal or inline form
-    // For now, it's a placeholder
-    const newEntry: CombinationRuleMappingEntry = {
+  const handleOpenAddMappingEntryDialog = () => {
+    setMappingEntryFormState(initialMappingEntryFormState);
+    setIsMappingEntryDialogOpen(true);
+  };
+
+  const handleMappingEntryFormChange = (field: keyof MappingEntryFormState, value: any) => {
+    setMappingEntryFormState(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveMappingEntry = () => {
+    const {
+      segmentACriterionType, segmentACodeValue, segmentARangeStart, segmentARangeEnd, segmentAHierarchyNodeId, segmentAIncludeChildren,
+      segmentBCriterionType, segmentBCodeValue, segmentBRangeStart, segmentBRangeEnd, segmentBHierarchyNodeId, segmentBIncludeChildren
+    } = mappingEntryFormState;
+
+    let critA: CombinationRuleCriterion | null = null;
+    if (segmentACriterionType === 'CODE' && segmentACodeValue) {
+      critA = { type: 'CODE', codeValue: segmentACodeValue };
+    } else if (segmentACriterionType === 'RANGE' && segmentARangeStart && segmentARangeEnd) {
+      critA = { type: 'RANGE', rangeStartValue: segmentARangeStart, rangeEndValue: segmentARangeEnd };
+    } else if (segmentACriterionType === 'HIERARCHY_NODE' && segmentAHierarchyNodeId) {
+      critA = { type: 'HIERARCHY_NODE', hierarchyNodeId: segmentAHierarchyNodeId, includeChildren: segmentAIncludeChildren };
+    }
+
+    let critB: CombinationRuleCriterion | null = null;
+    if (segmentBCriterionType === 'CODE' && segmentBCodeValue) {
+      critB = { type: 'CODE', codeValue: segmentBCodeValue };
+    } else if (segmentBCriterionType === 'RANGE' && segmentBRangeStart && segmentBRangeEnd) {
+      critB = { type: 'RANGE', rangeStartValue: segmentBRangeStart, rangeEndValue: segmentBRangeEnd };
+    } else if (segmentBCriterionType === 'HIERARCHY_NODE' && segmentBHierarchyNodeId) {
+      critB = { type: 'HIERARCHY_NODE', hierarchyNodeId: segmentBHierarchyNodeId, includeChildren: segmentBIncludeChildren };
+    }
+
+    if (critA && critB) {
+      const newEntry: CombinationRuleMappingEntry = {
         id: crypto.randomUUID(),
-        // Placeholder criteria
-        segmentACriterion: { type: 'CODE', codeValue: 'TEMP_A_CODE' },
-        segmentBCriterion: { type: 'CODE', codeValue: 'TEMP_B_CODE' },
-    };
-    setMappingEntries(prev => [...prev, newEntry]);
-    alert("Add mapping entry UI is not fully implemented yet. A placeholder entry was added.");
+        segmentACriterion: critA,
+        segmentBCriterion: critB,
+      };
+      setMappingEntries(prev => [...prev, newEntry]);
+      setIsMappingEntryDialogOpen(false);
+    } else {
+      alert("Please complete all required fields for both Segment A and Segment B criteria.");
+    }
   };
 
   const handleRemoveMappingEntry = (entryId: string) => {
     setMappingEntries(prev => prev.filter(entry => entry.id !== entryId));
+  };
+  
+  const renderCriterionDisplay = (criterion: CombinationRuleCriterion, segmentName?: string): string => {
+    const namePrefix = segmentName ? `${segmentName} ` : '';
+    switch (criterion.type) {
+      case 'CODE':
+        return `${namePrefix}Code: ${criterion.codeValue}`;
+      case 'RANGE':
+        return `${namePrefix}Range: ${criterion.rangeStartValue} - ${criterion.rangeEndValue}`;
+      case 'HIERARCHY_NODE':
+        return `${namePrefix}Hierarchy Node: ${criterion.hierarchyNodeId}${criterion.includeChildren ? ' (and children)' : ''}`;
+      default:
+        return 'Invalid Criterion';
+    }
   };
 
 
@@ -208,11 +296,11 @@ export default function CombinationRuleBuildPage() {
                         onValueChange={(value) => {
                           field.onChange(value);
                           if (value === form.getValues("segmentBId")) {
-                            form.setValue("segmentBId", ""); // Clear B if same as A
+                            form.setValue("segmentBId", ""); 
                           }
                         }} 
                         value={field.value}
-                        disabled={isEditMode} // Segments cannot be changed in edit mode for simplicity
+                        disabled={isEditMode}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -306,13 +394,12 @@ export default function CombinationRuleBuildPage() {
               <CardTitle>Define Valid Combinations</CardTitle>
               <CardDescription>
                 Specify which codes (or ranges/hierarchy nodes) from Segment A are valid with which codes from Segment B.
-                Full UI for detailed mapping definition will be implemented in a future step.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <Button type="button" variant="outline" onClick={handleAddMappingEntry} disabled={!segmentAValue || !segmentBValue}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Mapping Entry (Placeholder)
+                <Button type="button" variant="outline" onClick={handleOpenAddMappingEntryDialog} disabled={!segmentAValue || !segmentBValue}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Mapping Entry
                 </Button>
               </div>
               {(!segmentAValue || !segmentBValue) && (
@@ -327,12 +414,12 @@ export default function CombinationRuleBuildPage() {
                 <div className="space-y-3">
                 {mappingEntries.map(entry => (
                   <div key={entry.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/50">
-                    <div>
+                    <div className="space-y-1">
                       <p className="text-sm font-medium">
-                        Segment A Criterion: {JSON.stringify(entry.segmentACriterion)}
+                        {renderCriterionDisplay(entry.segmentACriterion)}
                       </p>
                       <p className="text-sm font-medium">
-                        Segment B Criterion: {JSON.stringify(entry.segmentBCriterion)}
+                        {renderCriterionDisplay(entry.segmentBCriterion)}
                       </p>
                     </div>
                     <Button 
@@ -361,6 +448,133 @@ export default function CombinationRuleBuildPage() {
           </div>
         </form>
       </Form>
+
+      {/* Dialog for Adding/Editing Mapping Entry */}
+      <Dialog open={isMappingEntryDialogOpen} onOpenChange={setIsMappingEntryDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Mapping Entry</DialogTitle>
+            <DialogDescription>
+              Define the criteria for Segment A ({selectedSegmentA?.displayName || 'N/A'}) and Segment B ({selectedSegmentB?.displayName || 'N/A'}).
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] p-1">
+            <div className="space-y-6 py-4 pr-4">
+              {/* Segment A Criterion */}
+              <Card>
+                <CardHeader><CardTitle className="text-lg">Segment A Criterion: {selectedSegmentA?.displayName || 'N/A'}</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label htmlFor="segmentACriterionType">Criterion Type</Label>
+                    <Select
+                      value={mappingEntryFormState.segmentACriterionType}
+                      onValueChange={(value) => handleMappingEntryFormChange('segmentACriterionType', value as CombinationRuleCriterionType)}
+                    >
+                      <SelectTrigger id="segmentACriterionType"><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CODE">Specific Code</SelectItem>
+                        <SelectItem value="RANGE">Range of Codes</SelectItem>
+                        <SelectItem value="HIERARCHY_NODE">Hierarchy Node</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {mappingEntryFormState.segmentACriterionType === 'CODE' && (
+                    <div>
+                      <Label htmlFor="segmentACodeValue">Code Value</Label>
+                      <Input id="segmentACodeValue" value={mappingEntryFormState.segmentACodeValue} onChange={(e) => handleMappingEntryFormChange('segmentACodeValue', e.target.value)} />
+                    </div>
+                  )}
+                  {mappingEntryFormState.segmentACriterionType === 'RANGE' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="segmentARangeStart">Start Code</Label>
+                        <Input id="segmentARangeStart" value={mappingEntryFormState.segmentARangeStart} onChange={(e) => handleMappingEntryFormChange('segmentARangeStart', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label htmlFor="segmentARangeEnd">End Code</Label>
+                        <Input id="segmentARangeEnd" value={mappingEntryFormState.segmentARangeEnd} onChange={(e) => handleMappingEntryFormChange('segmentARangeEnd', e.target.value)} />
+                      </div>
+                    </div>
+                  )}
+                  {mappingEntryFormState.segmentACriterionType === 'HIERARCHY_NODE' && (
+                    <div className="space-y-2">
+                      <div>
+                        <Label htmlFor="segmentAHierarchyNodeId">Hierarchy Node ID</Label>
+                        <Input id="segmentAHierarchyNodeId" value={mappingEntryFormState.segmentAHierarchyNodeId} onChange={(e) => handleMappingEntryFormChange('segmentAHierarchyNodeId', e.target.value)} />
+                        <p className="text-xs text-muted-foreground mt-1">Specify the ID of the node from a relevant hierarchy for Segment A.</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="segmentAIncludeChildren" checked={mappingEntryFormState.segmentAIncludeChildren} onCheckedChange={(checked) => handleMappingEntryFormChange('segmentAIncludeChildren', !!checked)} />
+                        <Label htmlFor="segmentAIncludeChildren" className="text-sm font-normal">Include Children</Label>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Segment B Criterion */}
+              <Card>
+                <CardHeader><CardTitle className="text-lg">Segment B Criterion: {selectedSegmentB?.displayName || 'N/A'}</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                   <div>
+                    <Label htmlFor="segmentBCriterionType">Criterion Type</Label>
+                    <Select
+                      value={mappingEntryFormState.segmentBCriterionType}
+                      onValueChange={(value) => handleMappingEntryFormChange('segmentBCriterionType', value as CombinationRuleCriterionType)}
+                    >
+                      <SelectTrigger id="segmentBCriterionType"><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CODE">Specific Code</SelectItem>
+                        <SelectItem value="RANGE">Range of Codes</SelectItem>
+                        <SelectItem value="HIERARCHY_NODE">Hierarchy Node</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {mappingEntryFormState.segmentBCriterionType === 'CODE' && (
+                    <div>
+                      <Label htmlFor="segmentBCodeValue">Code Value</Label>
+                      <Input id="segmentBCodeValue" value={mappingEntryFormState.segmentBCodeValue} onChange={(e) => handleMappingEntryFormChange('segmentBCodeValue', e.target.value)} />
+                    </div>
+                  )}
+                  {mappingEntryFormState.segmentBCriterionType === 'RANGE' && (
+                     <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="segmentBRangeStart">Start Code</Label>
+                        <Input id="segmentBRangeStart" value={mappingEntryFormState.segmentBRangeStart} onChange={(e) => handleMappingEntryFormChange('segmentBRangeStart', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label htmlFor="segmentBRangeEnd">End Code</Label>
+                        <Input id="segmentBRangeEnd" value={mappingEntryFormState.segmentBRangeEnd} onChange={(e) => handleMappingEntryFormChange('segmentBRangeEnd', e.target.value)} />
+                      </div>
+                    </div>
+                  )}
+                  {mappingEntryFormState.segmentBCriterionType === 'HIERARCHY_NODE' && (
+                    <div className="space-y-2">
+                      <div>
+                        <Label htmlFor="segmentBHierarchyNodeId">Hierarchy Node ID</Label>
+                        <Input id="segmentBHierarchyNodeId" value={mappingEntryFormState.segmentBHierarchyNodeId} onChange={(e) => handleMappingEntryFormChange('segmentBHierarchyNodeId', e.target.value)} />
+                        <p className="text-xs text-muted-foreground mt-1">Specify the ID of the node from a relevant hierarchy for Segment B.</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="segmentBIncludeChildren" checked={mappingEntryFormState.segmentBIncludeChildren} onCheckedChange={(checked) => handleMappingEntryFormChange('segmentBIncludeChildren', !!checked)} />
+                        <Label htmlFor="segmentBIncludeChildren" className="text-sm font-normal">Include Children</Label>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button type="button" onClick={handleSaveMappingEntry}>Save Entry</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
+
