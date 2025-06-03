@@ -45,6 +45,13 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { PlusCircle, ListFilter, CheckCircle, XCircle, ChevronsUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card';
@@ -567,6 +574,25 @@ export default function SegmentCodesPage() {
                                               </label>
                                             </div>
                                           );
+                                        case 'Dropdown':
+                                          return (
+                                            <Select
+                                              onValueChange={field.onChange}
+                                              value={field.value ?? ''}
+                                              disabled={isFieldDisabled}
+                                            >
+                                              <SelectTrigger>
+                                                <SelectValue placeholder={`Select ${customFieldDef.label}`} />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {(customFieldDef.dropdownOptions || []).map(option => (
+                                                  <SelectItem key={option} value={option}>
+                                                    {option}
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          );
                                         default:
                                           return null;
                                       }
@@ -756,6 +782,3 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
-
-
-    
