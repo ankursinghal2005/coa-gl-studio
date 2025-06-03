@@ -47,12 +47,12 @@ import {
 } from '@/components/ui/form';
 import { DatePicker } from "@/components/ui/date-picker";
 import { PlusCircle, ListFilter, CheckCircle, XCircle, ChevronsUpDown } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useSegments } from '@/contexts/SegmentsContext';
-import type { Segment, SegmentCode } from '@/lib/segment-types';
+import type { Segment, SegmentCode, CustomFieldDefinition } from '@/lib/segment-types';
 import { mockSegmentCodesData } from '@/lib/segment-types';
 
 const submoduleOptions = [
@@ -79,6 +79,7 @@ const segmentCodeFormSchema = z.object({
   availableForTransactionCoding: z.boolean().default(false),
   availableForBudgeting: z.boolean().default(false),
   allowedSubmodules: z.array(z.string()).optional(),
+  customFieldValues: z.record(z.string(), z.any().optional()).optional(),
 }).refine(data => {
   if (data.validFrom && data.validTo) {
     return data.validTo >= data.validFrom;
@@ -105,7 +106,8 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   validTo: undefined,
   availableForTransactionCoding: false,
   availableForBudgeting: false,
-  allowedSubmodules: [...submoduleOptions], // All submodules selected by default for new codes
+  allowedSubmodules: [...submoduleOptions], 
+  customFieldValues: {},
 };
 
 
@@ -160,7 +162,7 @@ export default function SegmentCodesPage() {
   useEffect(() => {
     if (isCodeFormOpen) {
       if (dialogMode === 'add') {
-        form.reset(defaultCodeFormValues);
+        form.reset({...defaultCodeFormValues, customFieldValues: {}});
         setCurrentEditingCode(null);
       } else if ((dialogMode === 'view' || dialogMode === 'edit') && currentEditingCode) {
         form.reset({
@@ -168,10 +170,11 @@ export default function SegmentCodesPage() {
           validFrom: currentEditingCode.validFrom ? new Date(currentEditingCode.validFrom) : new Date(),
           validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
           allowedSubmodules: currentEditingCode.allowedSubmodules || [],
+          customFieldValues: currentEditingCode.customFieldValues || {},
         });
       }
     } else {
-      form.reset(defaultCodeFormValues);
+      form.reset({...defaultCodeFormValues, customFieldValues: {}});
       setCurrentEditingCode(null);
       setDialogMode('add');
     }
@@ -192,19 +195,30 @@ export default function SegmentCodesPage() {
   const handleSaveCodeSubmit = (values: SegmentCodeFormValues) => {
     if (!selectedSegmentId) return;
 
-    const dataToSave = {
-      ...values,
+    const dataToSave: SegmentCode = {
+      id: values.id || `${selectedSegmentId}-code-${crypto.randomUUID()}`,
+      code: values.code,
+      description: values.description,
+      external1: values.external1,
+      external2: values.external2,
+      external3: values.external3,
+      external4: values.external4,
+      external5: values.external5,
+      summaryIndicator: values.summaryIndicator,
+      isActive: values.isActive,
+      validFrom: values.validFrom,
+      validTo: values.validTo,
+      availableForTransactionCoding: values.availableForTransactionCoding,
+      availableForBudgeting: values.availableForBudgeting,
       allowedSubmodules: values.allowedSubmodules || [],
+      customFieldValues: values.customFieldValues || {},
     };
 
+
     if (dialogMode === 'add') {
-      const newCode: SegmentCode = {
-        id: `${selectedSegmentId}-code-${crypto.randomUUID()}`,
-        ...dataToSave,
-      };
       setSegmentCodesData(prev => ({
         ...prev,
-        [selectedSegmentId]: [...(prev[selectedSegmentId] || []), newCode],
+        [selectedSegmentId]: [...(prev[selectedSegmentId] || []), dataToSave],
       }));
     } else if (dialogMode === 'edit' && currentEditingCode) {
       const updatedCode = { ...currentEditingCode, ...dataToSave };
@@ -448,7 +462,7 @@ export default function SegmentCodesPage() {
                                           field.onChange(currentSelection.filter((item) => item !== option));
                                         }
                                       }}
-                                      onSelect={(e) => e.preventDefault()} // Prevent menu closing on select
+                                      onSelect={(e) => e.preventDefault()} 
                                       disabled={isFieldDisabled}
                                     >
                                       {option}
@@ -460,7 +474,6 @@ export default function SegmentCodesPage() {
                             </FormItem>
                           )}
                         />
-
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
@@ -501,6 +514,68 @@ export default function SegmentCodesPage() {
                           />
                         </div>
                         
+                        {selectedSegment && selectedSegment.customFields && selectedSegment.customFields.length > 0 && (
+                          <Card className="my-4">
+                            <CardHeader>
+                              <CardTitle className="text-lg">Custom Fields for {selectedSegment.displayName}</CardTitle>
+                              <CardDesc>Provide values for segment-specific custom fields.</CardDesc>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              {selectedSegment.customFields.map((customFieldDef) => (
+                                <FormField
+                                  key={customFieldDef.id}
+                                  control={form.control}
+                                  name={`customFieldValues.${customFieldDef.id}`}
+                                  
+                                  rules={{ required: customFieldDef.required ? `${customFieldDef.label} is required.` : false }}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>{customFieldDef.label}{customFieldDef.required ? ' *' : ''}</FormLabel>
+                                      <FormControl>
+                                        {customFieldDef.type === 'Text' && (
+                                          <Input type="text" {...field} value={field.value ?? ''} disabled={isFieldDisabled} />
+                                        )}
+                                        {customFieldDef.type === 'Number' && (
+                                          <Input 
+                                            type="number" 
+                                            {...field} 
+                                            value={field.value ?? ''}
+                                            onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                            disabled={isFieldDisabled} 
+                                          />
+                                        )}
+                                        {customFieldDef.type === 'Date' && (
+                                          <DatePicker 
+                                            value={field.value ? new Date(field.value) : undefined} 
+                                            onValueChange={field.onChange} 
+                                            disabled={isFieldDisabled} 
+                                            placeholder={`Select ${customFieldDef.label}`}
+                                          />
+                                        )}
+                                        {customFieldDef.type === 'Boolean' && (
+                                          <div className="flex items-center space-x-2 pt-2">
+                                            <Switch 
+                                              checked={field.value ?? false} 
+                                              onCheckedChange={field.onChange} 
+                                              disabled={isFieldDisabled}
+                                              id={`customField-${customFieldDef.id}`}
+                                            />
+                                            <label htmlFor={`customField-${customFieldDef.id}`} className="text-sm">
+                                              {field.value ? 'Yes' : 'No'}
+                                            </label>
+                                          </div>
+                                        )}
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              ))}
+                            </CardContent>
+                          </Card>
+                        )}
+
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                           <FormField
                             control={form.control}
@@ -592,6 +667,7 @@ export default function SegmentCodesPage() {
                                   validFrom: currentEditingCode.validFrom ? new Date(currentEditingCode.validFrom) : new Date(),
                                   validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
                                   allowedSubmodules: currentEditingCode.allowedSubmodules || [],
+                                  customFieldValues: currentEditingCode.customFieldValues || {},
                                 });
                               }}>Cancel</Button>
                               <Button type="submit">Save Changes</Button>
@@ -668,3 +744,5 @@ export default function SegmentCodesPage() {
   );
 }
 
+
+    
