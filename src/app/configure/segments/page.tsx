@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
@@ -41,14 +41,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { PlusCircle, GripVertical } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { PlusCircle, GripVertical, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescriptionComponent } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { Label } from '@/components/ui/label';
 import { useSegments } from '@/contexts/SegmentsContext';
-import type { Segment } from '@/lib/segment-types';
+import type { Segment, CustomFieldDefinition } from '@/lib/segment-types';
 import { cn } from '@/lib/utils';
 
+
+const customFieldSchema = z.object({
+  id: z.string().optional(), // For existing fields, will be assigned crypto.randomUUID() for new ones
+  label: z.string().min(1, { message: "Label is required" }),
+  type: z.enum(['Text', 'Number', 'Date', 'Boolean'], { required_error: "Type is required" }),
+  required: z.boolean().default(false),
+});
 
 const segmentFormSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
@@ -65,6 +73,7 @@ const segmentFormSchema = z.object({
   isCustom: z.boolean().default(true),
   isCore: z.boolean().default(false),
   id: z.string().optional(),
+  customFields: z.array(customFieldSchema).optional(),
 }).refine(data => {
   if (data.validFrom && data.validTo) {
     return data.validTo >= data.validFrom;
@@ -89,6 +98,7 @@ const defaultFormValues: Omit<SegmentFormValues, 'id' | 'segmentType' | 'isCore'
   validFrom: new Date(),
   validTo: undefined,
   isCustom: true,
+  customFields: [],
 };
 
 export default function SegmentsPage() {
@@ -111,8 +121,15 @@ export default function SegmentsPage() {
     defaultValues: {
       ...defaultFormValues,
       isCore: false, 
+      customFields: [],
     },
   });
+
+  const { fields: customFormFields, append: appendCustomField, remove: removeCustomField } = useFieldArray({
+    control: form.control,
+    name: "customFields",
+  });
+
 
   useEffect(() => {
     if (isDialogOpen) {
@@ -122,6 +139,7 @@ export default function SegmentsPage() {
           isCore: false, 
           id: undefined, 
           segmentType: '', 
+          customFields: [],
         });
         setCurrentSegmentData(null);
       } else if ((dialogMode === 'view' || dialogMode === 'edit') && currentSegmentData) {
@@ -129,6 +147,7 @@ export default function SegmentsPage() {
           ...currentSegmentData,
           validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(),
           validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
+          customFields: currentSegmentData.customFields || [],
         });
       }
     } else {
@@ -137,6 +156,7 @@ export default function SegmentsPage() {
         isCore: false,
         id: undefined,
         segmentType: '',
+        customFields: [],
       });
       setCurrentSegmentData(null);
       setDialogMode('add');
@@ -155,7 +175,8 @@ export default function SegmentsPage() {
         ...defaultFormValues,
         isCore: false, 
         id: undefined,
-        segmentType: '' 
+        segmentType: '',
+        customFields: [],
     });
     setIsDialogOpen(true);
   };
@@ -173,37 +194,44 @@ export default function SegmentsPage() {
   };
 
   const onSubmit = (values: SegmentFormValues) => {
+    const dataToSave = {
+      ...values,
+      customFields: values.customFields?.map(cf => ({ ...cf, id: cf.id || crypto.randomUUID() })) || [],
+    };
+
     if (dialogMode === 'add') {
       const newSegment: Segment = {
         id: crypto.randomUUID(),
         isCore: false, 
         isCustom: true,
-        displayName: values.displayName,
-        segmentType: values.displayName, 
-        dataType: values.dataType,
-        maxLength: values.maxLength,
-        specialCharsAllowed: values.specialCharsAllowed,
-        defaultCode: values.defaultCode,
-        separator: values.separator,
-        isMandatoryForCoding: values.isMandatoryForCoding,
-        isActive: values.isActive,
-        validFrom: values.validFrom,
-        validTo: values.validTo,
+        displayName: dataToSave.displayName,
+        segmentType: dataToSave.displayName, 
+        dataType: dataToSave.dataType,
+        maxLength: dataToSave.maxLength,
+        specialCharsAllowed: dataToSave.specialCharsAllowed,
+        defaultCode: dataToSave.defaultCode,
+        separator: dataToSave.separator,
+        isMandatoryForCoding: dataToSave.isMandatoryForCoding,
+        isActive: dataToSave.isActive,
+        validFrom: dataToSave.validFrom,
+        validTo: dataToSave.validTo,
+        customFields: dataToSave.customFields,
       };
       addSegment(newSegment);
     } else if (dialogMode === 'edit' && currentSegmentData) {
       const updatedSegment: Segment = {
         ...currentSegmentData, 
-        displayName: values.displayName, 
-        dataType: values.dataType,
-        maxLength: values.maxLength,
-        specialCharsAllowed: values.specialCharsAllowed,
-        defaultCode: values.defaultCode,
-        separator: values.separator,
-        isMandatoryForCoding: values.isMandatoryForCoding,
-        isActive: values.isActive,
-        validFrom: values.validFrom,
-        validTo: values.validTo,
+        displayName: dataToSave.displayName, 
+        dataType: dataToSave.dataType,
+        maxLength: dataToSave.maxLength,
+        specialCharsAllowed: dataToSave.specialCharsAllowed,
+        defaultCode: dataToSave.defaultCode,
+        separator: dataToSave.separator,
+        isMandatoryForCoding: dataToSave.isMandatoryForCoding,
+        isActive: dataToSave.isActive,
+        validFrom: dataToSave.validFrom,
+        validTo: dataToSave.validTo,
+        customFields: dataToSave.customFields,
       };
       updateSegment(updatedSegment);
       setCurrentSegmentData(updatedSegment); 
@@ -219,12 +247,12 @@ export default function SegmentsPage() {
     { label: 'Segments' }
   ];
   
-  const isFieldDisabled = (isCoreSegment: boolean | undefined, fieldName?: keyof SegmentFormValues) => {
+  const isFieldDisabled = (isCoreSegment: boolean | undefined, fieldName?: keyof SegmentFormValues | `customFields.${number}.${keyof CustomFieldDefinition}`) => {
     if (dialogMode === 'view') return true;
 
     if (dialogMode === 'edit') {
       if (fieldName === 'displayName') return false; 
-      if (isCoreSegment) return true; 
+      if (isCoreSegment && typeof fieldName === 'string' && !fieldName.startsWith('customFields')) return true; 
       if (fieldName === 'segmentType') return true; 
     }
     return false; 
@@ -387,7 +415,7 @@ export default function SegmentsPage() {
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[65vh] overflow-y-auto pr-2">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-3">
                 <FormField
                   control={form.control}
                   name="displayName"
@@ -602,8 +630,98 @@ export default function SegmentsPage() {
                       aria-readonly
                     />
                   </FormItem>
+
+                {/* Custom Fields Section */}
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>Custom Fields for Segment Codes</CardTitle>
+                    <CardDescriptionComponent>
+                      Define additional data fields specific to codes of this segment. These fields will appear when adding/editing codes for this segment.
+                    </CardDescriptionComponent>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {customFormFields.map((item, index) => (
+                      <Card key={item.id} className="p-4 space-y-3 bg-muted/20 shadow-sm relative">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 h-6 w-6 text-destructive hover:text-destructive-foreground hover:bg-destructive/80"
+                          onClick={() => !isFieldDisabled(undefined) && removeCustomField(index)}
+                          disabled={isFieldDisabled(undefined)}
+                          aria-label="Remove custom field"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <FormField
+                          control={form.control}
+                          name={`customFields.${index}.label`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Field Label *</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="e.g., Project Manager" disabled={isFieldDisabled(undefined)} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name={`customFields.${index}.type`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Field Type *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled(undefined)}>
+                                  <FormControl>
+                                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Text">Text</SelectItem>
+                                    <SelectItem value="Number">Number</SelectItem>
+                                    <SelectItem value="Date">Date</SelectItem>
+                                    <SelectItem value="Boolean">Boolean (Yes/No)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`customFields.${index}.required`}
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-start space-x-2 rounded-lg border p-3 shadow-sm h-10 mt-auto">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    disabled={isFieldDisabled(undefined)}
+                                    id={`customFields.${index}.required`}
+                                  />
+                                </FormControl>
+                                <FormLabel htmlFor={`customFields.${index}.required`} className="text-sm font-normal cursor-pointer">
+                                  Required
+                                </FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </Card>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => !isFieldDisabled(undefined) && appendCustomField({ id: crypto.randomUUID(), label: '', type: 'Text', required: false })}
+                      disabled={isFieldDisabled(undefined)}
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Custom Field
+                    </Button>
+                  </CardContent>
+                </Card>
                   
-                <DialogFooter className="pt-4">
+                <DialogFooter className="pt-6">
                   {dialogMode === 'add' && (
                     <>
                       <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
@@ -625,6 +743,7 @@ export default function SegmentsPage() {
                                 ...currentSegmentData,
                                 validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(),
                                 validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
+                                customFields: currentSegmentData.customFields || [],
                             }); 
                           }
                         }}>Cancel</Button>
@@ -689,7 +808,7 @@ export default function SegmentsPage() {
                           id={`status-toggle-${segment.id}`}
                           checked={segment.isActive}
                           onCheckedChange={() => handleToggleChange(segment.id)}
-                          disabled={segment.isCore}
+                          disabled={segment.isCore && dialogMode === 'edit'}
                           aria-label={`Toggle status for ${segment.displayName}`}
                         />
                       </div>
@@ -717,3 +836,4 @@ export default function SegmentsPage() {
   );
 }
 
+    

@@ -1,6 +1,13 @@
 
 export type DataType = 'Alphanumeric' | 'Numeric' | 'Text';
 
+export interface CustomFieldDefinition {
+  id: string;
+  label: string;
+  type: 'Text' | 'Number' | 'Date' | 'Boolean';
+  required: boolean;
+}
+
 export interface Segment {
   id: string;
   displayName: string;
@@ -16,17 +23,18 @@ export interface Segment {
   isCore: boolean;
   validFrom: Date;
   validTo?: Date;
+  customFields?: CustomFieldDefinition[];
 }
 
 export const initialSegmentsData: Segment[] = [
-  { id: 'fund', displayName: 'Fund', segmentType: 'Fund', dataType: 'Alphanumeric', maxLength: 10, specialCharsAllowed: '', defaultCode: '101', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, validFrom: new Date(2023, 0, 1) },
-  { id: 'object', displayName: 'Object', segmentType: 'Object', dataType: 'Alphanumeric', maxLength: 10, specialCharsAllowed: '', defaultCode: '4001', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, validFrom: new Date(2023, 0, 1) },
-  { id: 'department', displayName: 'Department', segmentType: 'Department', dataType: 'Alphanumeric', maxLength: 15, specialCharsAllowed: '', defaultCode: 'POL-1', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, validFrom: new Date(2023, 0, 1) },
-  { id: 'project', displayName: 'Project', segmentType: 'Project', dataType: 'Alphanumeric', maxLength: 20, specialCharsAllowed: '-_', defaultCode: 'BUILD', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1) },
-  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', dataType: 'Alphanumeric', maxLength: 20, specialCharsAllowed: '-_', defaultCode: '1111', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1) },
-  { id: 'function', displayName: 'Function', segmentType: 'Function', dataType: 'Numeric', maxLength: 5, specialCharsAllowed: '', defaultCode: '2302', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1) },
-  { id: 'location', displayName: 'Location', segmentType: 'Location', dataType: 'Alphanumeric', maxLength: 10, specialCharsAllowed: '', defaultCode: 'KLN1', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1) },
-  { id: 'program', displayName: 'Program', segmentType: 'Program', dataType: 'Text', maxLength: 50, specialCharsAllowed: '-_ ', defaultCode: '9999', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1) },
+  { id: 'fund', displayName: 'Fund', segmentType: 'Fund', dataType: 'Alphanumeric', maxLength: 10, specialCharsAllowed: '', defaultCode: '101', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, validFrom: new Date(2023, 0, 1), customFields: [] },
+  { id: 'object', displayName: 'Object', segmentType: 'Object', dataType: 'Alphanumeric', maxLength: 10, specialCharsAllowed: '', defaultCode: '4001', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, validFrom: new Date(2023, 0, 1), customFields: [] },
+  { id: 'department', displayName: 'Department', segmentType: 'Department', dataType: 'Alphanumeric', maxLength: 15, specialCharsAllowed: '', defaultCode: 'POL-1', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, validFrom: new Date(2023, 0, 1), customFields: [] },
+  { id: 'project', displayName: 'Project', segmentType: 'Project', dataType: 'Alphanumeric', maxLength: 20, specialCharsAllowed: '-_', defaultCode: 'BUILD', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1), customFields: [] },
+  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', dataType: 'Alphanumeric', maxLength: 20, specialCharsAllowed: '-_', defaultCode: '1111', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1), customFields: [] },
+  { id: 'function', displayName: 'Function', segmentType: 'Function', dataType: 'Numeric', maxLength: 5, specialCharsAllowed: '', defaultCode: '2302', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1), customFields: [] },
+  { id: 'location', displayName: 'Location', segmentType: 'Location', dataType: 'Alphanumeric', maxLength: 10, specialCharsAllowed: '', defaultCode: 'KLN1', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1), customFields: [] },
+  { id: 'program', displayName: 'Program', segmentType: 'Program', dataType: 'Text', maxLength: 50, specialCharsAllowed: '-_ ', defaultCode: '9999', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, validFrom: new Date(2023, 0, 1), customFields: [] },
 ];
 
 // Consolidated SegmentCode interface
@@ -46,6 +54,7 @@ export interface SegmentCode {
   availableForTransactionCoding: boolean;
   availableForBudgeting: boolean;
   allowedSubmodules?: string[]; // New field for allowed submodules
+  // customFieldValues?: Record<string, string | number | boolean | Date>; // For later implementation
 }
 
 // Shared mock segment codes data
@@ -89,11 +98,10 @@ export const mockSegmentCodesData: Record<string, SegmentCode[]> = {
     { id: 'fb-o-6200', code: '6200', description: 'Utilities (Detail)', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['Accounts Payable'] },
   ],
   'project': [
-    { id: 'proj-001', code: 'P001', description: 'City Hall Renovation', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Accounts Payable'] },
-    { id: 'proj-002', code: 'P002', description: 'Park Improvement Project', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true },
+    { id: 'proj-001', code: 'P001', description: 'City Hall Renovation', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Accounts Payable'], customFields: [] },
   ],
    'grant': [
-    { id: 'grant-A', code: 'GR-A', description: 'Federal Infrastructure Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Cash Receipts'] },
+    { id: 'grant-A', code: 'GR-A', description: 'Federal Infrastructure Grant', summaryIndicator: false, isActive: true, validFrom: new Date(2023,0,1), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Cash Receipts'], customFields: [] },
   ],
   // Add more mock codes for other segments as needed
 };
