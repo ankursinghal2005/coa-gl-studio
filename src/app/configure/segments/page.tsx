@@ -60,11 +60,11 @@ const customFieldSchema = z.object({
   dropdownOptions: z.array(z.string()).optional(),
 }).refine(data => {
   if (data.type === 'Dropdown') {
-    return Array.isArray(data.dropdownOptions) && data.dropdownOptions.length > 0;
+    return Array.isArray(data.dropdownOptions) && data.dropdownOptions.length > 0 && data.dropdownOptions.every(opt => typeof opt === 'string' && opt.trim().length > 0);
   }
   return true;
 }, {
-  message: "Dropdown options are required when type is 'Dropdown'.",
+  message: "Dropdown options are required when type is 'Dropdown' and must contain non-empty strings.",
   path: ["dropdownOptions"],
 });
 
@@ -212,7 +212,7 @@ export default function SegmentsPage() {
       customFields: values.customFields?.map(cf => ({ 
         ...cf, 
         id: cf.id || crypto.randomUUID(),
-        dropdownOptions: cf.type === 'Dropdown' ? cf.dropdownOptions : undefined, // Ensure options only saved for dropdown
+        dropdownOptions: cf.type === 'Dropdown' ? (cf.dropdownOptions || []) : undefined,
       })) || [],
     };
 
@@ -239,6 +239,7 @@ export default function SegmentsPage() {
       const updatedSegment: Segment = {
         ...currentSegmentData, 
         displayName: dataToSave.displayName, 
+        segmentType: currentSegmentData.segmentType, // Preserve original segmentType
         dataType: dataToSave.dataType,
         maxLength: dataToSave.maxLength,
         specialCharsAllowed: dataToSave.specialCharsAllowed,
@@ -264,7 +265,7 @@ export default function SegmentsPage() {
     { label: 'Segments' }
   ];
   
-  const isFieldDisabled = (isCoreSegment: boolean | undefined, fieldName?: keyof SegmentFormValues | `customFields.${number}.${keyof CustomFieldDefinition}` | `customFields.${number}.dropdownOptions`) => {
+  const isFieldDisabled = (isCoreSegment: boolean | undefined, fieldName?: keyof SegmentFormValues | `customFields.${number}.${keyof CustomFieldDefinition}` | `customFields.${number}.dropdownOptions.${number}` | `customFields.${number}.dropdownOptions`) => {
     if (dialogMode === 'view') return true;
 
     if (dialogMode === 'edit') {
@@ -693,7 +694,6 @@ export default function SegmentsPage() {
                                 <Select 
                                   onValueChange={(value) => {
                                     field.onChange(value);
-                                    // If type changes away from Dropdown, clear options
                                     if (value !== 'Dropdown') {
                                       form.setValue(`customFields.${index}.dropdownOptions`, []);
                                     }
@@ -750,6 +750,11 @@ export default function SegmentsPage() {
                                     onChange={(e) => {
                                       const options = e.target.value.split('\n').map(opt => opt.trim()).filter(Boolean);
                                       field.onChange(options);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.stopPropagation();
+                                      }
                                     }}
                                     disabled={isFieldDisabled(undefined)}
                                     className="min-h-[80px]"
@@ -895,3 +900,4 @@ export default function SegmentsPage() {
 }
 
     
+
