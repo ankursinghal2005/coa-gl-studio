@@ -660,7 +660,7 @@ export default function SegmentsPage() {
                             <FormItem>
                               <FormLabel>Field Label *</FormLabel>
                               <FormControl>
-                                <Input {...field} placeholder="e.g., Project Manager" disabled={isFieldDisabled(undefined)} />
+                                <Input {...field} placeholder="e.g., Account Type" disabled={isFieldDisabled(undefined)} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
