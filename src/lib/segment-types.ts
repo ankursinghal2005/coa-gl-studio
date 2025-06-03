@@ -4,8 +4,9 @@ export type DataType = 'Alphanumeric' | 'Numeric' | 'Text';
 export interface CustomFieldDefinition {
   id: string;
   label: string;
-  type: 'Text' | 'Number' | 'Date' | 'Boolean';
+  type: 'Text' | 'Number' | 'Date' | 'Boolean' | 'Dropdown';
   required: boolean;
+  dropdownOptions?: string[];
 }
 
 export interface Segment {

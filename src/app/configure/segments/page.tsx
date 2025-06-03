@@ -17,6 +17,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -52,10 +53,19 @@ import { cn } from '@/lib/utils';
 
 
 const customFieldSchema = z.object({
-  id: z.string().optional(), // For existing fields, will be assigned crypto.randomUUID() for new ones
+  id: z.string().optional(), 
   label: z.string().min(1, { message: "Label is required" }),
-  type: z.enum(['Text', 'Number', 'Date', 'Boolean'], { required_error: "Type is required" }),
+  type: z.enum(['Text', 'Number', 'Date', 'Boolean', 'Dropdown'], { required_error: "Type is required" }),
   required: z.boolean().default(false),
+  dropdownOptions: z.array(z.string()).optional(),
+}).refine(data => {
+  if (data.type === 'Dropdown') {
+    return Array.isArray(data.dropdownOptions) && data.dropdownOptions.length > 0;
+  }
+  return true;
+}, {
+  message: "Dropdown options are required when type is 'Dropdown'.",
+  path: ["dropdownOptions"],
 });
 
 const segmentFormSchema = z.object({
@@ -147,7 +157,10 @@ export default function SegmentsPage() {
           ...currentSegmentData,
           validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(),
           validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
-          customFields: currentSegmentData.customFields || [],
+          customFields: currentSegmentData.customFields?.map(cf => ({
+            ...cf,
+            dropdownOptions: cf.dropdownOptions || [] 
+          })) || [],
         });
       }
     } else {
@@ -196,7 +209,11 @@ export default function SegmentsPage() {
   const onSubmit = (values: SegmentFormValues) => {
     const dataToSave = {
       ...values,
-      customFields: values.customFields?.map(cf => ({ ...cf, id: cf.id || crypto.randomUUID() })) || [],
+      customFields: values.customFields?.map(cf => ({ 
+        ...cf, 
+        id: cf.id || crypto.randomUUID(),
+        dropdownOptions: cf.type === 'Dropdown' ? cf.dropdownOptions : undefined, // Ensure options only saved for dropdown
+      })) || [],
     };
 
     if (dialogMode === 'add') {
@@ -247,7 +264,7 @@ export default function SegmentsPage() {
     { label: 'Segments' }
   ];
   
-  const isFieldDisabled = (isCoreSegment: boolean | undefined, fieldName?: keyof SegmentFormValues | `customFields.${number}.${keyof CustomFieldDefinition}`) => {
+  const isFieldDisabled = (isCoreSegment: boolean | undefined, fieldName?: keyof SegmentFormValues | `customFields.${number}.${keyof CustomFieldDefinition}` | `customFields.${number}.dropdownOptions`) => {
     if (dialogMode === 'view') return true;
 
     if (dialogMode === 'edit') {
@@ -673,7 +690,17 @@ export default function SegmentsPage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Field Type *</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled(undefined)}>
+                                <Select 
+                                  onValueChange={(value) => {
+                                    field.onChange(value);
+                                    // If type changes away from Dropdown, clear options
+                                    if (value !== 'Dropdown') {
+                                      form.setValue(`customFields.${index}.dropdownOptions`, []);
+                                    }
+                                  }} 
+                                  value={field.value} 
+                                  disabled={isFieldDisabled(undefined)}
+                                >
                                   <FormControl>
                                     <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                                   </FormControl>
@@ -682,6 +709,7 @@ export default function SegmentsPage() {
                                     <SelectItem value="Number">Number</SelectItem>
                                     <SelectItem value="Date">Date</SelectItem>
                                     <SelectItem value="Boolean">Boolean (Yes/No)</SelectItem>
+                                    <SelectItem value="Dropdown">Dropdown</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -708,12 +736,39 @@ export default function SegmentsPage() {
                             )}
                           />
                         </div>
+                        {form.watch(`customFields.${index}.type`) === 'Dropdown' && (
+                          <FormField
+                            control={form.control}
+                            name={`customFields.${index}.dropdownOptions`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Dropdown Options *</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Enter one option per line"
+                                    value={(field.value || []).join('\n')}
+                                    onChange={(e) => {
+                                      const options = e.target.value.split('\n').map(opt => opt.trim()).filter(Boolean);
+                                      field.onChange(options);
+                                    }}
+                                    disabled={isFieldDisabled(undefined)}
+                                    className="min-h-[80px]"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                                 <CardDescriptionComponent className="text-xs">
+                                  Each line will be a separate option in the dropdown.
+                                </CardDescriptionComponent>
+                              </FormItem>
+                            )}
+                          />
+                        )}
                       </Card>
                     ))}
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => !isFieldDisabled(undefined) && appendCustomField({ id: crypto.randomUUID(), label: '', type: 'Text', required: false })}
+                      onClick={() => !isFieldDisabled(undefined) && appendCustomField({ id: crypto.randomUUID(), label: '', type: 'Text', required: false, dropdownOptions: [] })}
                       disabled={isFieldDisabled(undefined)}
                     >
                       <PlusCircle className="mr-2 h-4 w-4" /> Add Custom Field
@@ -743,7 +798,10 @@ export default function SegmentsPage() {
                                 ...currentSegmentData,
                                 validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(),
                                 validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
-                                customFields: currentSegmentData.customFields || [],
+                                customFields: currentSegmentData.customFields?.map(cf => ({
+                                  ...cf,
+                                  dropdownOptions: cf.dropdownOptions || []
+                                })) || [],
                             }); 
                           }
                         }}>Cancel</Button>
