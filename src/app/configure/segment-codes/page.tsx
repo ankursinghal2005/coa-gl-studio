@@ -526,49 +526,62 @@ export default function SegmentCodesPage() {
                                   key={customFieldDef.id}
                                   control={form.control}
                                   name={`customFieldValues.${customFieldDef.id}`}
-                                  
                                   rules={{ required: customFieldDef.required ? `${customFieldDef.label} is required.` : false }}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>{customFieldDef.label}{customFieldDef.required ? ' *' : ''}</FormLabel>
-                                      <FormControl>
-                                        {customFieldDef.type === 'Text' && (
-                                          <Input type="text" {...field} value={field.value ?? ''} disabled={isFieldDisabled} />
-                                        )}
-                                        {customFieldDef.type === 'Number' && (
-                                          <Input 
-                                            type="number" 
-                                            {...field} 
-                                            value={field.value ?? ''}
-                                            onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                                            disabled={isFieldDisabled} 
-                                          />
-                                        )}
-                                        {customFieldDef.type === 'Date' && (
-                                          <DatePicker 
-                                            value={field.value ? new Date(field.value) : undefined} 
-                                            onValueChange={field.onChange} 
-                                            disabled={isFieldDisabled} 
-                                            placeholder={`Select ${customFieldDef.label}`}
-                                          />
-                                        )}
-                                        {customFieldDef.type === 'Boolean' && (
-                                          <div className="flex items-center space-x-2 pt-2">
-                                            <Switch 
-                                              checked={field.value ?? false} 
-                                              onCheckedChange={field.onChange} 
+                                  render={({ field }) => {
+                                    const getInputComponent = () => {
+                                      switch (customFieldDef.type) {
+                                        case 'Text':
+                                          return <Input type="text" {...field} value={field.value ?? ''} disabled={isFieldDisabled} />;
+                                        case 'Number':
+                                          return (
+                                            <Input
+                                              type="number"
+                                              {...field}
+                                              value={field.value ?? ''}
+                                              onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                                               disabled={isFieldDisabled}
-                                              id={`customField-${customFieldDef.id}`}
                                             />
-                                            <label htmlFor={`customField-${customFieldDef.id}`} className="text-sm">
-                                              {field.value ? 'Yes' : 'No'}
-                                            </label>
-                                          </div>
-                                        )}
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
+                                          );
+                                        case 'Date':
+                                          return (
+                                            <DatePicker
+                                              value={field.value ? new Date(field.value) : undefined}
+                                              onValueChange={field.onChange}
+                                              disabled={isFieldDisabled}
+                                              placeholder={`Select ${customFieldDef.label}`}
+                                            />
+                                          );
+                                        case 'Boolean':
+                                          const switchId = `custom-field-switch-${customFieldDef.id}-${field.name}`;
+                                          return (
+                                            <div className="flex items-center space-x-2 pt-2">
+                                              <Switch
+                                                {...field}
+                                                checked={field.value ?? false}
+                                                onCheckedChange={field.onChange}
+                                                disabled={isFieldDisabled}
+                                                id={switchId}
+                                              />
+                                              <label htmlFor={switchId} className="text-sm cursor-pointer">
+                                                {field.value ? 'Yes' : 'No'}
+                                              </label>
+                                            </div>
+                                          );
+                                        default:
+                                          return null;
+                                      }
+                                    };
+
+                                    return (
+                                      <FormItem>
+                                        <FormLabel>{customFieldDef.label}{customFieldDef.required ? ' *' : ''}</FormLabel>
+                                        <FormControl>
+                                          {getInputComponent()}
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    );
+                                  }}
                                 />
                               ))}
                             </CardContent>
