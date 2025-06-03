@@ -12,7 +12,7 @@ interface SegmentsContextType {
   updateSegment: (updatedSegment: Segment) => void;
   toggleSegmentStatus: (segmentId: string) => void;
   getSegmentById: (segmentId: string) => Segment | undefined;
-  setOrderedSegments: (orderedSegments: Segment[]) => void; // New function for reordering
+  setOrderedSegments: (orderedSegments: Segment[]) => void; 
 }
 
 const SegmentsContext = createContext<SegmentsContextType | undefined>(undefined);
@@ -21,23 +21,7 @@ export const SegmentsProvider = ({ children }: { children: ReactNode }) => {
   const [segments, setSegments] = useState<Segment[]>(defaultInitialSegments);
 
   const addSegment = useCallback((newSegment: Segment) => {
-    setSegments(prevSegments =>
-      [...prevSegments, newSegment].sort((a, b) => {
-        if (a.isCore && !b.isCore) return -1;
-        if (!a.isCore && b.isCore) return 1;
-        
-        const indexOfAInDefault = defaultInitialSegments.findIndex(s => s.id === a.id);
-        const indexOfBInDefault = defaultInitialSegments.findIndex(s => s.id === b.id);
-
-        if (indexOfAInDefault !== -1 && indexOfBInDefault !== -1) {
-          return indexOfAInDefault - indexOfBInDefault;
-        }
-        if (indexOfAInDefault !== -1) return -1;
-        if (indexOfBInDefault !== -1) return 1;
-        
-        return 0;
-      })
-    );
+    setSegments(prevSegments => [...prevSegments, newSegment]);
   }, []);
 
   const updateSegment = useCallback((updatedSegment: Segment) => {
@@ -59,10 +43,6 @@ export const SegmentsProvider = ({ children }: { children: ReactNode }) => {
   }, [segments]);
 
   const setOrderedSegments = useCallback((orderedSegments: Segment[]) => {
-    // Ensure core segments remain at the top if that's a hard rule,
-    // or allow free reordering if that's intended.
-    // For now, this function will trust the incoming order.
-    // If core segments need to be fixed, further logic would be needed here or in the calling component.
     setSegments(orderedSegments);
   }, []);
 

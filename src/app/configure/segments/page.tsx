@@ -237,14 +237,9 @@ export default function SegmentsPage() {
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, segmentId: string) => {
-    const segment = segments.find(s => s.id === segmentId);
-    if (segment && !segment.isCore) {
-      setDraggedSegmentId(segmentId);
-      e.dataTransfer.setData('text/plain', segmentId); 
-      e.dataTransfer.effectAllowed = "move";
-    } else {
-      e.preventDefault(); 
-    }
+    setDraggedSegmentId(segmentId);
+    e.dataTransfer.setData('text/plain', segmentId);
+    e.dataTransfer.effectAllowed = "move";
   };
 
   const handleDragEnd = () => {
@@ -253,11 +248,10 @@ export default function SegmentsPage() {
   };
   
   const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, hoverSegmentId: string) => {
-    e.preventDefault(); 
-    const hoverSegment = segments.find(s => s.id === hoverSegmentId);
-    if (hoverSegment && !hoverSegment.isCore && hoverSegment.id !== draggedSegmentId) {
+    e.preventDefault();
+    if (hoverSegmentId !== draggedSegmentId) {
       setDropTargetId(hoverSegmentId);
-    } else if (dropTargetId !== null) { 
+    } else if (dropTargetId !== null) {
       setDropTargetId(null);
     }
     e.dataTransfer.dropEffect = "move";
@@ -265,39 +259,28 @@ export default function SegmentsPage() {
 
   const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, droppedOnSegmentId: string) => {
     e.preventDefault();
-    const currentDraggedId = draggedSegmentId; 
+    const currentDraggedId = draggedSegmentId;
 
     if (!currentDraggedId || currentDraggedId === droppedOnSegmentId) {
       setDraggedSegmentId(null);
       setDropTargetId(null);
       return;
     }
-
-    const droppedOnSegment = segments.find(s => s.id === droppedOnSegmentId);
-    if (!droppedOnSegment || droppedOnSegment.isCore) { 
-      setDraggedSegmentId(null);
-      setDropTargetId(null);
-      return;
-    }
     
-    const coreSegments = segments.filter(s => s.isCore);
-    const nonCoreSegments = segments.filter(s => !s.isCore);
+    const reorderedSegments = [...segments];
+    const draggedItemIndex = reorderedSegments.findIndex(s => s.id === currentDraggedId);
+    const droppedOnItemIndex = reorderedSegments.findIndex(s => s.id === droppedOnSegmentId);
 
-    const nonCoreDraggedIndex = nonCoreSegments.findIndex(s => s.id === currentDraggedId);
-    const nonCoreDroppedOnIndex = nonCoreSegments.findIndex(s => s.id === droppedOnSegmentId);
-
-    if (nonCoreDraggedIndex === -1 || nonCoreDroppedOnIndex === -1) {
+    if (draggedItemIndex === -1 || droppedOnItemIndex === -1) {
       setDraggedSegmentId(null);
       setDropTargetId(null);
       return; 
     }
     
-    const reorderedNonCoreSegments = [...nonCoreSegments];
-    const [draggedItem] = reorderedNonCoreSegments.splice(nonCoreDraggedIndex, 1);
-    reorderedNonCoreSegments.splice(nonCoreDroppedOnIndex, 0, draggedItem);
+    const [draggedItem] = reorderedSegments.splice(draggedItemIndex, 1);
+    reorderedSegments.splice(droppedOnItemIndex, 0, draggedItem);
     
-    const finalOrderedSegments = [...coreSegments, ...reorderedNonCoreSegments];
-    setOrderedSegments(finalOrderedSegments);
+    setOrderedSegments(reorderedSegments);
     setDraggedSegmentId(null);
     setDropTargetId(null);
   };
@@ -306,7 +289,6 @@ export default function SegmentsPage() {
     if (!isClientMounted || !segments || segments.length === 0) {
       return [];
     }
-    // Filter for active segments first
     const activeSegments = segments.filter(segment => segment.isActive);
     
     return activeSegments.map((segment, index) => {
@@ -328,7 +310,7 @@ export default function SegmentsPage() {
         <header className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-primary">Manage Segments</h1>
           <p className="text-md text-muted-foreground mt-2">
-            Configure the building blocks of your chart of accounts. Define core and standard segments. Drag non-core segments to reorder.
+            Configure the building blocks of your chart of accounts. Define core and standard segments. Drag segments to reorder.
           </p>
         </header>
 
@@ -370,8 +352,8 @@ export default function SegmentsPage() {
                   </React.Fragment>
                 ))
               ) : (
-                <p className="text-center font-mono text-lg tracking-wider text-foreground self-center">
-                  No active segments configured yet.
+                <p className="text-center font-mono text-lg tracking-wider text-muted-foreground self-center">
+                  No active segments configured yet. Add or activate segments to see the preview.
                 </p>
               )}
             </div>
@@ -671,26 +653,22 @@ export default function SegmentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {segments.map((segment, index) => (
+                {segments.map((segment) => (
                   <TableRow 
                     key={segment.id}
-                    draggable={!segment.isCore} 
+                    draggable={true} 
                     onDragStart={(e) => handleDragStart(e, segment.id)}
                     onDragEnd={handleDragEnd} 
                     onDragOver={(e) => handleDragOver(e, segment.id)} 
                     onDrop={(e) => handleDrop(e, segment.id)}
                     className={cn(
-                      segment.isCore ? "bg-muted/30 cursor-not-allowed" : "cursor-grab active:cursor-grabbing transition-all duration-150 ease-in-out",
+                      "cursor-grab active:cursor-grabbing transition-all duration-150 ease-in-out",
                       draggedSegmentId === segment.id && "opacity-50 shadow-2xl ring-2 ring-primary z-10 relative",
-                      dropTargetId === segment.id && !segment.isCore && draggedSegmentId !== segment.id && "outline outline-2 outline-accent outline-offset-[-2px]"
+                      dropTargetId === segment.id && draggedSegmentId !== segment.id && "outline outline-2 outline-accent outline-offset-[-2px]"
                     )}
                   >
                     <TableCell className="text-center">
-                      {!segment.isCore ? (
                         <GripVertical className="inline-block h-5 w-5 text-muted-foreground" />
-                      ) : (
-                        <span className="text-sm text-muted-foreground">{index + 1}</span>
-                      )}
                     </TableCell>
                     <TableCell className="font-medium">
                       <span
