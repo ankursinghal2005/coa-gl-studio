@@ -64,7 +64,7 @@ const customFieldSchema = z.object({
   }
   return true;
 }, {
-  message: "Dropdown options are required when type is 'Dropdown' and must contain non-empty strings.",
+  message: "Dropdown options are required and must contain at least one non-empty option when type is 'Dropdown'.",
   path: ["dropdownOptions"],
 });
 
@@ -239,7 +239,7 @@ export default function SegmentsPage() {
       const updatedSegment: Segment = {
         ...currentSegmentData, 
         displayName: dataToSave.displayName, 
-        segmentType: currentSegmentData.segmentType, // Preserve original segmentType
+        segmentType: currentSegmentData.segmentType, 
         dataType: dataToSave.dataType,
         maxLength: dataToSave.maxLength,
         specialCharsAllowed: dataToSave.specialCharsAllowed,
@@ -696,6 +696,8 @@ export default function SegmentsPage() {
                                     field.onChange(value);
                                     if (value !== 'Dropdown') {
                                       form.setValue(`customFields.${index}.dropdownOptions`, []);
+                                    } else if (!form.getValues(`customFields.${index}.dropdownOptions`) || form.getValues(`customFields.${index}.dropdownOptions`).length === 0) {
+                                      form.setValue(`customFields.${index}.dropdownOptions`, ['']); // Add one empty option if new
                                     }
                                   }} 
                                   value={field.value} 
@@ -737,36 +739,59 @@ export default function SegmentsPage() {
                           />
                         </div>
                         {form.watch(`customFields.${index}.type`) === 'Dropdown' && (
-                          <FormField
-                            control={form.control}
-                            name={`customFields.${index}.dropdownOptions`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Dropdown Options *</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    placeholder="Enter one option per line"
-                                    value={(field.value || []).join('\n')}
-                                    onChange={(e) => {
-                                      const options = e.target.value.split('\n').map(opt => opt.trim()).filter(Boolean);
-                                      field.onChange(options);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.stopPropagation();
-                                      }
-                                    }}
-                                    disabled={isFieldDisabled(undefined)}
-                                    className="min-h-[80px]"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                                 <CardDescriptionComponent className="text-xs">
-                                  Each line will be a separate option in the dropdown.
-                                </CardDescriptionComponent>
-                              </FormItem>
-                            )}
-                          />
+                          <div className="space-y-2">
+                            <Label>Dropdown Options *</Label>
+                            {(form.getValues(`customFields.${index}.dropdownOptions`) || []).map((optionValue, optionIndex) => (
+                              <div key={optionIndex} className="flex items-center space-x-2">
+                                <Input
+                                  value={optionValue}
+                                  onChange={(e) => {
+                                    const currentOptions = form.getValues(`customFields.${index}.dropdownOptions`) || [];
+                                    const newOptions = [...currentOptions];
+                                    newOptions[optionIndex] = e.target.value;
+                                    form.setValue(`customFields.${index}.dropdownOptions`, newOptions, { shouldValidate: true });
+                                  }}
+                                  placeholder={`Option ${optionIndex + 1}`}
+                                  disabled={isFieldDisabled(undefined)}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    const currentOptions = form.getValues(`customFields.${index}.dropdownOptions`) || [];
+                                    const newOptions = currentOptions.filter((_, i) => i !== optionIndex);
+                                    form.setValue(`customFields.${index}.dropdownOptions`, newOptions, { shouldValidate: true });
+                                  }}
+                                  disabled={isFieldDisabled(undefined) || (form.getValues(`customFields.${index}.dropdownOptions`) || []).length <= 1}
+                                  className="text-destructive hover:text-destructive-foreground hover:bg-destructive/80"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const currentOptions = form.getValues(`customFields.${index}.dropdownOptions`) || [];
+                                form.setValue(`customFields.${index}.dropdownOptions`, [...currentOptions, '']);
+                              }}
+                              disabled={isFieldDisabled(undefined)}
+                              className="mt-1"
+                            >
+                              <PlusCircle className="mr-2 h-4 w-4" /> Add Option
+                            </Button>
+                             <FormField
+                                control={form.control}
+                                name={`customFields.${index}.dropdownOptions`}
+                                render={() => <FormMessage />} // To show array-level validation errors
+                              />
+                            <CardDescriptionComponent className="text-xs mt-1">
+                              Define the choices that will appear in the dropdown for this custom field. Each option must be non-empty.
+                            </CardDescriptionComponent>
+                          </div>
                         )}
                       </Card>
                     ))}
@@ -898,6 +923,3 @@ export default function SegmentsPage() {
     </div>
   );
 }
-
-    
-
