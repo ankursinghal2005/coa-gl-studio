@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -36,78 +36,85 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
 import { useCombinationRules } from '@/contexts/CombinationRulesContext';
-import type { CombinationRule, CombinationRuleMappingEntry, CombinationRuleCriterion, CombinationRuleCriterionType } from '@/lib/combination-rule-types';
+import type {
+  CombinationRule,
+  CombinationRuleDefinitionEntry,
+  SegmentCondition,
+  CombinationRuleCriterion,
+  CombinationRuleCriterionType,
+} from '@/lib/combination-rule-types';
 import type { Segment } from '@/lib/segment-types';
 
 
 const combinationRuleFormSchema = z.object({
   name: z.string().min(1, { message: 'Rule Name is required.' }),
-  status: z.enum(['Active', 'Inactive'], {
+  status: z.enum(['Active', 'Inactive'] as [string, ...string[]], { // Adjusted for general enum
     required_error: 'Status is required.',
   }),
   description: z.string().optional(),
-  segmentAId: z.string().min(1, { message: 'Segment A is required.' }),
-  segmentBId: z.string().min(1, { message: 'Segment B is required.' }),
-}).refine(data => data.segmentAId !== data.segmentBId, {
-  message: "Segment A and Segment B must be different.",
-  path: ["segmentBId"],
 });
 
 type CombinationRuleFormValues = z.infer<typeof combinationRuleFormSchema>;
 
-interface MappingEntryFormState {
-  behavior: 'Include' | 'Exclude';
-  segmentACriterionType: CombinationRuleCriterionType | '';
-  segmentACodeValue: string;
-  segmentARangeStart: string;
-  segmentARangeEnd: string;
-  segmentAHierarchyNodeId: string;
-  segmentAIncludeChildren: boolean;
-
-  segmentBCriterionType: CombinationRuleCriterionType | '';
-  segmentBCodeValue: string;
-  segmentBRangeStart: string;
-  segmentBRangeEnd: string;
-  segmentBHierarchyNodeId: string;
-  segmentBIncludeChildren: boolean;
+// Form state for a single SegmentCondition within the dialog
+interface SegmentConditionFormState {
+  id: string;
+  segmentId: string;
+  criterionType: CombinationRuleCriterionType | '';
+  codeValue: string;
+  rangeStartValue: string;
+  rangeEndValue: string;
+  hierarchyNodeId: string;
+  includeChildren: boolean;
 }
 
-const initialMappingEntryFormState: MappingEntryFormState = {
+// Form state for the Definition Entry dialog
+interface DefinitionEntryFormState {
+  id: string; // ID of the CombinationRuleDefinitionEntry being edited, or empty for new
+  description: string;
+  behavior: 'Include' | 'Exclude';
+  segmentConditions: SegmentConditionFormState[];
+}
+
+const initialSegmentConditionFormState: Omit<SegmentConditionFormState, 'id' | 'segmentId'> = {
+  criterionType: '',
+  codeValue: '',
+  rangeStartValue: '',
+  rangeEndValue: '',
+  hierarchyNodeId: '',
+  includeChildren: false,
+};
+
+const initialDefinitionEntryFormState: Omit<DefinitionEntryFormState, 'id'> = {
+  description: '',
   behavior: 'Include',
-  segmentACriterionType: '',
-  segmentACodeValue: '',
-  segmentARangeStart: '',
-  segmentARangeEnd: '',
-  segmentAHierarchyNodeId: '',
-  segmentAIncludeChildren: false,
-  segmentBCriterionType: '',
-  segmentBCodeValue: '',
-  segmentBRangeStart: '',
-  segmentBRangeEnd: '',
-  segmentBHierarchyNodeId: '',
-  segmentBIncludeChildren: false,
+  segmentConditions: [],
 };
 
 
 export default function CombinationRuleBuildPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { segments, getSegmentById } = useSegments();
+  const { segments: availableSegments, getSegmentById } = useSegments();
   const { addCombinationRule, updateCombinationRule, getCombinationRuleById } = useCombinationRules();
 
   const ruleIdQueryParam = searchParams.get('ruleId');
   const [currentRuleId, setCurrentRuleId] = useState<string | null>(ruleIdQueryParam);
   const [isEditMode, setIsEditMode] = useState<boolean>(!!ruleIdQueryParam);
   
-  const [mappingEntries, setMappingEntries] = useState<CombinationRuleMappingEntry[]>([]);
-  const [isMappingEntryDialogOpen, setIsMappingEntryDialogOpen] = useState(false);
-  const [mappingEntryFormState, setMappingEntryFormState] = useState<MappingEntryFormState>(initialMappingEntryFormState);
+  const [definitionEntries, setDefinitionEntries] = useState<CombinationRuleDefinitionEntry[]>([]);
+  const [isDefinitionEntryDialogOpen, setIsDefinitionEntryDialogOpen] = useState(false);
+  const [currentEditingDefinitionEntryId, setCurrentEditingDefinitionEntryId] = useState<string | null>(null);
+  const [definitionEntryFormState, setDefinitionEntryFormState] = useState<DefinitionEntryFormState>({
+    ...initialDefinitionEntryFormState,
+    id: '', // Initialize id for new entries
+  });
 
 
   const form = useForm<CombinationRuleFormValues>({
@@ -116,8 +123,6 @@ export default function CombinationRuleBuildPage() {
       name: '',
       status: 'Active',
       description: '',
-      segmentAId: '',
-      segmentBId: '',
     },
   });
 
@@ -127,12 +132,10 @@ export default function CombinationRuleBuildPage() {
       if (existingRule) {
         form.reset({
           name: existingRule.name,
-          status: existingRule.status,
+          status: existingRule.status as 'Active' | 'Inactive',
           description: existingRule.description || '',
-          segmentAId: existingRule.segmentAId,
-          segmentBId: existingRule.segmentBId,
         });
-        setMappingEntries(existingRule.mappingEntries || []);
+        setDefinitionEntries(existingRule.definitionEntries || []);
         setCurrentRuleId(existingRule.id);
         setIsEditMode(true);
       } else {
@@ -141,38 +144,34 @@ export default function CombinationRuleBuildPage() {
         setIsEditMode(false);
         setCurrentRuleId(null);
         form.reset();
-        setMappingEntries([]);
+        setDefinitionEntries([]);
       }
     } else {
         setIsEditMode(false);
         setCurrentRuleId(null);
         form.reset(); 
-        setMappingEntries([]);
+        setDefinitionEntries([]);
     }
   }, [ruleIdQueryParam, getCombinationRuleById, form, router]);
 
   const onSubmit = (values: CombinationRuleFormValues) => {
-    if (mappingEntries.length === 0) {
-        alert("Please define at least one valid combination mapping entry.");
+    if (definitionEntries.length === 0) {
+        alert("Please define at least one combination definition entry.");
         return;
     }
-    const ruleData = {
+    const ruleData: Omit<CombinationRule, 'id' | 'lastModifiedDate' | 'lastModifiedBy'> & {id?: string} = {
       name: values.name,
-      status: values.status,
+      status: values.status as 'Active' | 'Inactive',
       description: values.description,
-      segmentAId: values.segmentAId,
-      segmentBId: values.segmentBId,
-      mappingEntries: mappingEntries,
-      lastModifiedDate: new Date(),
-      lastModifiedBy: "Current User", 
+      definitionEntries: definitionEntries,
     };
 
     if (isEditMode && currentRuleId) {
-      updateCombinationRule({ ...ruleData, id: currentRuleId });
+      updateCombinationRule({ ...ruleData, id: currentRuleId, lastModifiedDate: new Date(), lastModifiedBy: "Current User" });
       alert(`Combination Rule "${values.name}" updated successfully!`);
     } else {
       const newId = crypto.randomUUID();
-      addCombinationRule({ ...ruleData, id: newId });
+      addCombinationRule({ ...ruleData, id: newId, lastModifiedDate: new Date(), lastModifiedBy: "Current User" });
       alert(`Combination Rule "${values.name}" saved successfully!`);
     }
     router.push('/configure/combination-rules');
@@ -182,71 +181,148 @@ export default function CombinationRuleBuildPage() {
     router.push('/configure/combination-rules');
   };
   
-  const segmentAValue = form.watch("segmentAId");
-  const segmentBValue = form.watch("segmentBId");
-
-  const selectedSegmentA = useMemo(() => segmentAValue ? getSegmentById(segmentAValue) : null, [segmentAValue, getSegmentById]);
-  const selectedSegmentB = useMemo(() => segmentBValue ? getSegmentById(segmentBValue) : null, [segmentBValue, getSegmentById]);
-
-  const availableSegmentsForA = segments;
-  const availableSegmentsForB = segments.filter(s => s.id !== segmentAValue);
-
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
     { label: 'Combination Rules', href: '/configure/combination-rules' },
     { label: isEditMode ? 'Edit Combination Rule' : 'Create Combination Rule' },
   ];
 
-  const handleOpenAddMappingEntryDialog = () => {
-    setMappingEntryFormState(initialMappingEntryFormState); 
-    setIsMappingEntryDialogOpen(true);
-  };
-
-  const handleMappingEntryFormChange = (field: keyof MappingEntryFormState, value: any) => {
-    setMappingEntryFormState(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSaveMappingEntry = () => {
-    const {
-      behavior,
-      segmentACriterionType, segmentACodeValue, segmentARangeStart, segmentARangeEnd, segmentAHierarchyNodeId, segmentAIncludeChildren,
-      segmentBCriterionType, segmentBCodeValue, segmentBRangeStart, segmentBRangeEnd, segmentBHierarchyNodeId, segmentBIncludeChildren
-    } = mappingEntryFormState;
-
-    let critA: CombinationRuleCriterion | null = null;
-    if (segmentACriterionType === 'CODE' && segmentACodeValue) {
-      critA = { type: 'CODE', codeValue: segmentACodeValue };
-    } else if (segmentACriterionType === 'RANGE' && segmentARangeStart && segmentARangeEnd) {
-      critA = { type: 'RANGE', rangeStartValue: segmentARangeStart, rangeEndValue: segmentARangeEnd };
-    } else if (segmentACriterionType === 'HIERARCHY_NODE' && segmentAHierarchyNodeId) {
-      critA = { type: 'HIERARCHY_NODE', hierarchyNodeId: segmentAHierarchyNodeId, includeChildren: segmentAIncludeChildren };
-    }
-
-    let critB: CombinationRuleCriterion | null = null;
-    if (segmentBCriterionType === 'CODE' && segmentBCodeValue) {
-      critB = { type: 'CODE', codeValue: segmentBCodeValue };
-    } else if (segmentBCriterionType === 'RANGE' && segmentBRangeStart && segmentBRangeEnd) {
-      critB = { type: 'RANGE', rangeStartValue: segmentBRangeStart, rangeEndValue: segmentBRangeEnd };
-    } else if (segmentBCriterionType === 'HIERARCHY_NODE' && segmentBHierarchyNodeId) {
-      critB = { type: 'HIERARCHY_NODE', hierarchyNodeId: segmentBHierarchyNodeId, includeChildren: segmentBIncludeChildren };
-    }
-
-    if (critA && critB) {
-      const newEntry: CombinationRuleMappingEntry = {
-        id: crypto.randomUUID(),
-        behavior: behavior,
-        segmentACriterion: critA,
-        segmentBCriterion: critB,
-      };
-      setMappingEntries(prev => [...prev, newEntry]);
-      setIsMappingEntryDialogOpen(false);
+  const handleOpenDefinitionEntryDialog = (entryToEditId?: string) => {
+    if (entryToEditId) {
+      const entry = definitionEntries.find(e => e.id === entryToEditId);
+      if (entry) {
+        setDefinitionEntryFormState({
+          id: entry.id,
+          description: entry.description || '',
+          behavior: entry.behavior,
+          segmentConditions: entry.segmentConditions.map(sc => ({
+            id: sc.id,
+            segmentId: sc.segmentId,
+            criterionType: sc.criterion.type,
+            codeValue: sc.criterion.codeValue || '',
+            rangeStartValue: sc.criterion.rangeStartValue || '',
+            rangeEndValue: sc.criterion.rangeEndValue || '',
+            hierarchyNodeId: sc.criterion.hierarchyNodeId || '',
+            includeChildren: sc.criterion.includeChildren || false,
+          })),
+        });
+        setCurrentEditingDefinitionEntryId(entryToEditId);
+      }
     } else {
-      alert("Please complete all required fields for both Segment A and Segment B criteria, and select a behavior.");
+      setDefinitionEntryFormState({ ...initialDefinitionEntryFormState, id: crypto.randomUUID(), segmentConditions: [] });
+      setCurrentEditingDefinitionEntryId(null);
     }
+    setIsDefinitionEntryDialogOpen(true);
   };
 
-  const handleRemoveMappingEntry = (entryId: string) => {
-    setMappingEntries(prev => prev.filter(entry => entry.id !== entryId));
+  const handleDefinitionEntryDialogChange = (field: keyof Omit<DefinitionEntryFormState, 'segmentConditions' | 'id'>, value: any) => {
+    setDefinitionEntryFormState(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSegmentConditionChange = (index: number, field: keyof SegmentConditionFormState, value: any) => {
+    setDefinitionEntryFormState(prev => {
+      const updatedConditions = [...prev.segmentConditions];
+      const conditionToUpdate = { ...updatedConditions[index] };
+      (conditionToUpdate as any)[field] = value;
+
+      if (field === 'criterionType') { // Reset other fields when criterion type changes
+        conditionToUpdate.codeValue = '';
+        conditionToUpdate.rangeStartValue = '';
+        conditionToUpdate.rangeEndValue = '';
+        conditionToUpdate.hierarchyNodeId = '';
+        conditionToUpdate.includeChildren = false;
+      }
+      updatedConditions[index] = conditionToUpdate;
+      return { ...prev, segmentConditions: updatedConditions };
+    });
+  };
+
+  const handleAddSegmentConditionToDialog = () => {
+    setDefinitionEntryFormState(prev => ({
+      ...prev,
+      segmentConditions: [
+        ...prev.segmentConditions,
+        { id: crypto.randomUUID(), segmentId: '', ...initialSegmentConditionFormState }
+      ]
+    }));
+  };
+  
+  const handleRemoveSegmentConditionFromDialog = (conditionIdToRemove: string) => {
+     setDefinitionEntryFormState(prev => ({
+      ...prev,
+      segmentConditions: prev.segmentConditions.filter(sc => sc.id !== conditionIdToRemove)
+    }));
+  };
+
+  const handleSaveDefinitionEntry = () => {
+    const { id, description, behavior, segmentConditions: formConditions } = definitionEntryFormState;
+
+    if (formConditions.length === 0) {
+      alert("Please define at least one segment condition for this definition entry.");
+      return;
+    }
+
+    const finalSegmentConditions: SegmentCondition[] = [];
+    for (const formCond of formConditions) {
+      if (!formCond.segmentId) {
+        alert("Please select a segment for all conditions.");
+        return;
+      }
+      if (!formCond.criterionType) {
+        alert(`Please select a criterion type for segment: ${getSegmentById(formCond.segmentId)?.displayName}.`);
+        return;
+      }
+
+      let criterion: CombinationRuleCriterion | null = null;
+      switch (formCond.criterionType) {
+        case 'CODE':
+          if (!formCond.codeValue) {
+            alert(`Code Value is required for segment: ${getSegmentById(formCond.segmentId)?.displayName}.`);
+            return;
+          }
+          criterion = { type: 'CODE', codeValue: formCond.codeValue };
+          break;
+        case 'RANGE':
+          if (!formCond.rangeStartValue || !formCond.rangeEndValue) {
+            alert(`Start and End Code Values are required for segment: ${getSegmentById(formCond.segmentId)?.displayName}.`);
+            return;
+          }
+          criterion = { type: 'RANGE', rangeStartValue: formCond.rangeStartValue, rangeEndValue: formCond.rangeEndValue };
+          break;
+        case 'HIERARCHY_NODE':
+          if (!formCond.hierarchyNodeId) {
+            alert(`Hierarchy Node ID is required for segment: ${getSegmentById(formCond.segmentId)?.displayName}.`);
+            return;
+          }
+          criterion = { type: 'HIERARCHY_NODE', hierarchyNodeId: formCond.hierarchyNodeId, includeChildren: formCond.includeChildren };
+          break;
+        default:
+          alert(`Invalid criterion type for segment: ${getSegmentById(formCond.segmentId)?.displayName}.`);
+          return;
+      }
+      finalSegmentConditions.push({ id: formCond.id, segmentId: formCond.segmentId, criterion });
+    }
+    
+    const newOrUpdatedEntry: CombinationRuleDefinitionEntry = {
+      id: currentEditingDefinitionEntryId || id || crypto.randomUUID(),
+      description,
+      behavior,
+      segmentConditions: finalSegmentConditions,
+    };
+
+    if (currentEditingDefinitionEntryId) {
+      setDefinitionEntries(prev => prev.map(entry => entry.id === currentEditingDefinitionEntryId ? newOrUpdatedEntry : entry));
+    } else {
+      setDefinitionEntries(prev => [...prev, newOrUpdatedEntry]);
+    }
+    setIsDefinitionEntryDialogOpen(false);
+    setCurrentEditingDefinitionEntryId(null);
+  };
+
+  const handleRemoveDefinitionEntry = (entryId: string) => {
+    if (window.confirm("Are you sure you want to delete this definition entry?")) {
+        setDefinitionEntries(prev => prev.filter(entry => entry.id !== entryId));
+    }
   };
   
   const renderCriterionDisplay = (criterion: CombinationRuleCriterion, segmentName?: string): string => {
@@ -265,7 +341,6 @@ export default function CombinationRuleBuildPage() {
 
 
   return (
-    // Removed p-4/sm:p-6/lg:p-8, min-h-screen, bg-background. Added w-full, max-w-5xl, mx-auto.
     <div className="w-full max-w-5xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
@@ -279,7 +354,7 @@ export default function CombinationRuleBuildPage() {
           <Card>
             <CardHeader>
               <CardTitle>Rule Details</CardTitle>
-              <CardDescription>Define the name, status, and segments for this rule.</CardDescription>
+              <CardDesc>Define the name, status, and overall description for this rule.</CardDesc>
             </CardHeader>
             <CardContent className="space-y-6">
               <FormField
@@ -289,76 +364,12 @@ export default function CombinationRuleBuildPage() {
                   <FormItem>
                     <FormLabel>Rule Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Fund/Object Core Spending" {...field} />
+                      <Input placeholder="e.g., Fund/Object/Dept Core Spending" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="segmentAId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Segment A *</FormLabel>
-                      <Select 
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          if (value === form.getValues("segmentBId")) {
-                            form.setValue("segmentBId", ""); 
-                          }
-                        }} 
-                        value={field.value}
-                        disabled={isEditMode && mappingEntries.length > 0} 
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Segment A" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {availableSegmentsForA.map(segment => (
-                            <SelectItem key={segment.id} value={segment.id} disabled={segment.id === segmentBValue}>
-                              {segment.displayName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {(isEditMode && mappingEntries.length > 0) && <FormDescription className="text-xs">Segments cannot be changed if mapping entries exist.</FormDescription>}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="segmentBId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Segment B *</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value}
-                        disabled={(isEditMode && mappingEntries.length > 0) || !segmentAValue}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={!segmentAValue ? "Select Segment A first" : "Select Segment B"} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {availableSegmentsForB.map(segment => (
-                            <SelectItem key={segment.id} value={segment.id}>
-                              {segment.displayName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
               <FormField
                 control={form.control}
                 name="status"
@@ -402,51 +413,62 @@ export default function CombinationRuleBuildPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Define Valid Combinations</CardTitle>
-              <CardDescription>
-                Specify which codes (or ranges/hierarchy nodes) from Segment A are valid with which codes from Segment B,
-                and whether each mapping should 'Include' or 'Exclude' the combination.
-              </CardDescription>
+              <CardTitle>Define Combination Scenarios</CardTitle>
+              <CardDesc>
+                Specify sets of segment conditions and their behavior (Include/Exclude).
+                Each scenario defines a multi-segment condition.
+              </CardDesc>
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <Button type="button" variant="outline" onClick={handleOpenAddMappingEntryDialog} disabled={!segmentAValue || !segmentBValue}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Mapping Entry
+                <Button type="button" variant="outline" onClick={() => handleOpenDefinitionEntryDialog()}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Definition Entry
                 </Button>
               </div>
-              {(!segmentAValue || !segmentBValue) && (
-                <p className="text-sm text-muted-foreground">Please select Segment A and Segment B to start adding mapping entries.</p>
-              )}
               <ScrollArea className="h-auto max-h-96 border rounded-md p-4">
-                {mappingEntries.length === 0 && segmentAValue && segmentBValue && (
+                {definitionEntries.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    No mapping entries defined yet. Click "Add Mapping Entry" to start.
+                    No definition entries created yet. Click "Add Definition Entry" to start.
                   </p>
                 )}
                 <div className="space-y-3">
-                {mappingEntries.map(entry => (
-                  <div key={entry.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/50">
-                    <div className="space-y-1">
-                       <p className={`text-sm font-semibold ${entry.behavior === 'Include' ? 'text-green-600' : 'text-red-600'}`}>
-                         [{entry.behavior.toUpperCase()}]
-                       </p>
-                      <p className="text-sm font-medium">
-                        {renderCriterionDisplay(entry.segmentACriterion, selectedSegmentA?.displayName)}
-                      </p>
-                      <p className="text-sm font-medium">
-                        {renderCriterionDisplay(entry.segmentBCriterion, selectedSegmentB?.displayName)}
-                      </p>
+                {definitionEntries.map(entry => (
+                  <Card key={entry.id} className="p-3 shadow-sm">
+                    <div className="flex items-start justify-between mb-2">
+                        <div>
+                            {entry.description && <p className="text-md font-semibold text-primary">{entry.description}</p>}
+                            <p className={`text-sm font-semibold ${entry.behavior === 'Include' ? 'text-green-600' : 'text-red-600'}`}>
+                                Behavior: {entry.behavior.toUpperCase()}
+                            </p>
+                        </div>
+                        <div className="flex space-x-1">
+                             <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleOpenDefinitionEntryDialog(entry.id)}
+                            >
+                              Edit
+                            </Button>
+                            <Button 
+                                type="button" 
+                                variant="destructive" 
+                                size="sm" 
+                                onClick={() => handleRemoveDefinitionEntry(entry.id)}
+                            >
+                              Delete
+                            </Button>
+                        </div>
                     </div>
-                    <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => handleRemoveMappingEntry(entry.id)}
-                        className="text-destructive hover:text-destructive/80"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                    <div className="space-y-1 pl-2 border-l-2 border-muted">
+                      {entry.segmentConditions.map((sc, index) => (
+                         <p key={sc.id} className="text-xs text-muted-foreground">
+                           {index > 0 && <span className="font-semibold">AND </span>}
+                           {renderCriterionDisplay(sc.criterion, getSegmentById(sc.segmentId)?.displayName)}
+                         </p>
+                      ))}
+                    </div>
+                  </Card>
                 ))}
                 </div>
               </ScrollArea>
@@ -464,137 +486,146 @@ export default function CombinationRuleBuildPage() {
         </form>
       </Form>
 
-      <Dialog open={isMappingEntryDialogOpen} onOpenChange={setIsMappingEntryDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+      <Dialog open={isDefinitionEntryDialogOpen} onOpenChange={setIsDefinitionEntryDialogOpen}>
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Add New Mapping Entry</DialogTitle>
+            <DialogTitle>{currentEditingDefinitionEntryId ? 'Edit Definition Entry' : 'Add New Definition Entry'}</DialogTitle>
             <DialogDescription>
-              Define the criteria for Segment A ({selectedSegmentA?.displayName || 'N/A'}) and Segment B ({selectedSegmentB?.displayName || 'N/A'}), and its behavior.
+              Define a specific combination scenario, its behavior, and the conditions for relevant segments.
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh] p-1">
-            <div className="space-y-6 py-4 pr-4">
-              <Card>
-                <CardHeader><CardTitle className="text-lg">Mapping Behavior</CardTitle></CardHeader>
-                <CardContent>
-                  <Label htmlFor="mappingBehavior">Behavior Type</Label>
-                  <Select
-                    value={mappingEntryFormState.behavior}
-                    onValueChange={(value) => handleMappingEntryFormChange('behavior', value as 'Include' | 'Exclude')}
-                  >
-                    <SelectTrigger id="mappingBehavior">
-                      <SelectValue placeholder="Select behavior" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Include">Include (Allow this combination)</SelectItem>
-                      <SelectItem value="Exclude">Exclude (Disallow this combination)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    'Include' allows the specified combination. 'Exclude' disallows it.
-                  </p>
-                </CardContent>
-              </Card>
+          <ScrollArea className="max-h-[65vh] p-1 pr-3">
+            <div className="space-y-6 py-4">
+               <div>
+                <Label htmlFor="entryDescription">Entry Description (Optional)</Label>
+                <Input 
+                  id="entryDescription" 
+                  value={definitionEntryFormState.description} 
+                  onChange={(e) => handleDefinitionEntryDialogChange('description', e.target.value)}
+                  placeholder="e.g., Allow Fund X with specific Object and Department"
+                />
+              </div>
+              <div>
+                <Label htmlFor="entryBehavior">Behavior Type *</Label>
+                <Select
+                  value={definitionEntryFormState.behavior}
+                  onValueChange={(value) => handleDefinitionEntryDialogChange('behavior', value as 'Include' | 'Exclude')}
+                >
+                  <SelectTrigger id="entryBehavior">
+                    <SelectValue placeholder="Select behavior" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Include">Include (Allow this combination scenario)</SelectItem>
+                    <SelectItem value="Exclude">Exclude (Disallow this combination scenario)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <Card>
-                <CardHeader><CardTitle className="text-lg">Segment A Criterion: {selectedSegmentA?.displayName || 'N/A'}</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <Label htmlFor="segmentACriterionType">Criterion Type</Label>
-                    <Select
-                      value={mappingEntryFormState.segmentACriterionType}
-                      onValueChange={(value) => handleMappingEntryFormChange('segmentACriterionType', value as CombinationRuleCriterionType)}
-                    >
-                      <SelectTrigger id="segmentACriterionType"><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CODE">Specific Code</SelectItem>
-                        <SelectItem value="RANGE">Range of Codes</SelectItem>
-                        <SelectItem value="HIERARCHY_NODE">Hierarchy Node</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {mappingEntryFormState.segmentACriterionType === 'CODE' && (
-                    <div>
-                      <Label htmlFor="segmentACodeValue">Code Value</Label>
-                      <Input id="segmentACodeValue" value={mappingEntryFormState.segmentACodeValue} onChange={(e) => handleMappingEntryFormChange('segmentACodeValue', e.target.value)} />
-                    </div>
-                  )}
-                  {mappingEntryFormState.segmentACriterionType === 'RANGE' && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="segmentARangeStart">Start Code</Label>
-                        <Input id="segmentARangeStart" value={mappingEntryFormState.segmentARangeStart} onChange={(e) => handleMappingEntryFormChange('segmentARangeStart', e.target.value)} />
-                      </div>
-                      <div>
-                        <Label htmlFor="segmentARangeEnd">End Code</Label>
-                        <Input id="segmentARangeEnd" value={mappingEntryFormState.segmentARangeEnd} onChange={(e) => handleMappingEntryFormChange('segmentARangeEnd', e.target.value)} />
-                      </div>
-                    </div>
-                  )}
-                  {mappingEntryFormState.segmentACriterionType === 'HIERARCHY_NODE' && (
-                    <div className="space-y-2">
-                      <div>
-                        <Label htmlFor="segmentAHierarchyNodeId">Hierarchy Node ID</Label>
-                        <Input id="segmentAHierarchyNodeId" value={mappingEntryFormState.segmentAHierarchyNodeId} onChange={(e) => handleMappingEntryFormChange('segmentAHierarchyNodeId', e.target.value)} />
-                        <p className="text-xs text-muted-foreground mt-1">Specify the ID of the node from a relevant hierarchy for Segment A.</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="segmentAIncludeChildren" checked={mappingEntryFormState.segmentAIncludeChildren} onCheckedChange={(checked) => handleMappingEntryFormChange('segmentAIncludeChildren', !!checked)} />
-                        <Label htmlFor="segmentAIncludeChildren" className="text-sm font-normal">Include Children Nodes</Label>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader><CardTitle className="text-lg">Segment B Criterion: {selectedSegmentB?.displayName || 'N/A'}</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                   <div>
-                    <Label htmlFor="segmentBCriterionType">Criterion Type</Label>
-                    <Select
-                      value={mappingEntryFormState.segmentBCriterionType}
-                      onValueChange={(value) => handleMappingEntryFormChange('segmentBCriterionType', value as CombinationRuleCriterionType)}
-                    >
-                      <SelectTrigger id="segmentBCriterionType"><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CODE">Specific Code</SelectItem>
-                        <SelectItem value="RANGE">Range of Codes</SelectItem>
-                        <SelectItem value="HIERARCHY_NODE">Hierarchy Node</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {mappingEntryFormState.segmentBCriterionType === 'CODE' && (
-                    <div>
-                      <Label htmlFor="segmentBCodeValue">Code Value</Label>
-                      <Input id="segmentBCodeValue" value={mappingEntryFormState.segmentBCodeValue} onChange={(e) => handleMappingEntryFormChange('segmentBCodeValue', e.target.value)} />
-                    </div>
-                  )}
-                  {mappingEntryFormState.segmentBCriterionType === 'RANGE' && (
-                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="segmentBRangeStart">Start Code</Label>
-                        <Input id="segmentBRangeStart" value={mappingEntryFormState.segmentBRangeStart} onChange={(e) => handleMappingEntryFormChange('segmentBRangeStart', e.target.value)} />
-                      </div>
-                      <div>
-                        <Label htmlFor="segmentBRangeEnd">End Code</Label>
-                        <Input id="segmentBRangeEnd" value={mappingEntryFormState.segmentBRangeEnd} onChange={(e) => handleMappingEntryFormChange('segmentBRangeEnd', e.target.value)} />
-                      </div>
-                    </div>
-                  )}
-                  {mappingEntryFormState.segmentBCriterionType === 'HIERARCHY_NODE' && (
-                    <div className="space-y-2">
-                      <div>
-                        <Label htmlFor="segmentBHierarchyNodeId">Hierarchy Node ID</Label>
-                        <Input id="segmentBHierarchyNodeId" value={mappingEntryFormState.segmentBHierarchyNodeId} onChange={(e) => handleMappingEntryFormChange('segmentBHierarchyNodeId', e.target.value)} />
-                        <p className="text-xs text-muted-foreground mt-1">Specify the ID of the node from a relevant hierarchy for Segment B.</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="segmentBIncludeChildren" checked={mappingEntryFormState.segmentBIncludeChildren} onCheckedChange={(checked) => handleMappingEntryFormChange('segmentBIncludeChildren', !!checked)} />
-                        <Label htmlFor="segmentBIncludeChildren" className="text-sm font-normal">Include Children Nodes</Label>
-                      </div>
-                    </div>
-                  )}
+                <CardHeader>
+                  <CardTitle className="text-lg">Segment Conditions</CardTitle>
+                  <CardDesc>Define conditions for one or more segments. All conditions must be met (AND logic) for this entry to apply.</CardDesc>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {definitionEntryFormState.segmentConditions.map((condition, index) => (
+                    <Card key={condition.id} className="p-4 space-y-3 bg-muted/30 relative">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute top-2 right-2 h-6 w-6 text-destructive hover:text-destructive/80"
+                        onClick={() => handleRemoveSegmentConditionFromDialog(condition.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor={`segmentId-${condition.id}`}>Segment *</Label>
+                            <Select 
+                              value={condition.segmentId}
+                              onValueChange={(value) => handleSegmentConditionChange(index, 'segmentId', value)}
+                            >
+                              <SelectTrigger id={`segmentId-${condition.id}`}><SelectValue placeholder="Select Segment" /></SelectTrigger>
+                              <SelectContent>
+                                {availableSegments.filter(s => 
+                                    !definitionEntryFormState.segmentConditions.some(sc => sc.segmentId === s.id && sc.id !== condition.id) || condition.segmentId === s.id
+                                ).map(seg => (
+                                  <SelectItem key={seg.id} value={seg.id}>{seg.displayName}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor={`criterionType-${condition.id}`}>Criterion Type *</Label>
+                            <Select 
+                              value={condition.criterionType}
+                              onValueChange={(value) => handleSegmentConditionChange(index, 'criterionType', value as CombinationRuleCriterionType)}
+                            >
+                              <SelectTrigger id={`criterionType-${condition.id}`}><SelectValue placeholder="Select Type" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CODE">Specific Code</SelectItem>
+                                <SelectItem value="RANGE">Range of Codes</SelectItem>
+                                <SelectItem value="HIERARCHY_NODE">Hierarchy Node</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                       </div>
+                        
+                        {condition.criterionType === 'CODE' && (
+                          <div>
+                            <Label htmlFor={`codeValue-${condition.id}`}>Code Value *</Label>
+                            <Input 
+                              id={`codeValue-${condition.id}`}
+                              value={condition.codeValue}
+                              onChange={(e) => handleSegmentConditionChange(index, 'codeValue', e.target.value)} 
+                            />
+                          </div>
+                        )}
+                        {condition.criterionType === 'RANGE' && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label htmlFor={`rangeStart-${condition.id}`}>Start Code *</Label>
+                              <Input 
+                                id={`rangeStart-${condition.id}`}
+                                value={condition.rangeStartValue}
+                                onChange={(e) => handleSegmentConditionChange(index, 'rangeStartValue', e.target.value)} 
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`rangeEnd-${condition.id}`}>End Code *</Label>
+                              <Input 
+                                id={`rangeEnd-${condition.id}`}
+                                value={condition.rangeEndValue}
+                                onChange={(e) => handleSegmentConditionChange(index, 'rangeEndValue', e.target.value)} 
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {condition.criterionType === 'HIERARCHY_NODE' && (
+                          <div className="space-y-2">
+                            <div>
+                              <Label htmlFor={`hierarchyNodeId-${condition.id}`}>Hierarchy Node ID *</Label>
+                              <Input 
+                                id={`hierarchyNodeId-${condition.id}`}
+                                value={condition.hierarchyNodeId}
+                                onChange={(e) => handleSegmentConditionChange(index, 'hierarchyNodeId', e.target.value)}
+                                placeholder="Enter ID of hierarchy node"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={`includeChildren-${condition.id}`}
+                                checked={condition.includeChildren}
+                                onCheckedChange={(checked) => handleSegmentConditionChange(index, 'includeChildren', !!checked)}
+                              />
+                              <Label htmlFor={`includeChildren-${condition.id}`} className="text-sm font-normal">Include Children Nodes</Label>
+                            </div>
+                          </div>
+                        )}
+                    </Card>
+                  ))}
+                  <Button type="button" variant="outline" onClick={handleAddSegmentConditionToDialog} className="mt-2">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Segment Condition
+                  </Button>
                 </CardContent>
               </Card>
             </div>
@@ -603,11 +634,12 @@ export default function CombinationRuleBuildPage() {
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancel</Button>
             </DialogClose>
-            <Button type="button" onClick={handleSaveMappingEntry}>Save Entry</Button>
+            <Button type="button" onClick={handleSaveDefinitionEntry}>
+              {currentEditingDefinitionEntryId ? 'Update Entry' : 'Save Entry'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

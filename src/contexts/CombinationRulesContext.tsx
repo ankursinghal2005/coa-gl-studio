@@ -4,7 +4,8 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useCallback } from 'react';
 import type { CombinationRule } from '@/lib/combination-rule-types';
-import { initialCombinationRulesData as defaultInitialCombinationRules } from '@/lib/combination-rule-types';
+// Import the empty initial data
+import { initialCombinationRulesData } from '@/lib/combination-rule-types';
 
 interface CombinationRulesContextType {
   combinationRules: CombinationRule[];
@@ -17,7 +18,8 @@ interface CombinationRulesContextType {
 const CombinationRulesContext = createContext<CombinationRulesContextType | undefined>(undefined);
 
 export const CombinationRulesProvider = ({ children }: { children: ReactNode }) => {
-  const [combinationRules, setCombinationRules] = useState<CombinationRule[]>(defaultInitialCombinationRules);
+  // Use the imported initialCombinationRulesData which is now an empty array
+  const [combinationRules, setCombinationRules] = useState<CombinationRule[]>(initialCombinationRulesData);
 
   const addCombinationRule = useCallback((newRule: CombinationRule) => {
     setCombinationRules(prevRules => [...prevRules, newRule]);
@@ -59,5 +61,3 @@ export const useCombinationRules = (): CombinationRulesContextType => {
   }
   return context;
 };
-
-    
