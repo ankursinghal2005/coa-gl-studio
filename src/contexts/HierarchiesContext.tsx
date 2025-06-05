@@ -3,42 +3,50 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useCallback } from 'react';
-import type { Hierarchy } from '@/lib/hierarchy-types';
-import { initialHierarchiesData as defaultInitialHierarchies } from '@/lib/hierarchy-types';
+import type { HierarchySet } from '@/lib/hierarchy-types'; // Updated import
+import { initialHierarchiesData as defaultInitialHierarchySets } from '@/lib/hierarchy-types'; // Updated import
 
 interface HierarchiesContextType {
-  hierarchies: Hierarchy[];
-  addHierarchy: (newHierarchy: Hierarchy) => void;
-  updateHierarchy: (updatedHierarchy: Hierarchy) => void;
-  getHierarchyById: (hierarchyId: string) => Hierarchy | undefined;
-  // Future: deleteHierarchy
+  hierarchySets: HierarchySet[]; // Renamed from hierarchies
+  addHierarchySet: (newSet: HierarchySet) => void; // Renamed
+  updateHierarchySet: (updatedSet: HierarchySet) => void; // Renamed
+  getHierarchySetById: (setId: string) => HierarchySet | undefined; // Renamed
+  deleteHierarchySet: (setId: string) => void; // Added delete function
 }
 
 const HierarchiesContext = createContext<HierarchiesContextType | undefined>(undefined);
 
 export const HierarchiesProvider = ({ children }: { children: ReactNode }) => {
-  const [hierarchies, setHierarchies] = useState<Hierarchy[]>(defaultInitialHierarchies);
+  const [hierarchySets, setHierarchySets] = useState<HierarchySet[]>(defaultInitialHierarchySets);
 
-  const addHierarchy = useCallback((newHierarchy: Hierarchy) => {
-    setHierarchies(prevHierarchies => [...prevHierarchies, newHierarchy]);
+  const addHierarchySet = useCallback((newSet: HierarchySet) => {
+    setHierarchySets(prevSets => [...prevSets, newSet]);
   }, []);
 
-  const updateHierarchy = useCallback((updatedHierarchy: Hierarchy) => {
-    setHierarchies(prev => 
-      prev.map(h => (h.id === updatedHierarchy.id ? updatedHierarchy : h))
+  const updateHierarchySet = useCallback((updatedSet: HierarchySet) => {
+    setHierarchySets(prevSets =>
+      prevSets.map(set => (set.id === updatedSet.id ? updatedSet : set))
     );
   }, []);
 
-  const getHierarchyById = useCallback((hierarchyId: string): Hierarchy | undefined => {
-    return hierarchies.find(h => h.id === hierarchyId);
-  }, [hierarchies]);
+  const getHierarchySetById = useCallback((setId: string): HierarchySet | undefined => {
+    return hierarchySets.find(set => set.id === setId);
+  }, [hierarchySets]);
 
-  // const deleteHierarchy = useCallback((hierarchyId: string) => {
-  //   setHierarchies(prev => prev.filter(h => h.id !== hierarchyId));
-  // }, []);
+  const deleteHierarchySet = useCallback((setId: string) => {
+    setHierarchySets(prevSets => prevSets.filter(set => set.id !== setId));
+  }, []);
 
   return (
-    <HierarchiesContext.Provider value={{ hierarchies, addHierarchy, updateHierarchy, getHierarchyById }}>
+    <HierarchiesContext.Provider
+      value={{
+        hierarchySets,
+        addHierarchySet,
+        updateHierarchySet,
+        getHierarchySetById,
+        deleteHierarchySet,
+      }}
+    >
       {children}
     </HierarchiesContext.Provider>
   );
