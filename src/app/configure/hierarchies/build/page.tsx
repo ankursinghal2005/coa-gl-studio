@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,31 +21,53 @@ import {
   Form,
   FormControl,
   FormField,
-  FormItem, 
-  FormLabel, 
+  FormItem,
+  FormLabel,
   FormMessage,
+  FormDescription
 } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription as DialogDesc, // Renamed to avoid conflict with FormDescription
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { GripVertical, FolderTree, Trash2, AlertTriangle } from 'lucide-react';
+import { GripVertical, FolderTree, Trash2, AlertTriangle, PlusCircle, Edit3, Workflow } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
 import { useHierarchies } from '@/contexts/HierarchiesContext';
 import type { Segment, SegmentCode } from '@/lib/segment-types';
 import { mockSegmentCodesData } from '@/lib/segment-types';
-import type { HierarchyNode, Hierarchy } from '@/lib/hierarchy-types';
+import type { HierarchyNode, HierarchySet, SegmentHierarchyInSet } from '@/lib/hierarchy-types';
+import { DatePicker } from '@/components/ui/date-picker';
+import { format } from 'date-fns';
 
-
-const hierarchyBuilderFormSchema = z.object({
-  hierarchyName: z.string().min(1, { message: 'Hierarchy Name is required.' }),
-  status: z.enum(['Active', 'Inactive', 'Deprecated'], {
+const hierarchySetFormSchema = z.object({
+  name: z.string().min(1, { message: 'Hierarchy Set Name is required.' }),
+  status: z.enum(['Active', 'Inactive', 'Deprecated'] as [HierarchySet['status'], ...Array<HierarchySet['status']>], {
     required_error: 'Status is required.',
   }),
   description: z.string().optional(),
+  validFrom: z.date({ required_error: "Valid From date is required." }),
+  validTo: z.date().optional(),
+}).refine(data => {
+  if (data.validFrom && data.validTo) {
+    return data.validTo >= data.validFrom;
+  }
+  return true;
+}, {
+  message: "Valid To date must be after or the same as Valid From date.",
+  path: ["validTo"],
 });
 
-type HierarchyBuilderFormValues = z.infer<typeof hierarchyBuilderFormSchema>;
+type HierarchySetFormValues = z.infer<typeof hierarchySetFormSchema>;
 
+// --- Tree Node Helper Functions (to be used in modal) ---
 const codeExistsInTree = (nodes: HierarchyNode[], codeId: string): boolean => {
   for (const node of nodes) {
     if (node.segmentCode.id === codeId) return true;
@@ -108,7 +130,9 @@ const removeNodeFromTreeRecursive = (nodes: HierarchyNode[], idToRemove: string)
       return node;
     });
 };
+// --- End Tree Node Helper Functions ---
 
+// --- TreeNodeDisplay Component (to be used in modal) ---
 const TreeNodeDisplay: React.FC<{
   node: HierarchyNode;
   level: number;
@@ -151,7 +175,7 @@ const TreeNodeDisplay: React.FC<{
       {canBeParent && (
         <div className="text-xs mt-1">
           {isSelectedParent ? (
-            <span className="text-green-600 font-semibold">(Selected as Parent for new children)</span>
+            <span className="text-green-600 font-semibold">(Selected as Parent)</span>
           ) : (
             <span className="text-blue-600 cursor-pointer hover:underline">(Click to select as parent)</span>
           )}
@@ -174,386 +198,366 @@ const TreeNodeDisplay: React.FC<{
     </div>
   );
 };
+// --- End TreeNodeDisplay Component ---
 
 
-export default function HierarchyBuildPage() {
+export default function HierarchySetBuildPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { getSegmentById } = useSegments();
-  const { addHierarchy, updateHierarchy, getHierarchyById } = useHierarchies();
+  const { segments: allGlobalSegments, getSegmentById } = useSegments();
+  const { addHierarchySet, updateHierarchySet, getHierarchySetById } = useHierarchies();
   
-  const segmentId = searchParams.get('segmentId');
-  const hierarchyIdQueryParam = searchParams.get('hierarchyId');
+  const hierarchySetIdQueryParam = searchParams.get('hierarchySetId');
+  const [currentHierarchySetId, setCurrentHierarchySetId] = useState<string | null>(hierarchySetIdQueryParam);
+  const [isEditMode, setIsEditMode] = useState<boolean>(!!hierarchySetIdQueryParam);
 
-  const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]);
-  const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
-  const [currentHierarchyId, setCurrentHierarchyId] = useState<string | null>(hierarchyIdQueryParam);
-  const [isEditMode, setIsEditMode] = useState<boolean>(!!hierarchyIdQueryParam);
+  const [segmentHierarchiesInSet, setSegmentHierarchiesInSet] = useState<SegmentHierarchyInSet[]>([]);
+  const [segmentToAdd, setSegmentToAdd] = useState<string>(''); // ID of segment to add to the set
 
-  const selectedParentNodeDetails = useMemo(() => {
-    if (!selectedParentNodeId) return null;
-    return findNodeById(treeNodes, selectedParentNodeId);
-  }, [selectedParentNodeId, treeNodes]);
+  // Modal State
+  const [isTreeBuilderModalOpen, setIsTreeBuilderModalOpen] = useState(false);
+  const [editingSegmentHierarchyConfig, setEditingSegmentHierarchyConfig] = useState<{ segmentId: string; segmentName: string; initialTreeNodes: HierarchyNode[] } | null>(null);
+  
+  // Tree Builder Modal - Specific State
+  const [modalTreeNodes, setModalTreeNodes] = useState<HierarchyNode[]>([]);
+  const [modalSelectedParentNodeId, setModalSelectedParentNodeId] = useState<string | null>(null);
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
+  const [modalRangeStartCode, setModalRangeStartCode] = useState('');
+  const [modalRangeEndCode, setModalRangeEndCode] = useState('');
+  
+  const [modalAllSegmentCodes, setModalAllSegmentCodes] = useState<SegmentCode[]>([]);
+  const [modalAvailableSummaryCodes, setModalAvailableSummaryCodes] = useState<SegmentCode[]>([]);
+  const [modalAvailableDetailCodes, setModalAvailableDetailCodes] = useState<SegmentCode[]>([]);
 
-  const [selectedSegment, setSelectedSegment] = useState<Segment | null>(null);
-  const [allSegmentCodes, setAllSegmentCodes] = useState<SegmentCode[]>([]);
-  const [availableSummaryCodes, setAvailableSummaryCodes] = useState<SegmentCode[]>([]);
-  const [availableDetailCodes, setAvailableDetailCodes] = useState<SegmentCode[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
 
-  const [rangeStartCode, setRangeStartCode] = useState('');
-  const [rangeEndCode, setRangeEndCode] = useState('');
-
-  const form = useForm<HierarchyBuilderFormValues>({
-    resolver: zodResolver(hierarchyBuilderFormSchema),
+  const form = useForm<HierarchySetFormValues>({
+    resolver: zodResolver(hierarchySetFormSchema),
     defaultValues: {
-      hierarchyName: '',
+      name: '',
       status: 'Active',
       description: '',
+      validFrom: new Date(),
+      validTo: undefined,
     },
   });
 
   useEffect(() => {
-    if (segmentId) {
-      const segment = getSegmentById(segmentId);
-      if (segment) {
-        setSelectedSegment(segment);
-        const codesForSegment = (mockSegmentCodesData[segment.id] || [])
-          .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
-        
-        setAllSegmentCodes(codesForSegment); 
-
-        const filteredCodes = searchTerm
-          ? codesForSegment.filter(
-              (code) =>
-                code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                code.description.toLowerCase().includes(searchTerm.toLowerCase())
-            )
-          : codesForSegment;
-
-        setAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator)); 
-        setAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator));
-
-        if (currentHierarchyId) {
-          const existingHierarchy = getHierarchyById(currentHierarchyId);
-          if (existingHierarchy && existingHierarchy.segmentId === segmentId) {
-            form.reset({
-              hierarchyName: existingHierarchy.name,
-              status: existingHierarchy.status,
-              description: existingHierarchy.description || '',
-            });
-            setTreeNodes(existingHierarchy.treeNodes);
-            setIsEditMode(true);
-          } else if (existingHierarchy) {
-            // Hierarchy ID belongs to a different segment, treat as error or new
-            alert("Error: Hierarchy ID does not match the selected segment. Starting new hierarchy.");
-            setCurrentHierarchyId(null);
-            setIsEditMode(false);
-            form.reset();
-            setTreeNodes([]);
-          } else {
-             // Hierarchy ID not found, treat as new
-            setCurrentHierarchyId(null);
-            setIsEditMode(false);
-          }
-        } else {
-          setIsEditMode(false);
-          // form.reset(); // Reset only if not edit mode and no hierarchyId was ever set.
-          // setTreeNodes([]); // Reset only if not edit mode
-        }
-
+    if (hierarchySetIdQueryParam) {
+      const existingSet = getHierarchySetById(hierarchySetIdQueryParam);
+      if (existingSet) {
+        form.reset({
+          name: existingSet.name,
+          status: existingSet.status,
+          description: existingSet.description || '',
+          validFrom: new Date(existingSet.validFrom),
+          validTo: existingSet.validTo ? new Date(existingSet.validTo) : undefined,
+        });
+        setSegmentHierarchiesInSet(existingSet.segmentHierarchies.map(sh => ({...sh, treeNodes: [...(sh.treeNodes || [])]})));
+        setCurrentHierarchySetId(existingSet.id);
+        setIsEditMode(true);
       } else {
-        alert('Segment not found.');
-        router.push('/configure/hierarchies');
+        alert("Hierarchy Set not found. Starting new set.");
+        router.replace('/configure/hierarchies/build');
+        // Reset to new set state
+        setIsEditMode(false);
+        setCurrentHierarchySetId(null);
+        form.reset();
+        setSegmentHierarchiesInSet([]);
       }
     } else {
-      alert('Segment ID is required.');
-      router.push('/configure/hierarchies');
+      // New set mode
+      setIsEditMode(false);
+      setCurrentHierarchySetId(null);
+      form.reset();
+      setSegmentHierarchiesInSet([]);
     }
-  }, [segmentId, getSegmentById, router, searchTerm, currentHierarchyId, getHierarchyById, form]);
+  }, [hierarchySetIdQueryParam, getHierarchySetById, form, router]);
 
-
-  if (!selectedSegment) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Loading segment information...</p>
-      </div>
-    );
-  }
-
-  const onSubmit = (values: HierarchyBuilderFormValues) => {
-    if (!segmentId) {
-        alert("Segment ID is missing. Cannot save hierarchy.");
-        return;
-    }
-    if (treeNodes.length === 0) {
-        alert("Hierarchy structure is empty. Please add at least one root node.");
-        return;
+  const onSubmit = (values: HierarchySetFormValues) => {
+    if (segmentHierarchiesInSet.length === 0) {
+      alert("Please add and define at least one segment hierarchy for this set.");
+      return;
     }
 
-    if (isEditMode && currentHierarchyId) {
-        const updatedHierarchy: Hierarchy = {
-            id: currentHierarchyId,
-            name: values.hierarchyName,
-            segmentId: segmentId,
-            status: values.status,
-            description: values.description,
-            treeNodes: treeNodes,
-            lastModifiedDate: new Date(),
-            lastModifiedBy: "Current User (Updated)", // Placeholder
-        };
-        updateHierarchy(updatedHierarchy);
-        alert(`Hierarchy "${values.hierarchyName}" updated successfully!`);
+    const hierarchySetData: HierarchySet = {
+      id: currentHierarchySetId || crypto.randomUUID(),
+      name: values.name,
+      status: values.status,
+      description: values.description,
+      validFrom: values.validFrom,
+      validTo: values.validTo,
+      segmentHierarchies: segmentHierarchiesInSet,
+      lastModifiedDate: new Date(),
+      lastModifiedBy: "Current User", // Placeholder
+    };
+
+    if (isEditMode && currentHierarchySetId) {
+      updateHierarchySet(hierarchySetData);
+      alert(`Hierarchy Set "${values.name}" updated successfully!`);
     } else {
-        const newHierarchy: Hierarchy = {
-            id: crypto.randomUUID(),
-            name: values.hierarchyName,
-            segmentId: segmentId,
-            status: values.status,
-            description: values.description,
-            treeNodes: treeNodes,
-            lastModifiedDate: new Date(),
-            lastModifiedBy: "Current User (Created)", // Placeholder
-        };
-        addHierarchy(newHierarchy);
-        alert(`Hierarchy "${values.hierarchyName}" saved successfully!`);
+      addHierarchySet(hierarchySetData);
+      alert(`Hierarchy Set "${values.name}" saved successfully!`);
     }
-    router.push(`/configure/hierarchies?segmentId=${segmentId}`);
+    router.push('/configure/hierarchies');
   };
 
   const handleCancel = () => {
-    if (segmentId) {
-        router.push(`/configure/hierarchies?segmentId=${segmentId}`);
-    } else {
-        router.push('/configure/hierarchies');
+    router.push('/configure/hierarchies');
+  };
+  
+  const handleAddSegmentToSet = () => {
+    if (!segmentToAdd) {
+      alert("Please select a segment to add.");
+      return;
     }
+    if (segmentHierarchiesInSet.find(sh => sh.segmentId === segmentToAdd)) {
+      alert("This segment is already part of the hierarchy set.");
+      return;
+    }
+    const newSegmentHierarchy: SegmentHierarchyInSet = {
+      id: crypto.randomUUID(),
+      segmentId: segmentToAdd,
+      treeNodes: [],
+    };
+    setSegmentHierarchiesInSet(prev => [...prev, newSegmentHierarchy]);
+    setSegmentToAdd(''); // Reset select
   };
 
-  const handleReset = () => {
-    form.reset();
-    setSearchTerm('');
-    if (isEditMode && currentHierarchyId) {
-        const existingHierarchy = getHierarchyById(currentHierarchyId);
-        if (existingHierarchy) {
-            setTreeNodes(existingHierarchy.treeNodes); // Reset tree to original edit state
+  const handleRemoveSegmentFromSet = (segmentHierarchyIdToRemove: string) => {
+    if (window.confirm("Are you sure you want to remove this segment's hierarchy from the set?")) {
+        setSegmentHierarchiesInSet(prev => prev.filter(sh => sh.id !== segmentHierarchyIdToRemove));
+    }
+  };
+  
+  const handleOpenTreeBuilderModal = (segmentHierarchy: SegmentHierarchyInSet) => {
+    const segment = getSegmentById(segmentHierarchy.segmentId);
+    if (!segment) {
+      alert("Segment details not found for this hierarchy.");
+      return;
+    }
+    setEditingSegmentHierarchyConfig({
+      segmentId: segmentHierarchy.segmentId,
+      segmentName: segment.displayName,
+      initialTreeNodes: JSON.parse(JSON.stringify(segmentHierarchy.treeNodes || [])), // Deep copy
+    });
+    setModalTreeNodes(JSON.parse(JSON.stringify(segmentHierarchy.treeNodes || []))); // Deep copy for modal editing
+    setIsTreeBuilderModalOpen(true);
+  };
+
+  const handleSaveSegmentTree = () => {
+    if (editingSegmentHierarchyConfig) {
+      setSegmentHierarchiesInSet(prev =>
+        prev.map(sh =>
+          sh.segmentId === editingSegmentHierarchyConfig.segmentId
+            ? { ...sh, treeNodes: modalTreeNodes }
+            : sh
+        )
+      );
+    }
+    setIsTreeBuilderModalOpen(false);
+    setEditingSegmentHierarchyConfig(null);
+  };
+
+  // --- Modal Tree Builder Logic ---
+  useEffect(() => {
+    if (isTreeBuilderModalOpen && editingSegmentHierarchyConfig) {
+        const segment = getSegmentById(editingSegmentHierarchyConfig.segmentId);
+        if (segment) {
+            const codesForSegment = (mockSegmentCodesData[segment.id] || [])
+              .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+            setModalAllSegmentCodes(codesForSegment);
         } else {
-            setTreeNodes([]); // Fallback if something went wrong
+            setModalAllSegmentCodes([]);
         }
     } else {
-        setTreeNodes([]); // Reset tree for new hierarchy
+        // Reset modal specific states when closed or no config
+        setModalSearchTerm('');
+        setModalSelectedParentNodeId(null);
+        setModalRangeStartCode('');
+        setModalRangeEndCode('');
+        setModalAllSegmentCodes([]);
     }
-    setSelectedParentNodeId(null);
-    setRangeStartCode('');
-    setRangeEndCode('');
-    alert('Hierarchy builder reset.');
-  };
+  }, [isTreeBuilderModalOpen, editingSegmentHierarchyConfig, getSegmentById]);
 
-  const handleDragStart = (event: React.DragEvent<HTMLDivElement>, code: SegmentCode) => {
+  useEffect(() => { // Effect for filtering codes in modal based on search term
+    if (modalAllSegmentCodes.length > 0) {
+        const filteredCodes = modalSearchTerm
+          ? modalAllSegmentCodes.filter(
+              (code) =>
+                code.code.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
+                code.description.toLowerCase().includes(modalSearchTerm.toLowerCase())
+            )
+          : modalAllSegmentCodes;
+        setModalAvailableSummaryCodes(filteredCodes.filter(c => c.summaryIndicator));
+        setModalAvailableDetailCodes(filteredCodes.filter(c => !c.summaryIndicator));
+    } else {
+        setModalAvailableSummaryCodes([]);
+        setModalAvailableDetailCodes([]);
+    }
+  }, [modalSearchTerm, modalAllSegmentCodes]);
+
+  const modalSelectedParentNodeDetails = useMemo(() => {
+    if (!modalSelectedParentNodeId) return null;
+    return findNodeById(modalTreeNodes, modalSelectedParentNodeId);
+  }, [modalSelectedParentNodeId, modalTreeNodes]);
+
+  const handleModalDragStart = (event: React.DragEvent<HTMLDivElement>, code: SegmentCode) => {
     event.dataTransfer.setData('application/json', JSON.stringify(code));
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleModalDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleModalDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const codeDataString = event.dataTransfer.getData('application/json');
     if (!codeDataString) return;
 
     try {
       const droppedSegmentCode: SegmentCode = JSON.parse(codeDataString);
-
-      if (codeExistsInTree(treeNodes, droppedSegmentCode.id)) {
-        alert(`Code ${droppedSegmentCode.code} (ID: ${droppedSegmentCode.id}) already exists anywhere in the hierarchy.`);
+      if (codeExistsInTree(modalTreeNodes, droppedSegmentCode.id)) {
+        alert(`Code ${droppedSegmentCode.code} already exists in this hierarchy.`);
         return;
       }
+      const newNode: HierarchyNode = { id: crypto.randomUUID(), segmentCode: droppedSegmentCode, children: [] };
 
-      const newNode: HierarchyNode = {
-        id: crypto.randomUUID(), 
-        segmentCode: droppedSegmentCode,
-        children: [],
-      };
-
-      if (treeNodes.length === 0) {
+      if (modalTreeNodes.length === 0) {
         if (!newNode.segmentCode.summaryIndicator) {
-          alert('The first node in a hierarchy must be a summary code.');
-          return;
+          alert('The first node in a hierarchy must be a summary code.'); return;
         }
-        setTreeNodes([newNode]);
-        setSelectedParentNodeId(newNode.id);
+        setModalTreeNodes([newNode]);
+        setModalSelectedParentNodeId(newNode.id);
       } else {
-        if (selectedParentNodeId) {
-          const parentNode = findNodeById(treeNodes, selectedParentNodeId);
+        if (modalSelectedParentNodeId) {
+          const parentNode = findNodeById(modalTreeNodes, modalSelectedParentNodeId);
           if (parentNode && !parentNode.segmentCode.summaryIndicator) {
-            alert(`Cannot add child to detail code "${parentNode.segmentCode.code}". Select a summary code as parent.`);
-            return;
+            alert(`Cannot add child to detail code "${parentNode.segmentCode.code}". Select a summary code as parent.`); return;
           }
-          setTreeNodes(prevNodes => addChildToNode(prevNodes, selectedParentNodeId, newNode));
+          setModalTreeNodes(prevNodes => addChildToNode(prevNodes, modalSelectedParentNodeId, newNode));
         } else {
           if (!newNode.segmentCode.summaryIndicator) {
-            alert('Cannot add a detail code as a new root. Select a summary parent or add a summary code as a new root.');
-            return;
+            alert('Cannot add a detail code as a new root. Select a summary parent or add a summary code as a new root.'); return;
           }
-          setTreeNodes(prevNodes => [...prevNodes, newNode]);
-          setSelectedParentNodeId(newNode.id); 
+          setModalTreeNodes(prevNodes => [...prevNodes, newNode]);
+          setModalSelectedParentNodeId(newNode.id); 
         }
       }
-    } catch (e) {
-      console.error("Failed to parse dropped data or add to tree:", e);
-      alert("Error processing dropped code.");
+    } catch (e) { console.error("Failed to process dropped code:", e); alert("Error processing dropped code."); }
+  };
+
+  const handleModalSelectParent = (nodeId: string) => {
+    const node = findNodeById(modalTreeNodes, nodeId);
+    if (node && node.segmentCode.summaryIndicator) setModalSelectedParentNodeId(nodeId);
+    else if (node && !node.segmentCode.summaryIndicator) { setModalSelectedParentNodeId(null); alert("Detail codes cannot be parents."); }
+    else setModalSelectedParentNodeId(null);
+  };
+
+  const handleModalRemoveNode = (nodeIdToRemove: string) => {
+    const newTree = removeNodeFromTreeRecursive(modalTreeNodes, nodeIdToRemove);
+    setModalTreeNodes(newTree);
+    if (modalSelectedParentNodeId && !nodeStillExistsInTree(newTree, modalSelectedParentNodeId)) {
+      setModalSelectedParentNodeId(null);
     }
   };
 
-  const handleSelectParent = (nodeId: string) => {
-    const node = findNodeById(treeNodes, nodeId);
-    if (node && node.segmentCode.summaryIndicator) {
-      setSelectedParentNodeId(nodeId);
-    } else if (node && !node.segmentCode.summaryIndicator) {
-        setSelectedParentNodeId(null); 
-        alert("Detail codes cannot be selected as parents.");
-    } else {
-      setSelectedParentNodeId(null); 
-    }
-  };
+  const handleModalAddRangeToParent = () => {
+    if (!modalSelectedParentNodeId) { alert('Please select a summary parent node from the tree first.'); return; }
+    const parentNode = findNodeById(modalTreeNodes, modalSelectedParentNodeId);
+    if (!parentNode || !parentNode.segmentCode.summaryIndicator) { alert('Selected parent is not valid.'); return; }
+    if (!modalRangeStartCode || !modalRangeEndCode) { alert('Please enter Start and End Codes for the range.'); return; }
 
-  const handleRemoveNode = (nodeIdToRemove: string) => {
-    const newTree = removeNodeFromTreeRecursive(treeNodes, nodeIdToRemove);
-    setTreeNodes(newTree);
+    const startIndex = modalAllSegmentCodes.findIndex(c => c.code === modalRangeStartCode);
+    const endIndex = modalAllSegmentCodes.findIndex(c => c.code === modalRangeEndCode);
+    if (startIndex === -1 || endIndex === -1) { alert('Start/End code not found.'); return; }
+    if (startIndex > endIndex) { alert('Start Code must precede or be End Code.'); return; }
 
-    if (selectedParentNodeId && !nodeStillExistsInTree(newTree, selectedParentNodeId)) {
-      setSelectedParentNodeId(null);
-    }
-  };
+    const codesInRange = modalAllSegmentCodes.slice(startIndex, endIndex + 1);
+    let currentTree = [...modalTreeNodes];
+    let addedCount = 0;
+    const skippedExisting = [];
 
-  const handleAddRangeToParent = () => {
-    if (!selectedParentNodeId) {
-      alert('Please select a summary parent node from the tree first.');
-      return;
-    }
-    const parentNode = findNodeById(treeNodes, selectedParentNodeId);
-    if (!parentNode || !parentNode.segmentCode.summaryIndicator) {
-      alert('Selected parent is not a valid summary code or not found.');
-      return;
-    }
-    if (!rangeStartCode || !rangeEndCode) {
-      alert('Please enter both a Start Code and an End Code for the range.');
-      return;
-    }
-
-    const startIndex = allSegmentCodes.findIndex(c => c.code === rangeStartCode);
-    const endIndex = allSegmentCodes.findIndex(c => c.code === rangeEndCode);
-
-    if (startIndex === -1 || endIndex === -1) {
-      alert('Start or End code not found in available codes for this segment.');
-      return;
-    }
-    if (startIndex > endIndex) {
-      alert('Start Code must come before or be the same as End Code.');
-      return;
-    }
-
-    const codesToAddInRange = allSegmentCodes.slice(startIndex, endIndex + 1);
-    let newTreeNodesState = [...treeNodes]; 
-    let codesAddedCount = 0;
-    const codesSkippedGlobally: string[] = [];
-    const codesSkippedLocally: string[] = [];
-
-
-    codesToAddInRange.forEach(code => {
-      if (codeExistsInTree(newTreeNodesState, code.id)) { 
-        codesSkippedGlobally.push(code.code);
-        return; 
-      }
+    codesInRange.forEach(code => {
+      if (codeExistsInTree(currentTree, code.id)) { skippedExisting.push(code.code); return; }
+      const newNode: HierarchyNode = { id: crypto.randomUUID(), segmentCode: code, children: [] };
       
-      const newNode: HierarchyNode = {
-        id: crypto.randomUUID(), 
-        segmentCode: code,
-        children: [],
-      };
-      
-      const parentNodeBeforeAdd = findNodeById(newTreeNodesState, selectedParentNodeId);
-      const childrenCountBefore = parentNodeBeforeAdd?.children.length ?? 0;
-
-      const tempTreeWithPotentiallyNewChild = addChildToNode(newTreeNodesState, selectedParentNodeId, newNode);
-      
-      const parentNodeAfterAdd = findNodeById(tempTreeWithPotentiallyNewChild, selectedParentNodeId);
-      const childrenCountAfter = parentNodeAfterAdd?.children.length ?? 0;
-
-      if (childrenCountAfter > childrenCountBefore) {
-         newTreeNodesState = tempTreeWithPotentiallyNewChild; 
-         codesAddedCount++;
-      } else {
-        if (!codesSkippedGlobally.includes(code.code)) {
-            codesSkippedLocally.push(code.code);
-        }
+      // Simulate add and check if successful (addChildToNode shows alerts for some failures)
+      const tempTree = addChildToNode(currentTree, modalSelectedParentNodeId, newNode);
+      if (JSON.stringify(tempTree) !== JSON.stringify(currentTree)) { // Crude check for actual addition
+          currentTree = tempTree;
+          addedCount++;
+      } else if (!skippedExisting.includes(code.code)) { // If not added and not already skipped for existence
+          skippedExisting.push(code.code + " (parent type restriction or already child)");
       }
     });
-
-    setTreeNodes(newTreeNodesState); 
-    setRangeStartCode('');
-    setRangeEndCode('');
-    let message = `${codesAddedCount} codes added to parent "${parentNode.segmentCode.code}".`;
-    if (codesSkippedGlobally.length > 0) {
-        message += ` Skipped globally existing codes: ${codesSkippedGlobally.join(', ')}.`;
-    }
-    if (codesSkippedLocally.length > 0) {
-        message += ` Skipped codes already under this parent or due to parent type: ${codesSkippedLocally.join(', ')}.`;
-    }
-    alert(message.trim());
+    setModalTreeNodes(currentTree);
+    setModalRangeStartCode(''); setModalRangeEndCode('');
+    let message = `${addedCount} codes added to parent "${parentNode.segmentCode.code}".`;
+    if (skippedExisting.length > 0) message += ` Skipped codes: ${skippedExisting.join(', ')}.`;
+    alert(message);
   };
 
+  const getModalDropZoneMessage = () => {
+    if (modalTreeNodes.length === 0) return "Drag a SUMMARY code here to start building this segment's hierarchy root.";
+    if (!modalSelectedParentNodeId) return "Select a summary node from the tree to add children, or drag another SUMMARY code here to create a new root.";
+    const selectedNodeName = modalSelectedParentNodeDetails ? `${modalSelectedParentNodeDetails.segmentCode.code}` : 'the selected parent';
+    return `Drag codes here to add as children to "${selectedNodeName}".`;
+  };
+  // --- End Modal Tree Builder Logic ---
 
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
-    { label: 'Hierarchies', href: `/configure/hierarchies?segmentId=${selectedSegment.id}` },
-    { label: isEditMode ? 'Edit Hierarchy' : 'Build Hierarchy' },
+    { label: 'Hierarchy Sets', href: '/configure/hierarchies' },
+    { label: isEditMode ? 'Edit Hierarchy Set' : 'Create Hierarchy Set' },
   ];
 
-  const getDropZoneMessage = () => {
-    if (treeNodes.length === 0) {
-      return "Drag a SUMMARY code here from the left panel to start building your hierarchy root.";
-    }
-    if (!selectedParentNodeId) {
-      return "Select a summary node from the tree to add children, or drag another SUMMARY code here to create a new root.";
-    }
-    const selectedNodeName = selectedParentNodeDetails ? `${selectedParentNodeDetails.segmentCode.code} - ${selectedParentNodeDetails.segmentCode.description}` : 'the selected parent';
-    return `Drag codes here to add as children to "${selectedNodeName}". You can also drag a new SUMMARY code to start another root.`;
-  };
-
+  const availableSegmentsForAdding = allGlobalSegments.filter(
+    seg => !segmentHierarchiesInSet.some(sh => sh.segmentId === seg.id)
+  );
 
   return (
     <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-primary">
-          {isEditMode ? 'Edit Hierarchy for: ' : 'Create Hierarchy for: '} {selectedSegment.displayName}
+        <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center">
+           <Workflow className="mr-3 h-7 w-7" />
+          {isEditMode ? 'Edit Hierarchy Set' : 'Create New Hierarchy Set'}
         </h1>
       </header>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Hierarchy Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <FormField
-                  control={form.control}
-                  name="hierarchyName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Hierarchy Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Main Reporting Hierarchy" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Hierarchy Set Details</CardTitle>
+              <CardDescription>Define the general properties for this collection of hierarchies.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Set Name *</FormLabel>
+                    <FormControl><Input placeholder="e.g., GASB Reporting Structure, FY25 Budget Rollup" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl><Textarea placeholder="Optional: Purpose of this hierarchy set" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
                   control={form.control}
                   name="status"
@@ -561,11 +565,7 @@ export default function HierarchyBuildPage() {
                     <FormItem>
                       <FormLabel>Status *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                        </FormControl>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="Active">Active</SelectItem>
                           <SelectItem value="Inactive">Inactive</SelectItem>
@@ -576,196 +576,227 @@ export default function HierarchyBuildPage() {
                     </FormItem>
                   )}
                 />
-                 <div className="space-y-2">
-                    <Label>Segment</Label>
-                    <Input value={selectedSegment.displayName} disabled />
-                  </div>
-              </div>
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Optional: Describe the purpose of this hierarchy"
-                        className="resize-none"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-[500px]">
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle>Available Codes for {selectedSegment.displayName}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col p-0 overflow-y-auto">
-            <div className="p-4 border-b shrink-0">
-              <Input
-                placeholder="Search codes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={!selectedSegment}
-              />
-            </div>
-            <div className="flex flex-col"> 
-              <div className="px-4 pt-4 pb-2">
-                <h4 className="text-md font-semibold mb-2 text-muted-foreground">Summary Codes (Parents)</h4>
-              </div>
-              <ScrollArea className="px-4 max-h-48 min-h-0">
-                {availableSummaryCodes.length > 0 ? (
-                  availableSummaryCodes.map(code => (
-                    <div
-                      key={code.id}
-                      draggable="true"
-                      onDragStart={(e) => handleDragStart(e, code)}
-                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
-                    >
-                      <GripVertical className="h-5 w-5 mr-3 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-grow">
-                        <div className="font-semibold text-sm">{code.code}</div>
-                        <div className="text-xs text-muted-foreground">{code.description}</div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                   <p className="text-sm text-muted-foreground px-2 py-1">
-                    {searchTerm ? 'No matching summary codes found.' : 'No summary codes available.'}
-                  </p>
-                )}
-              </ScrollArea>
-               <div className="px-4 pt-4 pb-2 border-t"> 
-                <h4 className="text-md font-semibold mb-2 text-muted-foreground">Detail Codes (Children)</h4>
-              </div>
-              <ScrollArea className="px-4 pb-1 max-h-48 min-h-0">
-                 {availableDetailCodes.length > 0 ? (
-                  availableDetailCodes.map(code => (
-                     <div
-                      key={code.id}
-                      draggable="true"
-                      onDragStart={(e) => handleDragStart(e, code)}
-                      className="flex items-center p-2 mb-1 border rounded-md hover:bg-accent cursor-grab active:cursor-grabbing"
-                    >
-                      <GripVertical className="h-5 w-5 mr-3 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-grow">
-                        <div className="font-semibold text-sm">{code.code}</div>
-                        <div className="text-xs text-muted-foreground">{code.description}</div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground px-2 py-1">
-                     {searchTerm ? 'No matching detail codes found.' : 'No detail codes available.'}
-                  </p>
-                )}
-              </ScrollArea>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-            className="lg:col-span-2 flex flex-col"
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-        >
-          <CardHeader>
-            <CardTitle>Hierarchy Structure</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col overflow-hidden p-6 bg-slate-50">
-            {selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
-              <Card className="mb-4 p-4 shadow shrink-0"> 
-                <h3 className="text-lg font-semibold mb-2 text-primary">
-                  Add Codes to Parent: {selectedParentNodeDetails.segmentCode.code} - {selectedParentNodeDetails.segmentCode.description}
-                </h3>
-                <div className="flex items-end gap-2 mb-2">
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="rangeStartCode">Start Code</Label>
-                    <Input
-                      id="rangeStartCode"
-                      placeholder="Enter start code"
-                      value={rangeStartCode}
-                      onChange={(e) => setRangeStartCode(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="rangeEndCode">End Code</Label>
-                    <Input
-                      id="rangeEndCode"
-                      placeholder="Enter end code"
-                      value={rangeEndCode}
-                      onChange={(e) => setRangeEndCode(e.target.value)}
-                    />
-                  </div>
-                  <Button onClick={handleAddRangeToParent} className="h-10">Add Range</Button>
-                </div>
-                 <p className="text-xs text-muted-foreground">
-                  Enter existing codes from the 'Available Codes' panel. Codes within the range (inclusive, sorted alphanumerically) will be added.
-                </p>
-              </Card>
-            )}
-
-            <ScrollArea className="flex-1 min-h-0">
-              {treeNodes.length === 0 ? (
-                <div className="text-center text-muted-foreground h-full flex flex-col items-center justify-center py-10">
-                  <FolderTree className="w-16 h-16 text-slate-400 mb-4" />
-                  <p className="text-lg mb-2">{getDropZoneMessage()}</p>
-                  <p className="text-sm">(Only SUMMARY codes can be parents. Click a summary node in the tree to select it as the parent for new children.)</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {treeNodes.map((rootNode) => (
-                    <TreeNodeDisplay
-                      key={rootNode.id}
-                      node={rootNode}
-                      level={0}
-                      selectedParentNodeId={selectedParentNodeId}
-                      onSelectParent={handleSelectParent}
-                      onRemoveNode={handleRemoveNode}
-                    />
-                  ))}
-                  {selectedParentNodeId && treeNodes.length > 0 && selectedParentNodeDetails && !selectedParentNodeDetails.segmentCode.summaryIndicator && (
-                     <div className="mt-4 p-3 border border-dashed border-destructive rounded-md bg-red-50/70 text-center text-sm text-destructive flex items-center justify-center">
-                        <AlertTriangle className="h-4 w-4 mr-2"/>
-                        The selected node ('{selectedParentNodeDetails.segmentCode.code}') is a DETAIL code. You cannot add children to it. Please select a SUMMARY node.
-                    </div>
+                <FormField
+                  control={form.control}
+                  name="validFrom"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Valid From *</FormLabel>
+                      <DatePicker value={field.value} onValueChange={field.onChange} placeholder="Select start date" />
+                      <FormMessage />
+                    </FormItem>
                   )}
+                />
+                <FormField
+                  control={form.control}
+                  name="validTo"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Valid To</FormLabel>
+                      <DatePicker 
+                        value={field.value} 
+                        onValueChange={field.onChange} 
+                        placeholder="Optional: Select end date" 
+                        disableDates={(date) => {
+                            const validFrom = form.getValues("validFrom");
+                            return validFrom instanceof Date ? date < validFrom : false;
+                        }}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Segment Hierarchies in this Set</CardTitle>
+              <CardDescription>Define or edit the tree structure for each segment included in this Hierarchy Set.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-6 p-4 border rounded-md bg-muted/30">
+                <Label htmlFor="segmentToAdd">Add Segment to this Set</Label>
+                <div className="flex items-center space-x-2 mt-1">
+                  <Select value={segmentToAdd} onValueChange={setSegmentToAdd}>
+                    <SelectTrigger id="segmentToAdd" className="flex-grow">
+                      <SelectValue placeholder="Select a segment..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSegmentsForAdding.length > 0 ? (
+                        availableSegmentsForAdding.map(seg => (
+                          <SelectItem key={seg.id} value={seg.id}>{seg.displayName}</SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="none" disabled>All segments already added or no segments available.</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" onClick={handleAddSegmentToSet} disabled={!segmentToAdd || segmentToAdd === 'none'}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Segment
+                  </Button>
+                </div>
+                 {availableSegmentsForAdding.length === 0 && segmentHierarchiesInSet.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2">All available segments have been added to this set.</p>
+                )}
+              </div>
+
+              {segmentHierarchiesInSet.length === 0 ? (
+                <p className="text-center text-muted-foreground py-6">No segment hierarchies defined for this set yet. Add a segment above to begin.</p>
+              ) : (
+                <div className="space-y-4">
+                  {segmentHierarchiesInSet.map((sh) => {
+                    const segmentDetails = getSegmentById(sh.segmentId);
+                    const treeNodeCount = sh.treeNodes?.length || 0; // Basic count, could be recursive for all nodes
+                    return (
+                      <Card key={sh.id} className="shadow">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <CardTitle className="text-xl">{segmentDetails?.displayName || 'Unknown Segment'}</CardTitle>
+                          <div className="flex space-x-2">
+                            <Button variant="outline" size="sm" onClick={() => handleOpenTreeBuilderModal(sh)}>
+                              <Edit3 className="mr-2 h-4 w-4" /> Edit Tree
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleRemoveSegmentFromSet(sh.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" /> Remove
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground">
+                            {sh.description || `Hierarchy for ${segmentDetails?.displayName || 'this segment'}.`}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {treeNodeCount > 0 ? `${treeNodeCount} root node(s) defined.` : 'No tree structure defined yet.'}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
-            </ScrollArea>
-             {selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
-                <div className="mt-4 p-3 border border-dashed border-green-500 rounded-md bg-green-50/70 text-center text-sm text-green-700 shrink-0"> 
-                    New children will be added to parent: '{selectedParentNodeDetails.segmentCode.code} - {selectedParentNodeDetails.segmentCode.description}'. Drag and drop or use 'Add Range'.
-                </div>
-            )}
-             {!selectedParentNodeId && treeNodes.length > 0 && (
-                <div className="mt-4 p-3 border border-dashed border-blue-500 rounded-md bg-blue-50/70 text-center text-sm text-blue-700 shrink-0"> 
-                    No parent selected. Drag a new SUMMARY code to create another root, or click an existing SUMMARY node to select it as parent.
-                </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
 
-      <div className="mt-8 flex justify-end space-x-3">
-        <Button type="button" variant="outline" onClick={handleCancel}>
-          Cancel
-        </Button>
-        <Button type="button" variant="ghost" onClick={handleReset}>
-          Reset Hierarchy
-        </Button>
-        <Button type="button" onClick={form.handleSubmit(onSubmit)}>
-          {isEditMode ? 'Update Hierarchy' : 'Save Hierarchy'}
-        </Button>
-      </div>
+          <div className="mt-8 flex justify-end space-x-3">
+            <Button type="button" variant="outline" onClick={handleCancel}>Cancel</Button>
+            <Button type="submit">
+              {isEditMode ? 'Update Hierarchy Set' : 'Save Hierarchy Set'}
+            </Button>
+          </div>
+        </form>
+      </Form>
+
+      {/* Tree Builder Modal */}
+      <Dialog open={isTreeBuilderModalOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) { // Reset on close if not explicitly saved
+              setIsTreeBuilderModalOpen(false);
+              setEditingSegmentHierarchyConfig(null);
+          } else {
+              setIsTreeBuilderModalOpen(true);
+          }
+      }}>
+        <DialogContent className="max-w-5xl min-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Build Hierarchy for: {editingSegmentHierarchyConfig?.segmentName || 'Segment'}</DialogTitle>
+            <DialogDesc>Drag codes from the left panel to the structure on the right. Select summary codes in the tree to add children to them.</DialogDesc>
+          </DialogHeader>
+          
+          {editingSegmentHierarchyConfig && (
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden pt-2">
+              {/* Available Codes Panel */}
+              <Card className="flex flex-col">
+                <CardHeader className="pt-2 pb-2">
+                  <CardTitle className="text-lg">Available Codes: {editingSegmentHierarchyConfig.segmentName}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col p-0 overflow-y-auto">
+                  <div className="p-3 border-b shrink-0">
+                    <Input
+                      placeholder="Search codes..."
+                      value={modalSearchTerm}
+                      onChange={(e) => setModalSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col flex-1">
+                    <div className="px-3 pt-3 pb-1"><h4 className="text-md font-semibold text-muted-foreground">Summary Codes (Parents)</h4></div>
+                    <ScrollArea className="px-3 flex-1 min-h-0">
+                      {modalAvailableSummaryCodes.map(code => (
+                        <div key={code.id} draggable onDragStart={(e) => handleModalDragStart(e, code)} className="flex items-center p-1.5 mb-1 border rounded-md hover:bg-accent cursor-grab">
+                          <GripVertical className="h-5 w-5 mr-2 text-muted-foreground shrink-0" />
+                          <div><div className="font-medium text-sm">{code.code}</div><div className="text-xs text-muted-foreground">{code.description}</div></div>
+                        </div>
+                      ))}
+                      {modalAvailableSummaryCodes.length === 0 && <p className="text-xs text-muted-foreground p-2">{modalSearchTerm ? 'No matching summary codes.' : 'No summary codes.'}</p>}
+                    </ScrollArea>
+                    <div className="px-3 pt-3 pb-1 border-t"><h4 className="text-md font-semibold text-muted-foreground">Detail Codes (Children)</h4></div>
+                    <ScrollArea className="px-3 pb-1 flex-1 min-h-0">
+                      {modalAvailableDetailCodes.map(code => (
+                        <div key={code.id} draggable onDragStart={(e) => handleModalDragStart(e, code)} className="flex items-center p-1.5 mb-1 border rounded-md hover:bg-accent cursor-grab">
+                           <GripVertical className="h-5 w-5 mr-2 text-muted-foreground shrink-0" />
+                           <div><div className="font-medium text-sm">{code.code}</div><div className="text-xs text-muted-foreground">{code.description}</div></div>
+                        </div>
+                      ))}
+                      {modalAvailableDetailCodes.length === 0 && <p className="text-xs text-muted-foreground p-2">{modalSearchTerm ? 'No matching detail codes.' : 'No detail codes.'}</p>}
+                    </ScrollArea>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Hierarchy Structure Panel */}
+              <Card className="lg:col-span-2 flex flex-col" onDragOver={handleModalDragOver} onDrop={handleModalDrop}>
+                <CardHeader className="pt-2 pb-2">
+                  <CardTitle className="text-lg">Tree Structure</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col overflow-hidden p-3 bg-slate-50">
+                  {modalSelectedParentNodeDetails && modalSelectedParentNodeDetails.segmentCode.summaryIndicator && (
+                    <Card className="mb-3 p-3 shadow shrink-0">
+                      <h3 className="text-md font-semibold mb-1 text-primary">Add Codes to: {modalSelectedParentNodeDetails.segmentCode.code}</h3>
+                      <div className="flex items-end gap-2 mb-1">
+                        <div className="flex-1 space-y-1"><Label htmlFor="modalRangeStartCode" className="text-xs">Start Code</Label><Input id="modalRangeStartCode" value={modalRangeStartCode} onChange={(e) => setModalRangeStartCode(e.target.value)} className="h-8 text-xs" /></div>
+                        <div className="flex-1 space-y-1"><Label htmlFor="modalRangeEndCode" className="text-xs">End Code</Label><Input id="modalRangeEndCode" value={modalRangeEndCode} onChange={(e) => setModalRangeEndCode(e.target.value)} className="h-8 text-xs" /></div>
+                        <Button onClick={handleModalAddRangeToParent} size="sm" className="h-8">Add Range</Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Codes within range (inclusive) will be added.</p>
+                    </Card>
+                  )}
+                  <ScrollArea className="flex-1 min-h-0">
+                    {modalTreeNodes.length === 0 ? (
+                      <div className="text-center text-muted-foreground h-full flex flex-col items-center justify-center py-6">
+                        <FolderTree className="w-12 h-12 text-slate-400 mb-3" />
+                        <p className="text-md mb-1">{getModalDropZoneMessage()}</p>
+                        <p className="text-xs">(Only SUMMARY codes can be parents.)</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {modalTreeNodes.map((rootNode) => (
+                          <TreeNodeDisplay key={rootNode.id} node={rootNode} level={0} selectedParentNodeId={modalSelectedParentNodeId} onSelectParent={handleModalSelectParent} onRemoveNode={handleModalRemoveNode} />
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                  {modalSelectedParentNodeDetails && modalSelectedParentNodeDetails.segmentCode.summaryIndicator && (
+                      <div className="mt-2 p-2 border border-dashed border-green-500 rounded-md bg-green-50/70 text-center text-xs text-green-700 shrink-0"> 
+                          Adding to: '{modalSelectedParentNodeDetails.segmentCode.code}'. Drag/drop or use 'Add Range'.
+                      </div>
+                  )}
+                  {!modalSelectedParentNodeId && modalTreeNodes.length > 0 && (
+                      <div className="mt-2 p-2 border border-dashed border-blue-500 rounded-md bg-blue-50/70 text-center text-xs text-blue-700 shrink-0"> 
+                          No parent selected. Drag new SUMMARY code for another root, or click existing SUMMARY node.
+                      </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          <DialogFooter className="pt-4">
+            <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+            <Button type="button" onClick={handleSaveSegmentTree}>Save Tree Structure</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+
+    
