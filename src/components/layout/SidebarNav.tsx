@@ -34,6 +34,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub as RadixDropdownMenuSub, // Alias to avoid conflict
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SheetTitle } from '@/components/ui/sheet'; // For accessibility
@@ -46,33 +49,81 @@ export function SidebarNav({ className }: SidebarNavProps) {
   const { state: sidebarState, toggleSidebar, isMobile } = useSidebar();
   const pathname = usePathname();
 
-  const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false) => {
+  const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false): React.ReactNode[] => {
     return items.map((item, index) => {
+      // Case 1: Label item (no href, no children)
       if (!item.href && !item.children) {
-        if (isSubmenu) {
+        if (isSubmenu && sidebarState === 'collapsed' && !isMobile) { // Context of a dropdown sub-menu
           return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{item.title}</DropdownMenuItem>;
         }
+        // For Accordion or top-level menu
         return (
-          <SidebarMenuItem key={`${item.title}-${index}-span`} className="px-2 py-1.5 text-sm text-muted-foreground">
+          <SidebarMenuItem key={`${item.title}-${index}-label`} className="px-2 py-1.5 text-sm text-muted-foreground">
             {item.icon && <span className="mr-2 w-5 h-5 inline-flex items-center justify-center">{item.icon}</span>}
             <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
           </SidebarMenuItem>
         );
       }
 
+      // Case 2: Item with children (potential parent for submenu)
       if (item.children && item.children.length > 0) {
         // Collapsed Desktop View: Use DropdownMenu
         if (sidebarState === 'collapsed' && !isMobile) {
+          // Check if any child also has children for multi-level dropdown
+          const hasGrandChildren = item.children.some(child => child.children && child.children.length > 0);
+
+          if (hasGrandChildren && !isSubmenu) { // Top-level item opening a sub-menu with further nesting
+             return (
+              <SidebarMenuItem key={`${item.title}-${index}-main-dd-sub`}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton tooltip={item.title} aria-label={item.title} disabled={item.disabled} className="w-full">
+                      {item.icon && <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                      <span className="sr-only">{item.title}</span>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="start" className="ml-1 w-56">
+                     {item.children.map((child, childIndex) => {
+                        if (child.children && child.children.length > 0) {
+                           return (
+                            <RadixDropdownMenuSub key={`${child.title}-${childIndex}-dd-sub`}>
+                              <DropdownMenuSubTrigger disabled={child.disabled}>
+                                {child.icon && <span className="mr-2 w-5 h-5">{child.icon}</span>}
+                                <span>{child.title}</span>
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                {child.children.map((grandChild, grandChildIndex) => (
+                                  <DropdownMenuItem key={`${grandChild.title}-${grandChildIndex}-dd-grandchild`} asChild disabled={grandChild.disabled}>
+                                    <Link href={grandChild.href || '#'} className={cn(grandChild.disabled && "pointer-events-none opacity-60")}>
+                                      {grandChild.icon && <span className="mr-2 w-5 h-5">{grandChild.icon}</span>}
+                                      {grandChild.title}
+                                    </Link>
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuSubContent>
+                            </RadixDropdownMenuSub>
+                           );
+                        }
+                        return (
+                          <DropdownMenuItem key={`${child.title}-${childIndex}-dd-child`} asChild disabled={child.disabled}>
+                            <Link href={child.href || '#'} className={cn(child.disabled && "pointer-events-none opacity-60")}>
+                              {child.icon && <span className="mr-2 w-5 h-5">{child.icon}</span>}
+                              {child.title}
+                            </Link>
+                          </DropdownMenuItem>
+                        );
+                     })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
+            );
+          }
+          // Standard single-level dropdown for items in a collapsed sidebar
           return (
             <SidebarMenuItem key={`${item.title}-${index}-dd`}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    aria-label={item.title}
-                    disabled={item.disabled}
-                    className="w-full"
-                  >
+                  <SidebarMenuButton tooltip={item.title} aria-label={item.title} disabled={item.disabled} className="w-full">
                     {item.icon && <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>}
                     <span className="sr-only">{item.title}</span>
                   </SidebarMenuButton>
@@ -104,32 +155,19 @@ export function SidebarNav({ className }: SidebarNavProps) {
                     disabled={item.disabled}
                     className={cn(
                       sidebarMenuButtonVariants({variant: "default", size: "default"}),
-                      "!hover:no-underline !py-2 !px-2 !h-8", // Overrides for AccordionTrigger default
+                      "!hover:no-underline !py-2 !px-2 !h-8",
                       "justify-between group-data-[collapsible=icon]:justify-center"
                     )}
                   >
-                     <span className="flex items-center gap-2"> {/* Wrapper for icon and title */}
+                     <span className="flex items-center gap-2">
                         {item.icon && <span className="w-5 h-5 flex items-center justify-center shrink-0">{item.icon}</span>}
                         <span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>
                       </span>
                   </AccordionTrigger>
                   <AccordionContent className="pb-0 group-data-[collapsible=icon]:hidden">
                     <SidebarMenuSub>
-                      {item.children.map((child, childIndex) => (
-                        <SidebarMenuSubItem key={`${child.title}-${childIndex}-acc-child`}>
-                          <Link href={child.href || '#'} legacyBehavior passHref>
-                            <SidebarMenuSubButton
-                              isActive={pathname === child.href}
-                              disabled={child.disabled}
-                              aria-disabled={child.disabled}
-                              tabIndex={child.disabled ? -1 : undefined}
-                            >
-                              {child.icon && <span className="mr-2 w-5 h-5 flex items-center justify-center">{child.icon}</span>}
-                              {child.title}
-                            </SidebarMenuSubButton>
-                          </Link>
-                        </SidebarMenuSubItem>
-                      ))}
+                      {/* Recursive call to renderNavItems for children */}
+                      {renderNavItems(item.children, true)}
                     </SidebarMenuSub>
                   </AccordionContent>
                 </AccordionItem>
@@ -138,23 +176,43 @@ export function SidebarNav({ className }: SidebarNavProps) {
           );
         }
       } else {
-        // Regular link item
-        return (
-          <SidebarMenuItem key={`${item.title}-${index}-link`}>
-            <Link href={item.href || '#'} legacyBehavior passHref>
-              <SidebarMenuButton
-                tooltip={item.title}
-                aria-label={item.title}
-                isActive={pathname === item.href}
-                disabled={item.disabled}
-                className="w-full"
-              >
-                {item.icon && <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>}
-                <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-              </SidebarMenuButton>
-            </Link>
-          </SidebarMenuItem>
-        );
+        // Case 3: Regular link item (leaf node)
+        if (isSubmenu) {
+          // Rendered inside a SidebarMenuSub (Accordion context)
+          return (
+            <SidebarMenuSubItem key={`${item.title}-${index}-sublink`}>
+              <Link href={item.href || '#'} legacyBehavior passHref>
+                <SidebarMenuSubButton
+                  isActive={pathname === item.href}
+                  disabled={item.disabled}
+                  aria-disabled={item.disabled}
+                  tabIndex={item.disabled ? -1 : undefined}
+                >
+                  {item.icon && <span className="mr-2 w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                  {item.title}
+                </SidebarMenuSubButton>
+              </Link>
+            </SidebarMenuSubItem>
+          );
+        } else {
+          // Rendered directly in SidebarMenu (top-level or mobile sheet)
+          return (
+            <SidebarMenuItem key={`${item.title}-${index}-link`}>
+              <Link href={item.href || '#'} legacyBehavior passHref>
+                <SidebarMenuButton
+                  tooltip={item.title}
+                  aria-label={item.title}
+                  isActive={pathname === item.href}
+                  disabled={item.disabled}
+                  className="w-full"
+                >
+                  {item.icon && <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                  <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+          );
+        }
       }
     });
   };
@@ -163,7 +221,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
   if (isMobile) {
     return (
       <>
-        {/* SheetTitle is crucial for accessibility for Radix Dialog (used by Sheet) */}
         <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
         <SidebarHeader className="p-2 border-b border-sidebar-border">
            <div className="flex items-center gap-2 px-2 py-2">
@@ -203,7 +260,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
       side="left"
     >
       <SidebarHeader className="p-2 border-b border-sidebar-border flex flex-col items-center">
-        {/* Unified Logo/Toggler Button for Desktop */}
         <Button
           variant="ghost"
           className={cn(
@@ -218,13 +274,11 @@ export function SidebarNav({ className }: SidebarNavProps) {
           <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded shrink-0">
             F
           </span>
-          {/* Text part is hidden by group-data CSS when sidebar is collapsed */}
           <div className="group-data-[collapsible=icon]:hidden text-left">
             <span className="font-semibold text-lg text-primary">Financial</span>
             <span className="text-xs block text-muted-foreground">by OpenGov</span>
           </div>
         </Button>
-        {/* SidebarTrigger (hamburger icon) removed from here for desktop */}
       </SidebarHeader>
 
       <SidebarContent className="p-0">
