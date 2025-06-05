@@ -58,7 +58,8 @@ export default function AccountAccessControlPage() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
+    // Removed p-4/sm:p-6/lg:p-8, min-h-screen, bg-background. Added w-full, max-w-6xl, mx-auto.
+    <div className="w-full max-w-6xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6 flex justify-between items-center">
         <div>

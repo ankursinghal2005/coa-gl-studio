@@ -285,12 +285,14 @@ export default function SegmentCodesPage() {
 
   const isFieldDisabled = dialogMode === 'view';
 
+  // Retaining current root structure as it's a multi-pane layout.
+  // Padding for breadcrumbs moved inside the initial div for better control with this specific layout.
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <div className="p-4 sm:p-8">
+    <div className="flex flex-col h-full"> {/* Use h-full to work with layout's flex */}
+      <div className="p-0 md:px-0 lg:px-0"> {/* Adjusted padding for breadcrumbs to be inside scrollable area potentially */}
          <Breadcrumbs items={breadcrumbItems} />
       </div>
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden"> {/* This flex-1 makes this part take remaining height */}
         <aside className="w-1/4 min-w-[200px] max-w-[300px] border-r bg-card p-4 space-y-2 overflow-y-auto">
           <h2 className="text-lg font-semibold mb-3 text-primary flex items-center">
             <ListFilter className="mr-2 h-5 w-5" /> Segments

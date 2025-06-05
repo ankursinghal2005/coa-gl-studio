@@ -58,8 +58,8 @@ export default function HomePage() {
   const breadcrumbItems = [{ label: 'COA Configuration' }];
 
   return (
-    <main className="flex flex-col items-center justify-start min-h-screen p-4 py-8 sm:p-8 bg-background">
-      <div className="w-full max-w-5xl">
+    // Removed min-h-screen, p-4/py-8, bg-background. Added w-full, max-w-5xl, mx-auto.
+    <div className="w-full max-w-5xl mx-auto">
         <Breadcrumbs items={breadcrumbItems} />
         <header className="mb-10 sm:mb-16 text-center">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-primary">
@@ -82,7 +82,6 @@ export default function HomePage() {
             />
           ))}
         </div>
-      </div>
-    </main>
+    </div>
   );
 }

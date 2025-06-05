@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react'; // Added useState
+import React, { useState } from 'react'; 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -20,13 +20,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PlusCircle, Eye, Edit2, Trash2, MoreHorizontal } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Added CardDescription
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; 
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCombinationRules } from '@/contexts/CombinationRulesContext';
 import { useSegments } from '@/contexts/SegmentsContext';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'; // Added imports
-import { Label } from '@/components/ui/label'; // Added imports
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'; 
+import { Label } from '@/components/ui/label'; 
 
 export default function CombinationRulesPage() {
   const router = useRouter();
@@ -57,7 +57,8 @@ export default function CombinationRulesPage() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
+    // Removed p-4/sm:p-6/lg:p-8, min-h-screen, bg-background. Added w-full, max-w-6xl, mx-auto.
+    <div className="w-full max-w-6xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6 flex justify-between items-center">
         <div>

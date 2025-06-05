@@ -352,8 +352,8 @@ export default function SegmentsPage() {
 
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen p-4 py-8 sm:p-8 bg-background">
-      <div className="w-full max-w-4xl">
+    // Removed p-4/py-8, min-h-screen, bg-background. Added w-full, max-w-4xl, mx-auto.
+    <div className="w-full max-w-4xl mx-auto">
         <Breadcrumbs items={breadcrumbItems} />
         <header className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-primary">Manage Segments</h1>
@@ -937,9 +937,6 @@ export default function SegmentsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
-
-    

@@ -64,9 +64,8 @@ const accessControlRuleFormSchema = z.object({
 
 type AccessControlRuleFormValues = z.infer<typeof accessControlRuleFormSchema>;
 
-// Initial state for the restriction dialog form
 const initialRestrictionDialogState = {
-  id: '', // Will be set if editing
+  id: '', 
   description: '',
   accessType: 'Read-Only' as AccessControlAccessType,
   segmentCriteria: [] as SegmentCriterion[],
@@ -168,7 +167,6 @@ export default function AccountAccessControlBuildPage() {
     { label: isEditMode ? 'Edit Rule' : 'Create Rule' },
   ];
 
-  // Restriction Dialog Logic
   const handleOpenRestrictionDialog = (restrictionId?: string) => {
     if (restrictionId) {
       const restrictionToEdit = restrictions.find(r => r.id === restrictionId);
@@ -177,11 +175,10 @@ export default function AccountAccessControlBuildPage() {
           id: restrictionToEdit.id,
           description: restrictionToEdit.description || '',
           accessType: restrictionToEdit.accessType,
-          segmentCriteria: restrictionToEdit.segmentCriteria.map(sc => ({...sc})), // Deep copy
+          segmentCriteria: restrictionToEdit.segmentCriteria.map(sc => ({...sc})), 
         });
         setEditingRestrictionId(restrictionId);
       } else {
-        // Should not happen if IDs are correct
         setRestrictionDialogState(initialRestrictionDialogState);
         setEditingRestrictionId(null);
       }
@@ -202,7 +199,6 @@ export default function AccountAccessControlBuildPage() {
       const criterionToUpdate = { ...updatedCriteria[criterionIndex] };
       (criterionToUpdate as any)[field] = value;
       
-      // Reset specific values if criterionType changes
       if (field === 'criterionType') {
         criterionToUpdate.codeValue = '';
         criterionToUpdate.rangeStartValue = '';
@@ -298,7 +294,8 @@ export default function AccountAccessControlBuildPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
+    // Removed p-4/sm:p-6/lg:p-8, min-h-screen, bg-background. Added w-full, max-w-5xl, mx-auto.
+    <div className="w-full max-w-5xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-primary">

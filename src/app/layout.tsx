@@ -9,7 +9,7 @@ import { HierarchiesProvider } from '@/contexts/HierarchiesContext';
 import { CombinationRulesProvider } from '@/contexts/CombinationRulesContext';
 import { AccountAccessControlProvider } from '@/contexts/AccountAccessControlContext';
 import { SidebarNav } from '@/components/layout/SidebarNav';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'; // Import SidebarProvider and SidebarTrigger
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'; 
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -37,23 +37,19 @@ export default function RootLayout({
           <HierarchiesProvider>
             <CombinationRulesProvider>
               <AccountAccessControlProvider>
-                <SidebarProvider> {/* Wrap with SidebarProvider */}
-                  <div className="relative flex min-h-screen flex-col md:flex-row group/sidebar-wrapper"> {/* Added group class */}
+                <SidebarProvider> 
+                  <div className="relative flex min-h-screen flex-col md:flex-row group/sidebar-wrapper"> 
                     <SidebarNav />
                     
-                    {/* Main content area */}
-                    <main className="flex flex-1 flex-col peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow"> {/* Adjusted for sidebar inset variant if used */}
-                      {/* Header for main content area - includes sidebar trigger */}
+                    <main className="flex flex-1 flex-col peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow">
                       <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-                        <SidebarTrigger className="md:hidden" /> {/* Mobile trigger */}
-                        {/* Desktop trigger can be placed here or inside SidebarNav header */}
-                        {/* <SidebarTrigger className="hidden md:flex" />  */}
-                        {/* Page title or other header content can go here */}
+                        <SidebarTrigger className="md:hidden" /> 
                         <div className="flex-1 text-center md:text-left">
-                           {/* App title removed from here as it's in sidebar header often */}
+                           {/* Removed fixed title here; handled by SidebarNav or individual pages */}
                         </div>
                       </header>
-                      <div className="flex-1 p-4 md:p-6 lg:p-8">
+                      {/* Added overflow-y-auto and h-full to ensure this area scrolls if content is too tall */}
+                      <div className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto h-full">
                         {children}
                       </div>
                     </main>

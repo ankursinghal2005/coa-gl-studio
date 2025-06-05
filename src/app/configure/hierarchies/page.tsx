@@ -4,7 +4,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { format } from 'date-fns'; // Import format
+import { format } from 'date-fns'; 
 import {
   Table,
   TableHeader,
@@ -32,11 +32,10 @@ export default function HierarchySetsPage() {
   const router = useRouter();
 
   const handleCreateHierarchySet = () => {
-    router.push(`/configure/hierarchies/build`); // Navigate to build page for a new set
+    router.push(`/configure/hierarchies/build`); 
   };
 
   const handleViewHierarchySet = (set: HierarchySet) => {
-    // For now, view will be same as edit. Can be a dedicated read-only page later.
     router.push(`/configure/hierarchies/build?hierarchySetId=${set.id}`);
   };
 
@@ -57,7 +56,8 @@ export default function HierarchySetsPage() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
+    // Removed p-4/sm:p-6/lg:p-8, min-h-screen, bg-background. Added w-full, max-w-6xl, mx-auto.
+    <div className="w-full max-w-6xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6 flex justify-between items-center">
         <div>
@@ -109,14 +109,14 @@ export default function HierarchySetsPage() {
                       </TableCell>
                       <TableCell>{set.status}</TableCell>
                       <TableCell>
-                        {set.validFrom ? format(set.validFrom, 'MM/dd/yyyy') : 'N/A'}
+                        {set.validFrom ? format(new Date(set.validFrom), 'MM/dd/yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        {set.validTo ? format(set.validTo, 'MM/dd/yyyy') : 'N/A'}
+                        {set.validTo ? format(new Date(set.validTo), 'MM/dd/yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
                         {set.lastModifiedDate
-                          ? `${format(set.lastModifiedDate, 'MM/dd/yyyy')} by ${set.lastModifiedBy || 'Unknown'}`
+                          ? `${format(new Date(set.lastModifiedDate), 'MM/dd/yyyy')} by ${set.lastModifiedBy || 'Unknown'}`
                           : 'N/A'}
                       </TableCell>
                       <TableCell className="text-center">
@@ -158,4 +158,3 @@ export default function HierarchySetsPage() {
     </div>
   );
 }
-

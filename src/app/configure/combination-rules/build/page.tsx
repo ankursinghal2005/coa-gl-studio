@@ -146,7 +146,7 @@ export default function CombinationRuleBuildPage() {
     } else {
         setIsEditMode(false);
         setCurrentRuleId(null);
-        form.reset(); // Ensure form is clean for new rule
+        form.reset(); 
         setMappingEntries([]);
     }
   }, [ruleIdQueryParam, getCombinationRuleById, form, router]);
@@ -198,7 +198,7 @@ export default function CombinationRuleBuildPage() {
   ];
 
   const handleOpenAddMappingEntryDialog = () => {
-    setMappingEntryFormState(initialMappingEntryFormState); // Reset dialog form
+    setMappingEntryFormState(initialMappingEntryFormState); 
     setIsMappingEntryDialogOpen(true);
   };
 
@@ -265,7 +265,8 @@ export default function CombinationRuleBuildPage() {
 
 
   return (
-    <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
+    // Removed p-4/sm:p-6/lg:p-8, min-h-screen, bg-background. Added w-full, max-w-5xl, mx-auto.
+    <div className="w-full max-w-5xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-primary">
@@ -309,7 +310,7 @@ export default function CombinationRuleBuildPage() {
                           }
                         }} 
                         value={field.value}
-                        disabled={isEditMode && mappingEntries.length > 0} // Disable if editing and mappings exist
+                        disabled={isEditMode && mappingEntries.length > 0} 
                       >
                         <FormControl>
                           <SelectTrigger>

@@ -31,7 +31,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription as DialogDesc, // Renamed to avoid conflict with FormDescription
+  DialogDescription as DialogDesc, 
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
@@ -67,7 +67,6 @@ const hierarchySetFormSchema = z.object({
 
 type HierarchySetFormValues = z.infer<typeof hierarchySetFormSchema>;
 
-// --- Tree Node Helper Functions (to be used in modal) ---
 const codeExistsInTree = (nodes: HierarchyNode[], codeId: string): boolean => {
   for (const node of nodes) {
     if (node.segmentCode.id === codeId) return true;
@@ -130,9 +129,7 @@ const removeNodeFromTreeRecursive = (nodes: HierarchyNode[], idToRemove: string)
       return node;
     });
 };
-// --- End Tree Node Helper Functions ---
 
-// --- TreeNodeDisplay Component (to be used in modal) ---
 const TreeNodeDisplay: React.FC<{
   node: HierarchyNode;
   level: number;
@@ -198,7 +195,6 @@ const TreeNodeDisplay: React.FC<{
     </div>
   );
 };
-// --- End TreeNodeDisplay Component ---
 
 
 export default function HierarchySetBuildPage() {
@@ -212,13 +208,11 @@ export default function HierarchySetBuildPage() {
   const [isEditMode, setIsEditMode] = useState<boolean>(!!hierarchySetIdQueryParam);
 
   const [segmentHierarchiesInSet, setSegmentHierarchiesInSet] = useState<SegmentHierarchyInSet[]>([]);
-  const [segmentToAdd, setSegmentToAdd] = useState<string>(''); // ID of segment to add to the set
+  const [segmentToAdd, setSegmentToAdd] = useState<string>('');
 
-  // Modal State
   const [isTreeBuilderModalOpen, setIsTreeBuilderModalOpen] = useState(false);
   const [editingSegmentHierarchyConfig, setEditingSegmentHierarchyConfig] = useState<{ segmentId: string; segmentName: string; initialTreeNodes: HierarchyNode[] } | null>(null);
   
-  // Tree Builder Modal - Specific State
   const [modalTreeNodes, setModalTreeNodes] = useState<HierarchyNode[]>([]);
   const [modalSelectedParentNodeId, setModalSelectedParentNodeId] = useState<string | null>(null);
   const [modalSearchTerm, setModalSearchTerm] = useState('');
@@ -258,14 +252,12 @@ export default function HierarchySetBuildPage() {
       } else {
         alert("Hierarchy Set not found. Starting new set.");
         router.replace('/configure/hierarchies/build');
-        // Reset to new set state
         setIsEditMode(false);
         setCurrentHierarchySetId(null);
         form.reset();
         setSegmentHierarchiesInSet([]);
       }
     } else {
-      // New set mode
       setIsEditMode(false);
       setCurrentHierarchySetId(null);
       form.reset();
@@ -288,7 +280,7 @@ export default function HierarchySetBuildPage() {
       validTo: values.validTo,
       segmentHierarchies: segmentHierarchiesInSet,
       lastModifiedDate: new Date(),
-      lastModifiedBy: "Current User", // Placeholder
+      lastModifiedBy: "Current User", 
     };
 
     if (isEditMode && currentHierarchySetId) {
@@ -320,7 +312,7 @@ export default function HierarchySetBuildPage() {
       treeNodes: [],
     };
     setSegmentHierarchiesInSet(prev => [...prev, newSegmentHierarchy]);
-    setSegmentToAdd(''); // Reset select
+    setSegmentToAdd(''); 
   };
 
   const handleRemoveSegmentFromSet = (segmentHierarchyIdToRemove: string) => {
@@ -338,9 +330,9 @@ export default function HierarchySetBuildPage() {
     setEditingSegmentHierarchyConfig({
       segmentId: segmentHierarchy.segmentId,
       segmentName: segment.displayName,
-      initialTreeNodes: JSON.parse(JSON.stringify(segmentHierarchy.treeNodes || [])), // Deep copy
+      initialTreeNodes: JSON.parse(JSON.stringify(segmentHierarchy.treeNodes || [])), 
     });
-    setModalTreeNodes(JSON.parse(JSON.stringify(segmentHierarchy.treeNodes || []))); // Deep copy for modal editing
+    setModalTreeNodes(JSON.parse(JSON.stringify(segmentHierarchy.treeNodes || []))); 
     setIsTreeBuilderModalOpen(true);
   };
 
@@ -358,7 +350,6 @@ export default function HierarchySetBuildPage() {
     setEditingSegmentHierarchyConfig(null);
   };
 
-  // --- Modal Tree Builder Logic ---
   useEffect(() => {
     if (isTreeBuilderModalOpen && editingSegmentHierarchyConfig) {
         const segment = getSegmentById(editingSegmentHierarchyConfig.segmentId);
@@ -370,7 +361,6 @@ export default function HierarchySetBuildPage() {
             setModalAllSegmentCodes([]);
         }
     } else {
-        // Reset modal specific states when closed or no config
         setModalSearchTerm('');
         setModalSelectedParentNodeId(null);
         setModalRangeStartCode('');
@@ -379,7 +369,7 @@ export default function HierarchySetBuildPage() {
     }
   }, [isTreeBuilderModalOpen, editingSegmentHierarchyConfig, getSegmentById]);
 
-  useEffect(() => { // Effect for filtering codes in modal based on search term
+  useEffect(() => { 
     if (modalAllSegmentCodes.length > 0) {
         const filteredCodes = modalSearchTerm
           ? modalAllSegmentCodes.filter(
@@ -483,12 +473,11 @@ export default function HierarchySetBuildPage() {
       if (codeExistsInTree(currentTree, code.id)) { skippedExisting.push(code.code); return; }
       const newNode: HierarchyNode = { id: crypto.randomUUID(), segmentCode: code, children: [] };
       
-      // Simulate add and check if successful (addChildToNode shows alerts for some failures)
       const tempTree = addChildToNode(currentTree, modalSelectedParentNodeId, newNode);
-      if (JSON.stringify(tempTree) !== JSON.stringify(currentTree)) { // Crude check for actual addition
+      if (JSON.stringify(tempTree) !== JSON.stringify(currentTree)) { 
           currentTree = tempTree;
           addedCount++;
-      } else if (!skippedExisting.includes(code.code)) { // If not added and not already skipped for existence
+      } else if (!skippedExisting.includes(code.code)) { 
           skippedExisting.push(code.code + " (parent type restriction or already child)");
       }
     });
@@ -505,7 +494,6 @@ export default function HierarchySetBuildPage() {
     const selectedNodeName = modalSelectedParentNodeDetails ? `${modalSelectedParentNodeDetails.segmentCode.code}` : 'the selected parent';
     return `Drag codes here to add as children to "${selectedNodeName}".`;
   };
-  // --- End Modal Tree Builder Logic ---
 
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
@@ -518,7 +506,8 @@ export default function HierarchySetBuildPage() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 bg-background">
+    // Removed p-4/sm:p-6/lg:p-8, min-h-screen, bg-background. Added w-full, max-w-7xl, mx-auto.
+    <div className="w-full max-w-7xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center">
@@ -562,7 +551,7 @@ export default function HierarchySetBuildPage() {
                   control={form.control}
                   name="status"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem className="flex flex-col"> {/* Ensure vertical stacking */}
                       <FormLabel>Status *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
@@ -648,7 +637,7 @@ export default function HierarchySetBuildPage() {
                 <div className="space-y-4">
                   {segmentHierarchiesInSet.map((sh) => {
                     const segmentDetails = getSegmentById(sh.segmentId);
-                    const treeNodeCount = sh.treeNodes?.length || 0; // Basic count, could be recursive for all nodes
+                    const treeNodeCount = sh.treeNodes?.length || 0; 
                     return (
                       <Card key={sh.id} className="shadow">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -687,9 +676,8 @@ export default function HierarchySetBuildPage() {
         </form>
       </Form>
 
-      {/* Tree Builder Modal */}
       <Dialog open={isTreeBuilderModalOpen} onOpenChange={(isOpen) => {
-          if (!isOpen) { // Reset on close if not explicitly saved
+          if (!isOpen) { 
               setIsTreeBuilderModalOpen(false);
               setEditingSegmentHierarchyConfig(null);
           } else {
@@ -704,7 +692,6 @@ export default function HierarchySetBuildPage() {
           
           {editingSegmentHierarchyConfig && (
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden pt-2">
-              {/* Available Codes Panel */}
               <Card className="flex flex-col">
                 <CardHeader className="pt-2 pb-2">
                   <CardTitle className="text-lg">Available Codes: {editingSegmentHierarchyConfig.segmentName}</CardTitle>
@@ -742,7 +729,6 @@ export default function HierarchySetBuildPage() {
                 </CardContent>
               </Card>
 
-              {/* Hierarchy Structure Panel */}
               <Card className="lg:col-span-2 flex flex-col" onDragOver={handleModalDragOver} onDrop={handleModalDrop}>
                 <CardHeader className="pt-2 pb-2">
                   <CardTitle className="text-lg">Tree Structure</CardTitle>
@@ -797,6 +783,3 @@ export default function HierarchySetBuildPage() {
     </div>
   );
 }
-
-
-    
