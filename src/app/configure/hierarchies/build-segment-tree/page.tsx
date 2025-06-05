@@ -159,7 +159,7 @@ export default function BuildSegmentTreePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getSegmentById } = useSegments();
-  const { hierarchySets: allSetsFromContext, getHierarchySetById, updateHierarchySet } = useHierarchies();
+  const { hierarchySets: allSetsFromContext, updateHierarchySet } = useHierarchies();
 
   const hierarchySetId = searchParams.get('hierarchySetId');
   const segmentHierarchyId = searchParams.get('segmentHierarchyId');
@@ -167,6 +167,7 @@ export default function BuildSegmentTreePage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isViewOnlyMode, setIsViewOnlyMode] = useState(viewModeQueryParam === 'true');
+  
   const [hierarchySet, setHierarchySet] = useState<HierarchySet | null>(null);
   const [segmentHierarchy, setSegmentHierarchy] = useState<SegmentHierarchyInSet | null>(null);
   const [segmentDetails, setSegmentDetails] = useState<Segment | null>(null);
@@ -183,58 +184,52 @@ export default function BuildSegmentTreePage() {
 
  useEffect(() => {
     setIsLoading(true);
-    console.log("BuildSegmentTreePage: useEffect triggered with hierarchySetId:", hierarchySetId, "segmentHierarchyId:", segmentHierarchyId);
+    // Reset states at the beginning of each effect run
+    setHierarchySet(null);
+    setSegmentHierarchy(null);
+    setSegmentDetails(null);
+    setTreeNodes([]); // Also reset treeNodes if they depend on these
     
-    // Log all HierarchySet IDs currently in context for diagnostics
+    console.log("BuildSegmentTreePage: useEffect triggered. Searching for hierarchySetId:", hierarchySetId, "segmentHierarchyId:", segmentHierarchyId);
     console.log("BuildSegmentTreePage: IDs in context at lookup:", allSetsFromContext.map(s => s.id));
-    console.log("BuildSegmentTreePage: Searching for ID:", hierarchySetId);
-
-
+    
     if (hierarchySetId) {
-      // Directly find the HierarchySet from the context's current array
       const hs = allSetsFromContext.find(s => s.id === hierarchySetId);
-      console.log("BuildSegmentTreePage: Fetched HierarchySet from context:", hs ? `ID: ${hs.id}, SegHierarchies: ${JSON.stringify(hs.segmentHierarchies.map(s => s.id))}` : 'Not Found');
+      console.log("BuildSegmentTreePage: Fetched HierarchySet from context:", hs ? `ID: ${hs.id}, Name: ${hs.name}, SegHierarchies Count: ${hs.segmentHierarchies.length}` : 'Not Found');
 
-      if (hs && segmentHierarchyId) {
-        const sh = hs.segmentHierarchies.find(s => s.id === segmentHierarchyId);
-        console.log("BuildSegmentTreePage: Found SegmentHierarchyInSet in hs:", sh ? `ID: ${sh.id}` : 'Not Found');
-
-        if (sh) {
-          const seg = getSegmentById(sh.segmentId);
-          console.log("BuildSegmentTreePage: Fetched SegmentDetails:", seg ? `ID: ${seg.id}` : 'Not Found');
-
-          if (seg) { 
-            setHierarchySet(hs);
-            setSegmentHierarchy(sh);
-            setSegmentDetails(seg);
-            setTreeNodes(JSON.parse(JSON.stringify(sh.treeNodes || []))); 
-
-            const codesForSegment = (mockSegmentCodesData[seg.id] || [])
-              .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
-            setAllSegmentCodes(codesForSegment);
-            setIsLoading(false); 
-            return; 
+      if (hs) {
+        setHierarchySet(JSON.parse(JSON.stringify(hs))); // Deep copy
+        if (segmentHierarchyId) {
+          const sh = hs.segmentHierarchies.find(s => s.id === segmentHierarchyId);
+          console.log("BuildSegmentTreePage: Found SegmentHierarchyInSet in hs:", sh ? `ID: ${sh.id}` : 'Not Found');
+          if (sh) {
+            setSegmentHierarchy(JSON.parse(JSON.stringify(sh))); // Deep copy
+            setTreeNodes(JSON.parse(JSON.stringify(sh.treeNodes || []))); // Initialize treeNodes from current SH
+            
+            const seg = getSegmentById(sh.segmentId);
+            console.log("BuildSegmentTreePage: Fetched SegmentDetails:", seg ? `ID: ${seg.id}` : 'Not Found');
+            if (seg) { 
+              setSegmentDetails(seg);
+              const codesForSegment = (mockSegmentCodesData[seg.id] || [])
+                .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+              setAllSegmentCodes(codesForSegment);
+            } else {
+              console.error("BuildSegmentTreePage: SegmentDetails NOT FOUND for segmentId:", sh.segmentId);
+            }
           } else {
-            console.error("BuildSegmentTreePage: SegmentDetails NOT FOUND for segmentId:", sh.segmentId);
+            console.error("BuildSegmentTreePage: SegmentHierarchyInSet NOT FOUND for ID:", segmentHierarchyId, "within set:", hs.id);
           }
         } else {
-          console.error("BuildSegmentTreePage: SegmentHierarchyInSet NOT FOUND for ID:", segmentHierarchyId, "within set:", hs.id);
+          console.error("BuildSegmentTreePage: segmentHierarchyId is missing from URL params.");
         }
       } else {
-        if (!hs) console.error("BuildSegmentTreePage: HierarchySet NOT FOUND for ID:", hierarchySetId);
-        if (!segmentHierarchyId) console.error("BuildSegmentTreePage: segmentHierarchyId is missing from URL params.");
+        console.error("BuildSegmentTreePage: HierarchySet NOT FOUND for ID:", hierarchySetId);
       }
     } else {
       console.error("BuildSegmentTreePage: hierarchySetId is missing from URL params.");
     }
-
-    setHierarchySet(null);
-    setSegmentHierarchy(null);
-    setSegmentDetails(null);
-    setTreeNodes([]);
-    setAllSegmentCodes([]);
-    setIsLoading(false);
-  }, [hierarchySetId, segmentHierarchyId, getSegmentById, allSetsFromContext]); // Added allSetsFromContext
+    setIsLoading(false); 
+  }, [hierarchySetId, segmentHierarchyId, allSetsFromContext, getSegmentById]);
 
 
   useEffect(() => {
@@ -431,9 +426,9 @@ export default function BuildSegmentTreePage() {
                 <ul className="text-xs list-disc list-inside text-muted-foreground/80 mb-4">
                     <li>Hierarchy Set ID from URL: {hierarchySetId || 'Not provided'}</li>
                     <li>Segment Hierarchy ID from URL: {segmentHierarchyId || 'Not provided'}</li>
-                    <li>Hierarchy Set found in context: {hierarchySet ? 'Yes' : 'No'}</li>
-                    <li>Segment Hierarchy found in Set: {segmentHierarchy ? 'Yes' : 'No'}</li>
-                    <li>Segment Details found: {segmentDetails ? 'Yes' : 'No'}</li>
+                    <li>Hierarchy Set loaded: {hierarchySet ? 'Yes' : 'No'}</li>
+                    <li>Segment Hierarchy loaded: {segmentHierarchy ? 'Yes' : 'No'}</li>
+                    <li>Segment Details loaded: {segmentDetails ? 'Yes' : 'No'}</li>
                 </ul>
                 <Button onClick={() => router.push(hierarchySetId ? `/configure/hierarchies/build?hierarchySetId=${hierarchySetId}` : '/configure/hierarchies')}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
