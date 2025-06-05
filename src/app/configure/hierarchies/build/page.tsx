@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -25,15 +25,19 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription
+  FormDescription as FormDesc
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescUI } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { PlusCircle, Edit3, Trash2, Workflow, AlertTriangle } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
 import { useHierarchies } from '@/contexts/HierarchiesContext';
-import type { SegmentHierarchyInSet, HierarchySet } from '@/lib/hierarchy-types';
+import type { SegmentHierarchyInSet, HierarchySet, HierarchyNode } from '@/lib/hierarchy-types';
 import { DatePicker } from '@/components/ui/date-picker';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { mockSegmentCodesData, type SegmentCode } from '@/lib/segment-types';
+import { GripVertical, FolderTree, ArrowLeft } from 'lucide-react';
 
 
 const hierarchySetFormSchema = z.object({
@@ -56,12 +60,13 @@ const hierarchySetFormSchema = z.object({
 
 type HierarchySetFormValues = z.infer<typeof hierarchySetFormSchema>;
 
+// --- TreeNodeDisplay and related helpers (moved to build-segment-tree) ---
 
 export default function HierarchySetBuildPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { segments: allGlobalSegments, getSegmentById } = useSegments();
-  const { addHierarchySet, updateHierarchySet, getHierarchySetById } = useHierarchies();
+  const { hierarchySets: allSetsFromContext, addHierarchySet, updateHierarchySet, getHierarchySetById } = useHierarchies();
   
   const hierarchySetIdQueryParam = searchParams.get('hierarchySetId');
   const [currentHierarchySetId, setCurrentHierarchySetId] = useState<string | null>(hierarchySetIdQueryParam);
@@ -96,15 +101,13 @@ export default function HierarchySetBuildPage() {
         setCurrentHierarchySetId(existingSet.id);
         setIsEditMode(true);
       } else {
-        // If ID in query param but not found, treat as error or redirect
         alert("Hierarchy Set not found with the provided ID. Navigating back.");
         router.push('/configure/hierarchies');
       }
     } else {
-      // No ID in query param, this is for creating a new set
       setIsEditMode(false);
-      setCurrentHierarchySetId(null); // Important: ID is null until first save
-      form.reset({ // Reset to defaults for a new form
+      setCurrentHierarchySetId(null); 
+      form.reset({ 
         name: '',
         status: 'Active',
         description: '',
@@ -117,7 +120,7 @@ export default function HierarchySetBuildPage() {
 
   const onSubmit = (values: HierarchySetFormValues) => {
     const hierarchySetData: HierarchySet = {
-      id: currentHierarchySetId || crypto.randomUUID(), // Use current ID if editing, or generate new if it was null
+      id: currentHierarchySetId || crypto.randomUUID(), 
       name: values.name,
       status: values.status,
       description: values.description,
@@ -131,20 +134,23 @@ export default function HierarchySetBuildPage() {
     if (isEditMode && currentHierarchySetId) {
       updateHierarchySet(hierarchySetData);
       alert(`Hierarchy Set "${values.name}" updated successfully!`);
-      // No navigation needed, stay on page for further edits or to manage segment hierarchies
-    } else { // This is a new set being saved for the first time
-      const newId = hierarchySetData.id; // ID was generated above
-      addHierarchySet(hierarchySetData);
+    } else { 
+      const newId = hierarchySetData.id; 
+      addHierarchySet(hierarchySetData); 
+      
+      setCurrentHierarchySetId(newId);
+      setIsEditMode(true);
+      form.reset({
+        name: hierarchySetData.name,
+        status: hierarchySetData.status,
+        description: hierarchySetData.description,
+        validFrom: hierarchySetData.validFrom, // Already Date objects
+        validTo: hierarchySetData.validTo,     // Already Date object or undefined
+      });
+      setSegmentHierarchiesInSet(hierarchySetData.segmentHierarchies.map(sh => ({...sh, treeNodes: [...(sh.treeNodes || [])]})));
+      
       alert(`Hierarchy Set "${values.name}" saved successfully! You can now add segment hierarchies.`);
-      // Replace URL to reflect that it's now an existing set, allowing segment hierarchy editing
       router.replace(`/configure/hierarchies/build?hierarchySetId=${newId}`, { scroll: false });
-      // Manually update state to reflect edit mode immediately without full effect reload if needed,
-      // or rely on useEffect to pick up hierarchySetIdQueryParam on next render cycle.
-      // For simplicity, useEffect will handle it, but this means a quick re-render.
-      // Alternatively, directly call:
-      // setIsEditMode(true);
-      // setCurrentHierarchySetId(newId);
-      // form.reset(values); // To keep form values consistent with saved data
     }
   };
 
@@ -152,8 +158,8 @@ export default function HierarchySetBuildPage() {
     router.push('/configure/hierarchies');
   };
   
-  const handleAddSegmentToSet = () => {
-    if (!isEditMode) {
+ const handleAddSegmentToSet = () => {
+    if (!isEditMode && !currentHierarchySetId) {
         alert("Please save the Hierarchy Set details first.");
         return;
     }
@@ -161,7 +167,8 @@ export default function HierarchySetBuildPage() {
       alert("Please select a segment to add.");
       return;
     }
-    if (segmentHierarchiesInSet.find(sh => sh.segmentId === segmentToAdd)) {
+    const segmentAlreadyAdded = segmentHierarchiesInSet.find(sh => sh.segmentId === segmentToAdd);
+    if (segmentAlreadyAdded) {
       alert("This segment is already part of the hierarchy set.");
       return;
     }
@@ -170,13 +177,50 @@ export default function HierarchySetBuildPage() {
       segmentId: segmentToAdd,
       treeNodes: [], 
     };
-    setSegmentHierarchiesInSet(prev => [...prev, newSegmentHierarchy]);
+
+    if (isEditMode && currentHierarchySetId) {
+      const formValues = form.getValues();
+      const updatedLocalSegmentHierarchies = [...segmentHierarchiesInSet, newSegmentHierarchy];
+      const updatedSetData: HierarchySet = {
+        id: currentHierarchySetId,
+        name: formValues.name,
+        status: formValues.status,
+        description: formValues.description,
+        validFrom: formValues.validFrom,
+        validTo: formValues.validTo,
+        segmentHierarchies: updatedLocalSegmentHierarchies,
+        lastModifiedDate: new Date(),
+        lastModifiedBy: "Current User (Segment Added)",
+      };
+      updateHierarchySet(updatedSetData);
+      setSegmentHierarchiesInSet(updatedLocalSegmentHierarchies);
+    } else {
+      // This case should ideally not be reached if "Save first" is enforced for new sets
+      setSegmentHierarchiesInSet(prev => [...prev, newSegmentHierarchy]);
+    }
     setSegmentToAdd(''); 
   };
 
   const handleRemoveSegmentFromSet = (segmentHierarchyIdToRemove: string) => {
     if (window.confirm("Are you sure you want to remove this segment's hierarchy from the set? Its tree structure will be lost from this set.")) {
-        setSegmentHierarchiesInSet(prev => prev.filter(sh => sh.id !== segmentHierarchyIdToRemove));
+      const updatedSegmentHierarchies = segmentHierarchiesInSet.filter(sh => sh.id !== segmentHierarchyIdToRemove);
+      setSegmentHierarchiesInSet(updatedSegmentHierarchies);
+      
+      if (isEditMode && currentHierarchySetId) {
+        const formValues = form.getValues();
+        const updatedSetData: HierarchySet = {
+          id: currentHierarchySetId,
+          name: formValues.name,
+          status: formValues.status,
+          description: formValues.description,
+          validFrom: formValues.validFrom,
+          validTo: formValues.validTo,
+          segmentHierarchies: updatedSegmentHierarchies,
+          lastModifiedDate: new Date(),
+          lastModifiedBy: "Current User (Segment Removed)",
+        };
+        updateHierarchySet(updatedSetData);
+      }
     }
   };
 
@@ -289,7 +333,7 @@ export default function HierarchySetBuildPage() {
               <CardDescUI>Define or edit the tree structure for each segment included in this Hierarchy Set.</CardDescUI>
             </CardHeader>
             <CardContent>
-              {!isEditMode ? (
+              {!isEditMode && !currentHierarchySetId ? (
                  <div className="border-l-4 border-yellow-400 bg-yellow-50 p-4 rounded-md">
                     <div className="flex">
                         <div className="flex-shrink-0">
@@ -307,7 +351,7 @@ export default function HierarchySetBuildPage() {
                   <div className="mb-6 p-4 border rounded-md bg-muted/30">
                     <Label htmlFor="segmentToAdd">Add Segment to this Set</Label>
                     <div className="flex items-center space-x-2 mt-1">
-                      <Select value={segmentToAdd} onValueChange={setSegmentToAdd} disabled={!isEditMode}>
+                      <Select value={segmentToAdd} onValueChange={setSegmentToAdd}>
                         <SelectTrigger id="segmentToAdd" className="flex-grow">
                           <SelectValue placeholder="Select a segment..." />
                         </SelectTrigger>
@@ -321,7 +365,7 @@ export default function HierarchySetBuildPage() {
                           )}
                         </SelectContent>
                       </Select>
-                      <Button type="button" onClick={handleAddSegmentToSet} disabled={!segmentToAdd || segmentToAdd === 'none' || !isEditMode}>
+                      <Button type="button" onClick={handleAddSegmentToSet} disabled={!segmentToAdd || segmentToAdd === 'none'}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Add Segment
                       </Button>
                     </div>
@@ -346,7 +390,7 @@ export default function HierarchySetBuildPage() {
                                   variant="outline" 
                                   size="sm" 
                                   asChild 
-                                  disabled={!currentHierarchySetId} // Disable if set ID not yet available (should be rare with save first)
+                                  disabled={!currentHierarchySetId}
                                 >
                                   <Link href={`/configure/hierarchies/build-segment-tree?hierarchySetId=${currentHierarchySetId}&segmentHierarchyId=${sh.id}`}>
                                     <Edit3 className="mr-2 h-4 w-4" /> Edit Tree
@@ -389,3 +433,5 @@ export default function HierarchySetBuildPage() {
     
 
       
+
+    
