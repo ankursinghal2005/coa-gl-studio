@@ -15,11 +15,11 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  sidebarMenuButtonVariants, // Ensure this is exported and imported
+  sidebarMenuButtonVariants, 
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem, // Ensure this is imported
-  SidebarTrigger, // Keep for mobile
+  SidebarMenuSubItem,
+  SidebarTrigger, 
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -34,12 +34,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSub as RadixDropdownMenuSub, // Alias to avoid conflict
+  DropdownMenuSub as RadixDropdownMenuSub, 
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SheetTitle } from '@/components/ui/sheet'; // For accessibility
+import { SheetTitle } from '@/components/ui/sheet'; 
 
 interface SidebarNavProps {
   className?: string;
@@ -53,12 +53,10 @@ export function SidebarNav({ className }: SidebarNavProps) {
     return items.map((item, index) => {
       const iconSpan = item.icon ? <span className="w-4 h-4 flex items-center justify-center shrink-0">{item.icon}</span> : null;
 
-      // Case 1: Label item (no href, no children)
       if (!item.href && !item.children) {
-        if (isSubmenu && sidebarState === 'collapsed' && !isMobile) { // Context of a dropdown sub-menu
+        if (isSubmenu && sidebarState === 'collapsed' && !isMobile) { 
           return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{iconSpan}{item.title}</DropdownMenuItem>;
         }
-        // For Accordion or top-level menu
         return (
           <SidebarMenuItem key={`${item.title}-${index}-label`} className="px-2 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
             {iconSpan}
@@ -67,9 +65,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
         );
       }
 
-      // Case 2: Item with children (potential parent for submenu)
       if (item.children && item.children.length > 0) {
-        // Collapsed Desktop View: Use DropdownMenu
         if (sidebarState === 'collapsed' && !isMobile) {
           const hasGrandChildren = item.children.some(child => child.children && child.children.length > 0);
 
@@ -123,7 +119,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
               </SidebarMenuItem>
             );
           }
-          // Standard single-level dropdown for items in a collapsed sidebar
           return (
             <SidebarMenuItem key={`${item.title}-${index}-dd`}>
               <DropdownMenu>
@@ -154,7 +149,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
             </SidebarMenuItem>
           );
         } else {
-          // Expanded Desktop or Mobile View: Use Accordion
           return (
             <SidebarMenuItem key={`${item.title}-${index}-acc`} className="p-0">
               <Accordion type="multiple" className="w-full">
@@ -183,9 +177,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
           );
         }
       } else {
-        // Case 3: Regular link item (leaf node)
         if (isSubmenu) {
-          // Rendered inside a SidebarMenuSub (Accordion context)
           return (
             <SidebarMenuSubItem key={`${item.title}-${index}-sublink`}>
               <Link href={item.href || '#'} legacyBehavior passHref>
@@ -194,16 +186,15 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   disabled={item.disabled}
                   aria-disabled={item.disabled}
                   tabIndex={item.disabled ? -1 : undefined}
-                  className="block w-full" // Added block and w-full
+                  className="block w-full" 
                 >
                   {iconSpan}
-                  {item.title}
+                  <span className="truncate">{item.title}</span>
                 </SidebarMenuSubButton>
               </Link>
             </SidebarMenuSubItem>
           );
         } else {
-          // Rendered directly in SidebarMenu (top-level or mobile sheet)
           return (
             <SidebarMenuItem key={`${item.title}-${index}-link`}>
               <Link href={item.href || '#'} legacyBehavior passHref>
@@ -225,7 +216,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
     });
   };
 
-  // Mobile Sheet View (uses Sheet component from ui/sidebar which wraps Radix Dialog)
   if (isMobile) {
     return (
       <>
@@ -259,7 +249,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
     );
   }
 
-  // Desktop Sidebar View
   return (
     <Sidebar
       variant="sidebar"
