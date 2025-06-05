@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescUI } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
-import { PlusCircle, Edit3, Trash2, Workflow, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Edit3, Trash2, Workflow, AlertTriangle, Eye } from 'lucide-react'; // Added Eye
 import { useSegments } from '@/contexts/SegmentsContext';
 import { useHierarchies } from '@/contexts/HierarchiesContext';
 import type { SegmentHierarchyInSet, HierarchySet, HierarchyNode } from '@/lib/hierarchy-types';
@@ -138,8 +138,10 @@ export default function HierarchySetBuildPage() {
       const newId = hierarchySetData.id; 
       addHierarchySet(hierarchySetData); 
       
+      // Update local state to reflect the newly created set and switch to edit mode
       setCurrentHierarchySetId(newId);
       setIsEditMode(true);
+      // Reset form with the data that was just saved
       form.reset({
         name: hierarchySetData.name,
         status: hierarchySetData.status,
@@ -147,9 +149,11 @@ export default function HierarchySetBuildPage() {
         validFrom: hierarchySetData.validFrom, // Already Date objects
         validTo: hierarchySetData.validTo,     // Already Date object or undefined
       });
+      // Ensure local segment hierarchies are initialized if needed (usually empty for new set)
       setSegmentHierarchiesInSet(hierarchySetData.segmentHierarchies.map(sh => ({...sh, treeNodes: [...(sh.treeNodes || [])]})));
       
       alert(`Hierarchy Set "${values.name}" saved successfully! You can now add segment hierarchies.`);
+      // Replace URL to reflect edit mode for the new set
       router.replace(`/configure/hierarchies/build?hierarchySetId=${newId}`, { scroll: false });
     }
   };
@@ -178,25 +182,33 @@ export default function HierarchySetBuildPage() {
       treeNodes: [], 
     };
 
+    const updatedLocalSegmentHierarchies = [...segmentHierarchiesInSet, newSegmentHierarchy];
+
     if (isEditMode && currentHierarchySetId) {
-      const formValues = form.getValues();
-      const updatedLocalSegmentHierarchies = [...segmentHierarchiesInSet, newSegmentHierarchy];
+      const currentSetFromContext = getHierarchySetById(currentHierarchySetId);
+      if (!currentSetFromContext) {
+        console.error("Cannot add segment: Current HierarchySet not found in context during segment add.");
+        alert("Error: Could not find the current Hierarchy Set to update. Please try saving the set again.");
+        return;
+      }
+      
       const updatedSetData: HierarchySet = {
-        id: currentHierarchySetId,
-        name: formValues.name,
-        status: formValues.status,
-        description: formValues.description,
-        validFrom: formValues.validFrom,
-        validTo: formValues.validTo,
-        segmentHierarchies: updatedLocalSegmentHierarchies,
+        ...currentSetFromContext, // Spread existing set data from context
+        name: form.getValues('name'), // Get current form values for other fields
+        status: form.getValues('status'),
+        description: form.getValues('description'),
+        validFrom: form.getValues('validFrom'),
+        validTo: form.getValues('validTo'),
+        segmentHierarchies: updatedLocalSegmentHierarchies, // Use the locally updated segment hierarchies
         lastModifiedDate: new Date(),
         lastModifiedBy: "Current User (Segment Added)",
       };
-      updateHierarchySet(updatedSetData);
-      setSegmentHierarchiesInSet(updatedLocalSegmentHierarchies);
+      updateHierarchySet(updatedSetData); // Update context immediately
+      setSegmentHierarchiesInSet(updatedLocalSegmentHierarchies); // Update local state
     } else {
-      // This case should ideally not be reached if "Save first" is enforced for new sets
-      setSegmentHierarchiesInSet(prev => [...prev, newSegmentHierarchy]);
+      // This branch should ideally not be hit if "Save first" is enforced.
+      // However, if it is, we just update local state.
+      setSegmentHierarchiesInSet(updatedLocalSegmentHierarchies);
     }
     setSegmentToAdd(''); 
   };
@@ -279,7 +291,7 @@ export default function HierarchySetBuildPage() {
                   control={form.control}
                   name="status"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem className="flex flex-col"> {/* Ensure vertical stacking */}
                       <FormLabel>Status *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
@@ -392,8 +404,8 @@ export default function HierarchySetBuildPage() {
                                   asChild 
                                   disabled={!currentHierarchySetId}
                                 >
-                                  <Link href={`/configure/hierarchies/build-segment-tree?hierarchySetId=${currentHierarchySetId}&segmentHierarchyId=${sh.id}`}>
-                                    <Edit3 className="mr-2 h-4 w-4" /> Edit Tree
+                                  <Link href={`/configure/hierarchies/build-segment-tree?hierarchySetId=${currentHierarchySetId}&segmentHierarchyId=${sh.id}&viewMode=true`}>
+                                    <Eye className="mr-2 h-4 w-4" /> View Tree 
                                   </Link>
                                 </Button>
                                 <Button variant="destructive" size="sm" onClick={() => handleRemoveSegmentFromSet(sh.id)}>

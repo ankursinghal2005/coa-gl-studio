@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { GripVertical, FolderTree, Trash2, AlertTriangle, PlusCircle, Edit3, Workflow, ArrowLeft } from 'lucide-react';
+import { GripVertical, FolderTree, Trash2, AlertTriangle, PlusCircle, Edit3, Workflow, ArrowLeft, Eye } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
 import { useHierarchies } from '@/contexts/HierarchiesContext';
 import type { Segment, SegmentCode } from '@/lib/segment-types';
@@ -87,40 +87,46 @@ const TreeNodeDisplay: React.FC<{
   selectedParentNodeId: string | null;
   onSelectParent: (nodeId: string) => void;
   onRemoveNode: (nodeId: string) => void;
-}> = ({ node, level, selectedParentNodeId, onSelectParent, onRemoveNode }) => {
+  isViewOnlyMode: boolean;
+}> = ({ node, level, selectedParentNodeId, onSelectParent, onRemoveNode, isViewOnlyMode }) => {
   const isSelectedParent = node.id === selectedParentNodeId;
   const canBeParent = node.segmentCode.summaryIndicator;
 
   return (
     <div
       style={{ marginLeft: `${level * 20}px` }}
-      className={`relative p-3 border rounded-md mb-2 shadow-sm ${isSelectedParent ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-card hover:bg-accent/50'}`}
+      className={`relative p-3 border rounded-md mb-2 shadow-sm ${
+        isSelectedParent && !isViewOnlyMode ? 'bg-blue-100 ring-2 ring-blue-500' 
+        : isViewOnlyMode ? 'bg-card' : 'bg-card hover:bg-accent/50'
+      }`}
       onClick={(e) => {
-        if (canBeParent) {
+        if (canBeParent && !isViewOnlyMode) {
           e.stopPropagation();
           onSelectParent(node.id);
         }
       }}
     >
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-1 right-1 h-6 w-6 text-destructive hover:text-destructive/80"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemoveNode(node.id);
-        }}
-        aria-label="Remove node"
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
+      {!isViewOnlyMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-1 right-1 h-6 w-6 text-destructive hover:text-destructive/80"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemoveNode(node.id);
+          }}
+          aria-label="Remove node"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      )}
       <div className="font-medium text-primary flex items-center">
         {node.segmentCode.code} - {node.segmentCode.description}
       </div>
       <div className="text-xs text-muted-foreground mt-1">
         Type: {node.segmentCode.summaryIndicator ? 'Summary (Parent)' : 'Detail (Child)'}
       </div>
-      {canBeParent && (
+      {canBeParent && !isViewOnlyMode && (
         <div className="text-xs mt-1">
           {isSelectedParent ? (
             <span className="text-green-600 font-semibold">(Selected as Parent)</span>
@@ -139,6 +145,7 @@ const TreeNodeDisplay: React.FC<{
               selectedParentNodeId={selectedParentNodeId}
               onSelectParent={onSelectParent}
               onRemoveNode={onRemoveNode}
+              isViewOnlyMode={isViewOnlyMode}
             />
           ))}
         </div>
@@ -156,8 +163,10 @@ export default function BuildSegmentTreePage() {
 
   const hierarchySetId = searchParams.get('hierarchySetId');
   const segmentHierarchyId = searchParams.get('segmentHierarchyId');
+  const viewModeQueryParam = searchParams.get('viewMode');
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isViewOnlyMode, setIsViewOnlyMode] = useState(viewModeQueryParam === 'true');
   const [hierarchySet, setHierarchySet] = useState<HierarchySet | null>(null);
   const [segmentHierarchy, setSegmentHierarchy] = useState<SegmentHierarchyInSet | null>(null);
   const [segmentDetails, setSegmentDetails] = useState<Segment | null>(null);
@@ -175,13 +184,11 @@ export default function BuildSegmentTreePage() {
  useEffect(() => {
     setIsLoading(true);
     console.log("BuildSegmentTreePage: useEffect triggered with hierarchySetId:", hierarchySetId, "segmentHierarchyId:", segmentHierarchyId);
+    console.log("BuildSegmentTreePage: IDs in context at lookup:", allSetsFromContext.map(s => s.id));
+    console.log("BuildSegmentTreePage: Searching for ID:", hierarchySetId);
+
 
     if (hierarchySetId) {
-      // Log all HierarchySet IDs currently in context for diagnosis
-      const idsInContext = allSetsFromContext.map(s => s.id);
-      console.log("BuildSegmentTreePage: IDs in context at lookup:", idsInContext);
-      console.log("BuildSegmentTreePage: Searching for ID:", hierarchySetId);
-
       const hs = getHierarchySetById(hierarchySetId);
       console.log("BuildSegmentTreePage: Fetched HierarchySet from context:", hs ? `ID: ${hs.id}, SegHierarchies: ${JSON.stringify(hs.segmentHierarchies.map(s => s.id))}` : 'Not Found');
 
@@ -193,17 +200,17 @@ export default function BuildSegmentTreePage() {
           const seg = getSegmentById(sh.segmentId);
           console.log("BuildSegmentTreePage: Fetched SegmentDetails:", seg ? `ID: ${seg.id}` : 'Not Found');
 
-          if (seg) { // Only proceed if all three critical pieces of data are found
+          if (seg) { 
             setHierarchySet(hs);
             setSegmentHierarchy(sh);
             setSegmentDetails(seg);
-            setTreeNodes(JSON.parse(JSON.stringify(sh.treeNodes || []))); // Deep copy
+            setTreeNodes(JSON.parse(JSON.stringify(sh.treeNodes || []))); 
 
             const codesForSegment = (mockSegmentCodesData[seg.id] || [])
               .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
             setAllSegmentCodes(codesForSegment);
-            setIsLoading(false); // Data loaded successfully
-            return; // Exit early from useEffect
+            setIsLoading(false); 
+            return; 
           } else {
             console.error("BuildSegmentTreePage: SegmentDetails NOT FOUND for segmentId:", sh.segmentId);
           }
@@ -218,7 +225,6 @@ export default function BuildSegmentTreePage() {
       console.error("BuildSegmentTreePage: hierarchySetId is missing from URL params.");
     }
 
-    // If we reach here, something critical was missing, so set all to null and stop loading
     setHierarchySet(null);
     setSegmentHierarchy(null);
     setSegmentDetails(null);
@@ -251,16 +257,19 @@ export default function BuildSegmentTreePage() {
   }, [selectedParentNodeId, treeNodes]);
 
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>, code: SegmentCode) => {
+    if (isViewOnlyMode) return;
     event.dataTransfer.setData('application/json', JSON.stringify(code));
     event.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (isViewOnlyMode) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (isViewOnlyMode) return;
     event.preventDefault();
     const codeDataString = event.dataTransfer.getData('application/json');
     if (!codeDataString) return;
@@ -298,6 +307,7 @@ export default function BuildSegmentTreePage() {
   };
 
   const handleSelectParent = (nodeId: string) => {
+    if (isViewOnlyMode) return;
     const node = findNodeById(treeNodes, nodeId);
     if (node && node.segmentCode.summaryIndicator) setSelectedParentNodeId(nodeId);
     else if (node && !node.segmentCode.summaryIndicator) { setSelectedParentNodeId(null); alert("Detail codes cannot be parents."); }
@@ -305,6 +315,7 @@ export default function BuildSegmentTreePage() {
   };
 
   const handleRemoveNode = (nodeIdToRemove: string) => {
+    if (isViewOnlyMode) return;
     const newTree = removeNodeFromTreeRecursive(treeNodes, nodeIdToRemove);
     setTreeNodes(newTree);
     if (selectedParentNodeId && !nodeStillExistsInTree(newTree, selectedParentNodeId)) {
@@ -313,6 +324,7 @@ export default function BuildSegmentTreePage() {
   };
 
   const handleAddRangeToParent = () => {
+    if (isViewOnlyMode) return;
     if (!selectedParentNodeId) { alert('Please select a summary parent node from the tree first.'); return; }
     const parentNode = findNodeById(treeNodes, selectedParentNodeId);
     if (!parentNode || !parentNode.segmentCode.summaryIndicator) { alert('Selected parent is not valid.'); return; }
@@ -348,6 +360,7 @@ export default function BuildSegmentTreePage() {
   };
 
   const getDropZoneMessage = () => {
+    if (isViewOnlyMode) return "Viewing hierarchy tree. Click 'Enable Editing' to make changes.";
     if (treeNodes.length === 0) return "Drag a SUMMARY code here to start building this segment's hierarchy root.";
     if (!selectedParentNodeId) return "Select a summary node from the tree to add children, or drag another SUMMARY code here to create a new root.";
     const selectedNodeName = selectedParentNodeDetails ? `${selectedParentNodeDetails.segmentCode.code}` : 'the selected parent';
@@ -355,7 +368,8 @@ export default function BuildSegmentTreePage() {
   };
 
   const handleSaveTree = () => {
-    if (!hierarchySet || !segmentHierarchy || !segmentDetails) { // Check all required data
+    if (isViewOnlyMode) return;
+    if (!hierarchySet || !segmentHierarchy || !segmentDetails) { 
       alert("Error: Critical hierarchy details are missing. Cannot save.");
       return;
     }
@@ -372,12 +386,16 @@ export default function BuildSegmentTreePage() {
     router.push(`/configure/hierarchies/build?hierarchySetId=${hierarchySetId}`);
   };
 
+  const handleEnableEditing = () => {
+    setIsViewOnlyMode(false);
+  };
+
 
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
     { label: 'Hierarchy Sets', href: '/configure/hierarchies' },
-    { label: `Edit Set: ${hierarchySet?.name || 'Loading Set...'}`, href: hierarchySetId ? `/configure/hierarchies/build?hierarchySetId=${hierarchySetId}` : '/configure/hierarchies' },
-    { label: `Build Tree: ${segmentDetails?.displayName || 'Loading Segment...'}` },
+    { label: `Set: ${hierarchySet?.name || 'Loading...'}`, href: hierarchySetId ? `/configure/hierarchies/build?hierarchySetId=${hierarchySetId}` : '/configure/hierarchies' },
+    { label: `${isViewOnlyMode ? 'View' : 'Build'} Tree: ${segmentDetails?.displayName || 'Loading...'}` },
   ];
 
   if (isLoading) {
@@ -432,10 +450,10 @@ export default function BuildSegmentTreePage() {
         <header className="mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center">
             <Workflow className="mr-3 h-7 w-7" />
-            Build Hierarchy for: {segmentDetails.displayName}
+            {isViewOnlyMode ? 'View Hierarchy for: ' : 'Build Hierarchy for: '} {segmentDetails.displayName}
           </h1>
           <CardDescription>
-            Define the tree structure for the "{segmentDetails.displayName}" segment within the "{hierarchySet.name}" Hierarchy Set.
+             {isViewOnlyMode ? 'Viewing the ' : 'Define the '} tree structure for the "{segmentDetails.displayName}" segment within the "{hierarchySet.name}" Hierarchy Set.
           </CardDescription>
         </header>
       </div>
@@ -451,13 +469,19 @@ export default function BuildSegmentTreePage() {
                   placeholder="Search codes..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={isViewOnlyMode}
                 />
               </div>
               <div className="flex flex-col flex-1">
                 <div className="px-3 pt-3 pb-1"><h4 className="text-md font-semibold text-muted-foreground">Summary Codes (Parents)</h4></div>
                 <ScrollArea className="px-3 flex-1 min-h-0">
                   {availableSummaryCodes.map(code => (
-                    <div key={code.id} draggable onDragStart={(e) => handleDragStart(e, code)} className="flex items-center p-1.5 mb-1 border rounded-md hover:bg-accent cursor-grab">
+                    <div 
+                      key={code.id} 
+                      draggable={!isViewOnlyMode} 
+                      onDragStart={(e) => handleDragStart(e, code)} 
+                      className={`flex items-center p-1.5 mb-1 border rounded-md ${!isViewOnlyMode ? 'hover:bg-accent cursor-grab' : 'cursor-default'}`}
+                    >
                       <GripVertical className="h-5 w-5 mr-2 text-muted-foreground shrink-0" />
                       <div><div className="font-medium text-sm">{code.code}</div><div className="text-xs text-muted-foreground">{code.description}</div></div>
                     </div>
@@ -467,7 +491,12 @@ export default function BuildSegmentTreePage() {
                 <div className="px-3 pt-3 pb-1 border-t"><h4 className="text-md font-semibold text-muted-foreground">Detail Codes (Children)</h4></div>
                 <ScrollArea className="px-3 pb-1 flex-1 min-h-0">
                   {availableDetailCodes.map(code => (
-                    <div key={code.id} draggable onDragStart={(e) => handleDragStart(e, code)} className="flex items-center p-1.5 mb-1 border rounded-md hover:bg-accent cursor-grab">
+                    <div 
+                      key={code.id} 
+                      draggable={!isViewOnlyMode}
+                      onDragStart={(e) => handleDragStart(e, code)} 
+                      className={`flex items-center p-1.5 mb-1 border rounded-md ${!isViewOnlyMode ? 'hover:bg-accent cursor-grab' : 'cursor-default'}`}
+                    >
                         <GripVertical className="h-5 w-5 mr-2 text-muted-foreground shrink-0" />
                         <div><div className="font-medium text-sm">{code.code}</div><div className="text-xs text-muted-foreground">{code.description}</div></div>
                     </div>
@@ -483,7 +512,7 @@ export default function BuildSegmentTreePage() {
               <CardTitle className="text-lg">Tree Structure</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col p-3 bg-slate-50">
-              {selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
+            {!isViewOnlyMode && selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
                 <Card className="mb-3 p-3 shadow shrink-0">
                   <h3 className="text-md font-semibold mb-1 text-primary">Add Codes to: {selectedParentNodeDetails.segmentCode.code}</h3>
                   <div className="flex items-end gap-2 mb-1">
@@ -499,22 +528,22 @@ export default function BuildSegmentTreePage() {
                   <div className="text-center text-muted-foreground h-full flex flex-col items-center justify-center py-6">
                     <FolderTree className="w-12 h-12 text-slate-400 mb-3" />
                     <p className="text-md mb-1">{getDropZoneMessage()}</p>
-                    <p className="text-xs">(Only SUMMARY codes can be parents.)</p>
+                    {!isViewOnlyMode && <p className="text-xs">(Only SUMMARY codes can be parents.)</p>}
                   </div>
                 ) : (
                   <div className="space-y-1.5">
                     {treeNodes.map((rootNode) => (
-                      <TreeNodeDisplay key={rootNode.id} node={rootNode} level={0} selectedParentNodeId={selectedParentNodeId} onSelectParent={handleSelectParent} onRemoveNode={handleRemoveNode} />
+                      <TreeNodeDisplay key={rootNode.id} node={rootNode} level={0} selectedParentNodeId={selectedParentNodeId} onSelectParent={handleSelectParent} onRemoveNode={handleRemoveNode} isViewOnlyMode={isViewOnlyMode} />
                     ))}
                   </div>
                 )}
               </ScrollArea>
-              {selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
+              {!isViewOnlyMode && selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
                   <div className="mt-2 p-2 border border-dashed border-green-500 rounded-md bg-green-50/70 text-center text-xs text-green-700 shrink-0">
                       Adding to: '{selectedParentNodeDetails.segmentCode.code}'. Drag/drop or use 'Add Range'.
                   </div>
               )}
-              {!selectedParentNodeId && treeNodes.length > 0 && (
+              {!isViewOnlyMode && !selectedParentNodeId && treeNodes.length > 0 && (
                   <div className="mt-2 p-2 border border-dashed border-blue-500 rounded-md bg-blue-50/70 text-center text-xs text-blue-700 shrink-0">
                       No parent selected. Drag new SUMMARY code for another root, or click existing SUMMARY node.
                   </div>
@@ -527,9 +556,15 @@ export default function BuildSegmentTreePage() {
             <Button type="button" variant="outline" onClick={handleCancel}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to Set
             </Button>
-            <Button type="button" onClick={handleSaveTree}>
-              Save Tree Structure
-            </Button>
+            {isViewOnlyMode ? (
+                <Button type="button" onClick={handleEnableEditing}>
+                    <Edit3 className="mr-2 h-4 w-4" /> Enable Editing
+                </Button>
+            ) : (
+                <Button type="button" onClick={handleSaveTree}>
+                    Save Tree Structure
+                </Button>
+            )}
           </div>
       </div>
     </div>
