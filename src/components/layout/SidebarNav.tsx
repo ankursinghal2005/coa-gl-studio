@@ -51,15 +51,17 @@ export function SidebarNav({ className }: SidebarNavProps) {
 
   const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false): React.ReactNode[] => {
     return items.map((item, index) => {
+      const iconSpan = item.icon ? <span className="w-4 h-4 flex items-center justify-center shrink-0">{item.icon}</span> : null;
+
       // Case 1: Label item (no href, no children)
       if (!item.href && !item.children) {
         if (isSubmenu && sidebarState === 'collapsed' && !isMobile) { // Context of a dropdown sub-menu
-          return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{item.title}</DropdownMenuItem>;
+          return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{iconSpan}{item.title}</DropdownMenuItem>;
         }
         // For Accordion or top-level menu
         return (
-          <SidebarMenuItem key={`${item.title}-${index}-label`} className="px-2 py-1.5 text-sm text-muted-foreground">
-            {item.icon && <span className="mr-2 w-5 h-5 inline-flex items-center justify-center">{item.icon}</span>}
+          <SidebarMenuItem key={`${item.title}-${index}-label`} className="px-2 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
+            {iconSpan}
             <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
           </SidebarMenuItem>
         );
@@ -69,45 +71,48 @@ export function SidebarNav({ className }: SidebarNavProps) {
       if (item.children && item.children.length > 0) {
         // Collapsed Desktop View: Use DropdownMenu
         if (sidebarState === 'collapsed' && !isMobile) {
-          // Check if any child also has children for multi-level dropdown
           const hasGrandChildren = item.children.some(child => child.children && child.children.length > 0);
 
-          if (hasGrandChildren && !isSubmenu) { // Top-level item opening a sub-menu with further nesting
+          if (hasGrandChildren && !isSubmenu) { 
              return (
               <SidebarMenuItem key={`${item.title}-${index}-main-dd-sub`}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <SidebarMenuButton tooltip={item.title} aria-label={item.title} disabled={item.disabled} className="w-full">
-                      {item.icon && <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                      {iconSpan}
                       <span className="sr-only">{item.title}</span>
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent side="right" align="start" className="ml-1 w-56">
                      {item.children.map((child, childIndex) => {
+                        const childIconSpan = child.icon ? <span className="mr-2 w-4 h-4 flex items-center justify-center shrink-0">{child.icon}</span> : null;
                         if (child.children && child.children.length > 0) {
                            return (
                             <RadixDropdownMenuSub key={`${child.title}-${childIndex}-dd-sub`}>
                               <DropdownMenuSubTrigger disabled={child.disabled}>
-                                {child.icon && <span className="mr-2 w-5 h-5">{child.icon}</span>}
+                                {childIconSpan}
                                 <span>{child.title}</span>
                               </DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>
-                                {child.children.map((grandChild, grandChildIndex) => (
-                                  <DropdownMenuItem key={`${grandChild.title}-${grandChildIndex}-dd-grandchild`} asChild disabled={grandChild.disabled}>
-                                    <Link href={grandChild.href || '#'} className={cn(grandChild.disabled && "pointer-events-none opacity-60")}>
-                                      {grandChild.icon && <span className="mr-2 w-5 h-5">{grandChild.icon}</span>}
-                                      {grandChild.title}
-                                    </Link>
-                                  </DropdownMenuItem>
-                                ))}
+                                {child.children.map((grandChild, grandChildIndex) => {
+                                  const grandChildIconSpan = grandChild.icon ? <span className="mr-2 w-4 h-4 flex items-center justify-center shrink-0">{grandChild.icon}</span> : null;
+                                  return (
+                                    <DropdownMenuItem key={`${grandChild.title}-${grandChildIndex}-dd-grandchild`} asChild disabled={grandChild.disabled}>
+                                      <Link href={grandChild.href || '#'} className={cn("flex items-center", grandChild.disabled && "pointer-events-none opacity-60")}>
+                                        {grandChildIconSpan}
+                                        {grandChild.title}
+                                      </Link>
+                                    </DropdownMenuItem>
+                                  );
+                                })}
                               </DropdownMenuSubContent>
                             </RadixDropdownMenuSub>
                            );
                         }
                         return (
                           <DropdownMenuItem key={`${child.title}-${childIndex}-dd-child`} asChild disabled={child.disabled}>
-                            <Link href={child.href || '#'} className={cn(child.disabled && "pointer-events-none opacity-60")}>
-                              {child.icon && <span className="mr-2 w-5 h-5">{child.icon}</span>}
+                            <Link href={child.href || '#'} className={cn("flex items-center", child.disabled && "pointer-events-none opacity-60")}>
+                              {childIconSpan}
                               {child.title}
                             </Link>
                           </DropdownMenuItem>
@@ -124,23 +129,26 @@ export function SidebarNav({ className }: SidebarNavProps) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton tooltip={item.title} aria-label={item.title} disabled={item.disabled} className="w-full">
-                    {item.icon && <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                    {iconSpan}
                     <span className="sr-only">{item.title}</span>
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="right" align="start" className="ml-1 w-56">
-                  <DropdownMenuItem className="font-semibold mb-1 cursor-default focus:bg-transparent">
-                    {item.icon && <span className="mr-2 w-5 h-5">{item.icon}</span>}
+                  <DropdownMenuItem className="font-semibold mb-1 cursor-default focus:bg-transparent flex items-center gap-2">
+                    {iconSpan}
                     {item.title}
                   </DropdownMenuItem>
-                  {item.children.map((child, childIndex) => (
-                    <DropdownMenuItem key={`${child.title}-${childIndex}-dd-child`} asChild disabled={child.disabled}>
-                      <Link href={child.href || '#'} className={cn(child.disabled && "pointer-events-none opacity-60")}>
-                        {child.icon && <span className="mr-2 w-5 h-5">{child.icon}</span>}
-                        {child.title}
-                      </Link>
-                    </DropdownMenuItem>
-                  ))}
+                  {item.children.map((child, childIndex) => {
+                     const childIconSpan = child.icon ? <span className="mr-2 w-4 h-4 flex items-center justify-center shrink-0">{child.icon}</span> : null;
+                    return (
+                      <DropdownMenuItem key={`${child.title}-${childIndex}-dd-child`} asChild disabled={child.disabled}>
+                        <Link href={child.href || '#'} className={cn("flex items-center", child.disabled && "pointer-events-none opacity-60")}>
+                          {childIconSpan}
+                          {child.title}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
                 </DropdownMenuContent>
               </DropdownMenu>
             </SidebarMenuItem>
@@ -160,13 +168,12 @@ export function SidebarNav({ className }: SidebarNavProps) {
                     )}
                   >
                      <span className="flex items-center gap-2">
-                        {item.icon && <span className="w-5 h-5 flex items-center justify-center shrink-0">{item.icon}</span>}
+                        {iconSpan}
                         <span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>
                       </span>
                   </AccordionTrigger>
                   <AccordionContent className="pb-0 group-data-[collapsible=icon]:hidden">
                     <SidebarMenuSub>
-                      {/* Recursive call to renderNavItems for children */}
                       {renderNavItems(item.children, true)}
                     </SidebarMenuSub>
                   </AccordionContent>
@@ -187,8 +194,9 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   disabled={item.disabled}
                   aria-disabled={item.disabled}
                   tabIndex={item.disabled ? -1 : undefined}
+                  className="block w-full" // Added block and w-full
                 >
-                  {item.icon && <span className="mr-2 w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                  {iconSpan}
                   {item.title}
                 </SidebarMenuSubButton>
               </Link>
@@ -206,7 +214,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   disabled={item.disabled}
                   className="w-full"
                 >
-                  {item.icon && <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                  {iconSpan}
                   <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                 </SidebarMenuButton>
               </Link>
