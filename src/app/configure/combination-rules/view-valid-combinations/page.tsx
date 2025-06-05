@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import {
@@ -13,6 +13,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -21,15 +22,13 @@ import { useSegments } from '@/contexts/SegmentsContext';
 import type { CombinationRuleCriterion, CombinationRuleMappingEntry } from '@/lib/combination-rule-types';
 import type { Segment, SegmentCode } from '@/lib/segment-types';
 import { mockSegmentCodesData } from '@/lib/segment-types';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, FilterX } from 'lucide-react';
 
-type EffectiveStatus = 'Effective' | 'Segment A Code Inactive' | 'Segment B Code Inactive' | 'Both Codes Inactive' | 'Code Validity Unknown';
-
-interface DisplayableCombinationEntry {
-  id: string; // Mapping Entry ID
-  ruleName: string;
-  [segmentId: string]: string | EffectiveStatus; // Dynamic properties for each active segment's criterion display
-  effectiveStatus: EffectiveStatus;
+interface DisplayableCombination {
+  mappingEntryId: string; 
+  // ruleName: string; // Removed as per request
+  segmentCriteriaDisplay: Record<string, string>; // Key is segmentId, value is the code or "Any Valid Code"
+  // effectiveStatus: EffectiveStatus; // Potentially remove or simplify
 }
 
 
@@ -47,15 +46,47 @@ const isCodeValidOnDate = (code: SegmentCode | undefined, targetDate: Date): boo
   return true;
 };
 
-const getSegmentCode = (segmentId: string, codeValue: string): SegmentCode | undefined => {
+const getSegmentCodeByValue = (segmentId: string, codeValue: string): SegmentCode | undefined => {
     const codesForSegment = mockSegmentCodesData[segmentId];
     if (!codesForSegment) return undefined;
     return codesForSegment.find(sc => sc.code === codeValue);
 };
 
+// Helper to get individual codes from a criterion (code or range)
+const getCodesFromCriterion = (
+    criterion: CombinationRuleCriterion,
+    segmentId: string,
+    targetDate: Date
+): SegmentCode[] => {
+    const codesForSegment = mockSegmentCodesData[segmentId] || [];
+    if (!codesForSegment) return [];
+
+    switch (criterion.type) {
+        case 'CODE':
+            const singleCode = codesForSegment.find(sc => sc.code === criterion.codeValue);
+            return singleCode && isCodeValidOnDate(singleCode, targetDate) ? [singleCode] : [];
+        case 'RANGE':
+            if (!criterion.rangeStartValue || !criterion.rangeEndValue) return [];
+            // Basic alphanumeric sort for range comparison, might need refinement for complex numeric/alpha codes
+            return codesForSegment.filter(sc => 
+                sc.code >= criterion.rangeStartValue! && 
+                sc.code <= criterion.rangeEndValue! &&
+                isCodeValidOnDate(sc, targetDate)
+            ).sort((a,b) => a.code.localeCompare(b.code)); // Ensure consistent order
+        case 'HIERARCHY_NODE':
+            // For now, we don't expand hierarchy nodes into individual codes.
+            // This would require traversing the hierarchy.
+            // We'll return a placeholder or a specific marker if needed,
+            // or just rely on renderCriterionDisplay to show the node info.
+            // For the purpose of generating combinations, we treat it as "not expandable into individual codes here"
+            return []; // Or handle differently if one specific code should represent the node
+        default:
+            return [];
+    }
+};
+
 
 const renderCriterionDisplay = (criterion: CombinationRuleCriterion): string => {
-    // Segment name prefix is removed as it will be part of the column header
     switch (criterion.type) {
       case 'CODE':
         return `Code: ${criterion.codeValue}`;
@@ -77,9 +108,10 @@ export default function ViewValidCombinationsPage() {
   const { combinationRules } = useCombinationRules();
   const { segments: allSegments, getSegmentById } = useSegments();
 
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+
   const activeSegments = useMemo(() => {
     return allSegments.filter(s => s.isActive).sort((a, b) => {
-        // Optional: Consistent ordering, e.g., core segments first, then by name
         if (a.isCore && !b.isCore) return -1;
         if (!a.isCore && b.isCore) return 1;
         return a.displayName.localeCompare(b.displayName);
@@ -92,72 +124,101 @@ export default function ViewValidCombinationsPage() {
     return isNaN(date.getTime()) ? null : date;
   }, [dateString]);
 
-  const processedEntries = useMemo((): DisplayableCombinationEntry[] => {
+  const generatedCombinations = useMemo((): DisplayableCombination[] => {
     if (!selectedDate) return [];
 
     const activeCombinationRules = combinationRules.filter(rule => rule.status === 'Active');
-    const entriesToDisplay: DisplayableCombinationEntry[] = [];
+    const entriesToDisplay: DisplayableCombination[] = [];
 
     activeCombinationRules.forEach(rule => {
       rule.mappingEntries.forEach(entry => {
         if (entry.behavior !== 'Include') return;
 
-        let currentEffectiveStatus: EffectiveStatus = 'Effective';
-        let segmentAValidOnDate = true;
-        let segmentBValidOnDate = true;
-
-        // Check validity for Segment A code
-        if (entry.segmentACriterion.type === 'CODE' && entry.segmentACriterion.codeValue) {
-          const codeA = getSegmentCode(rule.segmentAId, entry.segmentACriterion.codeValue);
-          segmentAValidOnDate = codeA ? isCodeValidOnDate(codeA, selectedDate) : false;
-          if (!codeA && currentEffectiveStatus !== 'Code Validity Unknown') currentEffectiveStatus = 'Code Validity Unknown';
-        } else if (entry.segmentACriterion.type !== 'CODE') {
-           if (currentEffectiveStatus !== 'Code Validity Unknown') currentEffectiveStatus = 'Code Validity Unknown';
-        }
+        const codesA = getCodesFromCriterion(entry.segmentACriterion, rule.segmentAId, selectedDate);
+        const codesB = getCodesFromCriterion(entry.segmentBCriterion, rule.segmentBId, selectedDate);
         
-        // Check validity for Segment B code
-        if (entry.segmentBCriterion.type === 'CODE' && entry.segmentBCriterion.codeValue) {
-          const codeB = getSegmentCode(rule.segmentBId, entry.segmentBCriterion.codeValue);
-          segmentBValidOnDate = codeB ? isCodeValidOnDate(codeB, selectedDate) : false;
-          if (!codeB && currentEffectiveStatus !== 'Code Validity Unknown') currentEffectiveStatus = 'Code Validity Unknown';
-        } else if (entry.segmentBCriterion.type !== 'CODE') {
-           if (currentEffectiveStatus !== 'Code Validity Unknown') currentEffectiveStatus = 'Code Validity Unknown';
-        }
-        
-        // Determine overall status if not already 'Code Validity Unknown'
-        if (currentEffectiveStatus !== 'Code Validity Unknown') {
-            if (!segmentAValidOnDate && !segmentBValidOnDate) {
-                currentEffectiveStatus = 'Both Codes Inactive';
-            } else if (!segmentAValidOnDate) {
-                currentEffectiveStatus = 'Segment A Code Inactive';
-            } else if (!segmentBValidOnDate) {
-                currentEffectiveStatus = 'Segment B Code Inactive';
-            }
-        }
+        const segmentADisplay = renderCriterionDisplay(entry.segmentACriterion);
+        const segmentBDisplay = renderCriterionDisplay(entry.segmentBCriterion);
 
-        // Only include if the specific codes in rule are effective OR if validity is unknown (for ranges/hierarchies)
-        if (currentEffectiveStatus === 'Effective' || currentEffectiveStatus === 'Code Validity Unknown') {
-          const rowData: DisplayableCombinationEntry = {
-            id: entry.id,
-            ruleName: rule.name,
-            effectiveStatus: currentEffectiveStatus,
-          };
-
-          activeSegments.forEach(activeSeg => {
-            if (activeSeg.id === rule.segmentAId) {
-              rowData[activeSeg.id] = renderCriterionDisplay(entry.segmentACriterion);
-            } else if (activeSeg.id === rule.segmentBId) {
-              rowData[activeSeg.id] = renderCriterionDisplay(entry.segmentBCriterion);
-            } else {
-              rowData[activeSeg.id] = "Any Valid Code";
-            }
-          });
-          entriesToDisplay.push(rowData);
+        if (codesA.length > 0 && codesB.length > 0) { // Both criteria yielded specific codes
+            codesA.forEach(codeA => {
+                codesB.forEach(codeB => {
+                    const segmentCriteriaDisplay: Record<string, string> = {};
+                    activeSegments.forEach(activeSeg => {
+                        if (activeSeg.id === rule.segmentAId) {
+                            segmentCriteriaDisplay[activeSeg.id] = codeA.code;
+                        } else if (activeSeg.id === rule.segmentBId) {
+                            segmentCriteriaDisplay[activeSeg.id] = codeB.code;
+                        } else {
+                            segmentCriteriaDisplay[activeSeg.id] = "Any Valid Code";
+                        }
+                    });
+                    entriesToDisplay.push({
+                        mappingEntryId: entry.id,
+                        segmentCriteriaDisplay,
+                    });
+                });
+            });
+        } else if (codesA.length > 0 && entry.segmentBCriterion.type === 'HIERARCHY_NODE') {
+             codesA.forEach(codeA => {
+                const segmentCriteriaDisplay: Record<string, string> = {};
+                activeSegments.forEach(activeSeg => {
+                    if (activeSeg.id === rule.segmentAId) segmentCriteriaDisplay[activeSeg.id] = codeA.code;
+                    else if (activeSeg.id === rule.segmentBId) segmentCriteriaDisplay[activeSeg.id] = segmentBDisplay;
+                    else segmentCriteriaDisplay[activeSeg.id] = "Any Valid Code";
+                });
+                entriesToDisplay.push({ mappingEntryId: entry.id, segmentCriteriaDisplay });
+            });
+        } else if (codesB.length > 0 && entry.segmentACriterion.type === 'HIERARCHY_NODE') {
+            codesB.forEach(codeB => {
+                const segmentCriteriaDisplay: Record<string, string> = {};
+                activeSegments.forEach(activeSeg => {
+                    if (activeSeg.id === rule.segmentAId) segmentCriteriaDisplay[activeSeg.id] = segmentADisplay;
+                    else if (activeSeg.id === rule.segmentBId) segmentCriteriaDisplay[activeSeg.id] = codeB.code;
+                    else segmentCriteriaDisplay[activeSeg.id] = "Any Valid Code";
+                });
+                entriesToDisplay.push({ mappingEntryId: entry.id, segmentCriteriaDisplay });
+            });
+        } else if (entry.segmentACriterion.type === 'HIERARCHY_NODE' && entry.segmentBCriterion.type === 'HIERARCHY_NODE') {
+            // Both are hierarchy nodes, show them as they are
+            const segmentCriteriaDisplay: Record<string, string> = {};
+            activeSegments.forEach(activeSeg => {
+                if (activeSeg.id === rule.segmentAId) segmentCriteriaDisplay[activeSeg.id] = segmentADisplay;
+                else if (activeSeg.id === rule.segmentBId) segmentCriteriaDisplay[activeSeg.id] = segmentBDisplay;
+                else segmentCriteriaDisplay[activeSeg.id] = "Any Valid Code";
+            });
+            entriesToDisplay.push({ mappingEntryId: entry.id, segmentCriteriaDisplay });
         }
+        // If one is a hierarchy and the other yields no codes, we don't list it as it's not a specific combination
       });
     });
     return entriesToDisplay;
-  }, [selectedDate, combinationRules, getSegmentById, activeSegments]);
+  }, [selectedDate, combinationRules, activeSegments]);
+
+  const filteredCombinations = useMemo(() => {
+    return generatedCombinations.filter(combo => {
+      return Object.entries(columnFilters).every(([key, filterValue]) => {
+        if (!filterValue) return true;
+        const lowerFilterValue = filterValue.toLowerCase();
+        
+        if (key === 'mappingEntryId') {
+            return combo.mappingEntryId.toLowerCase().includes(lowerFilterValue);
+        }
+        // For dynamic segment columns
+        const segmentValue = combo.segmentCriteriaDisplay[key];
+        return segmentValue?.toLowerCase().includes(lowerFilterValue) ?? false;
+      });
+    });
+  }, [generatedCombinations, columnFilters]);
+
+  const handleFilterChange = (columnId: string, value: string) => {
+    setColumnFilters(prev => ({ ...prev, [columnId]: value }));
+  };
+  
+  const clearAllFilters = () => {
+    setColumnFilters({});
+  };
+
 
   if (!selectedDate) {
     return (
@@ -188,73 +249,72 @@ export default function ViewValidCombinationsPage() {
     { label: `Valid Combinations for ${format(selectedDate, 'MM/dd/yyyy')}` },
   ];
   
-  const getStatusIndicator = (status: EffectiveStatus) => {
-    switch(status) {
-        case 'Effective': return <CheckCircle className="h-5 w-5 text-green-600" />;
-        case 'Segment A Code Inactive':
-        case 'Segment B Code Inactive':
-        case 'Both Codes Inactive':
-            return <XCircle className="h-5 w-5 text-red-600" />;
-        case 'Code Validity Unknown':
-            return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-        default: return null;
-    }
-  };
-
   return (
-    <div className="w-full max-w-7xl mx-auto"> {/* Increased max-width for wider table */}
+    <div className="w-full max-w-7xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
-      <header className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary">
-            Valid Combinations by Rule Entry
-          </h1>
-          <p className="text-md text-muted-foreground mt-1">
-            Showing 'Include' rule entries from active rules, and their code validity as of <span className="font-semibold text-primary">{format(selectedDate, 'PPP')}</span>.
-            <br/>"Any Valid Code" indicates the segment is not restricted by this specific 2-segment rule entry.
-          </p>
+      <header className="mb-6">
+        <div className="flex justify-between items-center">
+            <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-primary">
+                    Valid Segment Code Combinations
+                </h1>
+                <p className="text-md text-muted-foreground mt-1">
+                    Showing specific code combinations derived from 'Include' rule entries effective as of <span className="font-semibold text-primary">{format(selectedDate, 'PPP')}</span>.
+                </p>
+                 <p className="text-xs text-muted-foreground mt-0.5">
+                    "Any Valid Code" indicates the segment is not restricted by the 2-segment rule that generated this row. Hierarchy Node criteria are shown as defined.
+                </p>
+            </div>
+            <Button onClick={() => router.push('/configure/combination-rules')} variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to All Rules
+            </Button>
         </div>
-        <Button onClick={() => router.push('/configure/combination-rules')} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to All Rules
-        </Button>
+        <div className="mt-4 flex justify-end">
+            <Button onClick={clearAllFilters} variant="ghost" size="sm" disabled={Object.values(columnFilters).every(f => !f)}>
+                <FilterX className="mr-2 h-4 w-4" /> Clear All Filters
+            </Button>
+        </div>
       </header>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Rule Entries Effective on {format(selectedDate, 'MM/dd/yyyy')}</CardTitle>
-          <CardDescription>
-            This table lists 'Include' mapping entries from active combination rules. The 'Effective Status' indicates if specific codes in the Segment A/B criteria are active on the selected date. 'Code Validity Unknown' applies if criteria are ranges/hierarchies or codes were not found.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {processedEntries.length > 0 ? (
+        <CardContent className="pt-6">
+          {filteredCombinations.length > 0 ? (
             <ScrollArea className="w-full whitespace-nowrap">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[150px]">Mapping Entry ID</TableHead>
-                    <TableHead className="min-w-[200px]">Rule Name</TableHead>
+                    <TableHead className="min-w-[150px] sticky left-0 bg-card z-10">
+                        Mapping Entry ID
+                        <Input
+                            placeholder="Filter ID..."
+                            value={columnFilters['mappingEntryId'] || ''}
+                            onChange={(e) => handleFilterChange('mappingEntryId', e.target.value)}
+                            className="mt-1 h-8"
+                        />
+                    </TableHead>
                     {activeSegments.map(seg => (
-                        <TableHead key={seg.id} className="min-w-[150px]">{seg.displayName}</TableHead>
+                        <TableHead key={seg.id} className="min-w-[180px]">
+                            {seg.displayName}
+                            <Input
+                                placeholder={`Filter ${seg.displayName}...`}
+                                value={columnFilters[seg.id] || ''}
+                                onChange={(e) => handleFilterChange(seg.id, e.target.value)}
+                                className="mt-1 h-8"
+                            />
+                        </TableHead>
                     ))}
-                    <TableHead className="text-center min-w-[150px]">Effective Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {processedEntries.map(entry => (
-                    <TableRow key={entry.id}>
-                      <TableCell className="font-medium">{entry.id}</TableCell>
-                      <TableCell>{entry.ruleName}</TableCell>
+                  {filteredCombinations.map((combo, comboIndex) => (
+                    <TableRow key={`${combo.mappingEntryId}-${comboIndex}`}> {/* Ensure unique key for react rendering */}
+                      <TableCell className="font-medium sticky left-0 bg-card z-10">{combo.mappingEntryId}</TableCell>
                       {activeSegments.map(seg => (
-                        <TableCell key={`${entry.id}-${seg.id}`}>{entry[seg.id]}</TableCell>
+                        <TableCell key={`${combo.mappingEntryId}-${comboIndex}-${seg.id}`}>
+                            {combo.segmentCriteriaDisplay[seg.id]}
+                        </TableCell>
                       ))}
-                      <TableCell className="text-center">
-                        <div className="flex flex-col items-center">
-                           {getStatusIndicator(entry.effectiveStatus)}
-                           <span className="text-xs mt-1">{entry.effectiveStatus}</span>
-                        </div>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -262,7 +322,10 @@ export default function ViewValidCombinationsPage() {
             </ScrollArea>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No 'Include' rule entries are effectively active for the selected date, or no relevant rules configured.
+              {generatedCombinations.length === 0 ? 
+                "No 'Include' rule entries generate specific combinations for the selected date." :
+                "No combinations match your current filter criteria."
+              }
             </p>
           )}
         </CardContent>
@@ -270,3 +333,4 @@ export default function ViewValidCombinationsPage() {
     </div>
   );
 }
+
