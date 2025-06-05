@@ -184,7 +184,17 @@ export default function ViewValidCombinationsPage() {
         // If one is a hierarchy and the other yields no codes, we don't list it as it's not a specific combination
       });
     });
-    return entriesToDisplay;
+    // Deduplicate entries based on the content of segmentCriteriaDisplay to avoid identical rows from different rules/entries
+    // This is a simple string-based deduplication. More complex scenarios might need smarter logic.
+    const uniqueEntries = new Map<string, DisplayableCombination>();
+    entriesToDisplay.forEach(entry => {
+        const key = JSON.stringify(entry.segmentCriteriaDisplay); // Create a key from the displayed values
+        if (!uniqueEntries.has(key)) {
+            uniqueEntries.set(key, entry);
+        }
+    });
+
+    return Array.from(uniqueEntries.values());
   }, [selectedDate, combinationRules, activeSegments]);
 
   const filteredCombinations = useMemo(() => {
@@ -194,6 +204,10 @@ export default function ViewValidCombinationsPage() {
         const lowerFilterValue = filterValue.toLowerCase();
         
         if (key === 'mappingEntryId') {
+            // For combinations generated from ranges/multiple codes, mappingEntryId might not be unique.
+            // Consider if filtering by the displayed content is more appropriate or if mappingEntryId is still useful.
+            // If a single mapping entry can produce many rows, this filter might be less intuitive.
+            // For now, keeping it as is:
             return combo.mappingEntryId.toLowerCase().includes(lowerFilterValue);
         }
         // For dynamic segment columns
@@ -300,14 +314,14 @@ export default function ViewValidCombinationsPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredCombinations.map((combo, comboIndex) => (
-                    <TableRow key={`${combo.mappingEntryId}-${comboIndex}`}> {/* Ensure unique key for react rendering */}
-                      <TableCell className="font-medium sticky left-0 bg-card z-10">{combo.mappingEntryId}</TableCell>
-                      {activeSegments.map(seg => (
-                        <TableCell key={`${combo.mappingEntryId}-${comboIndex}-${seg.id}`}>
-                            {combo.segmentCriteriaDisplay[seg.id]}
-                        </TableCell>
-                      ))}
-                    </TableRow>
+                    <TableRow key={`${combo.mappingEntryId}-${comboIndex}`}>{/*
+                   */}<TableCell className="font-medium sticky left-0 bg-card z-10">{combo.mappingEntryId}</TableCell>{/*
+                   */}{activeSegments.map(seg => (
+                        <TableCell key={`${combo.mappingEntryId}-${comboIndex}-${seg.id}`}>{/*
+                       */}{combo.segmentCriteriaDisplay[seg.id]}{/*
+                     */}</TableCell>
+                      ))}{/*
+                 */}</TableRow>
                   ))}
                 </TableBody>
               </Table>
@@ -325,4 +339,3 @@ export default function ViewValidCombinationsPage() {
     </div>
   );
 }
-
