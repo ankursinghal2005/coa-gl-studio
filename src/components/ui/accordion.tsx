@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -23,18 +24,26 @@ AccordionItem.displayName = "AccordionItem"
 const AccordionTrigger = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, asChild, ...props }, ref) => ( // Destructure asChild
   <AccordionPrimitive.Header className="flex">
     <AccordionPrimitive.Trigger
       ref={ref}
+      asChild={asChild} // Pass asChild to the primitive
       className={cn(
-        "flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180",
+        "flex flex-1 items-center font-medium transition-all hover:underline",
+        // Apply justify-between and chevron rotation only if not asChild
+        !asChild && "justify-between",
+        !asChild && "[&[data-state=open]>svg]:rotate-180",
+        // Apply default padding if not asChild
+        !asChild && "py-4",
         className
       )}
       {...props}
     >
-      {children}
-      <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+      {children} {/* This will be the content passed to AccordionTrigger */}
+      {!asChild && ( /* Render ChevronDown only if AccordionTrigger is not in asChild mode */
+        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+      )}
     </AccordionPrimitive.Trigger>
   </AccordionPrimitive.Header>
 ))
