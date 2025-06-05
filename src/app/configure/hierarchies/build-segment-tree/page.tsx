@@ -16,7 +16,7 @@ import { mockSegmentCodesData } from '@/lib/segment-types';
 import type { HierarchyNode, HierarchySet, SegmentHierarchyInSet } from '@/lib/hierarchy-types';
 import { Label } from '@/components/ui/label';
 
-// --- Helper functions for tree manipulation (similar to those previously in the modal) ---
+// --- Helper functions for tree manipulation ---
 const codeExistsInTree = (nodes: HierarchyNode[], codeId: string): boolean => {
   for (const node of nodes) {
     if (node.segmentCode.id === codeId) return true;
@@ -80,7 +80,7 @@ const removeNodeFromTreeRecursive = (nodes: HierarchyNode[], idToRemove: string)
     });
 };
 
-// --- TreeNodeDisplay Component (similar to previous) ---
+// --- TreeNodeDisplay Component ---
 const TreeNodeDisplay: React.FC<{
   node: HierarchyNode;
   level: number;
@@ -97,7 +97,7 @@ const TreeNodeDisplay: React.FC<{
       className={`relative p-3 border rounded-md mb-2 shadow-sm ${isSelectedParent ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-card hover:bg-accent/50'}`}
       onClick={(e) => {
         if (canBeParent) {
-          e.stopPropagation(); 
+          e.stopPropagation();
           onSelectParent(node.id);
         }
       }}
@@ -107,7 +107,7 @@ const TreeNodeDisplay: React.FC<{
         size="icon"
         className="absolute top-1 right-1 h-6 w-6 text-destructive hover:text-destructive/80"
         onClick={(e) => {
-          e.stopPropagation(); 
+          e.stopPropagation();
           onRemoveNode(node.id);
         }}
         aria-label="Remove node"
@@ -155,44 +155,75 @@ export default function BuildSegmentTreePage() {
   const { getHierarchySetById, updateHierarchySet } = useHierarchies();
 
   const hierarchySetId = searchParams.get('hierarchySetId');
-  const segmentHierarchyId = searchParams.get('segmentHierarchyId'); // This is the ID of SegmentHierarchyInSet
+  const segmentHierarchyId = searchParams.get('segmentHierarchyId');
 
+  const [isLoading, setIsLoading] = useState(true);
   const [hierarchySet, setHierarchySet] = useState<HierarchySet | null>(null);
   const [segmentHierarchy, setSegmentHierarchy] = useState<SegmentHierarchyInSet | null>(null);
   const [segmentDetails, setSegmentDetails] = useState<Segment | null>(null);
-  
+
   const [treeNodes, setTreeNodes] = useState<HierarchyNode[]>([]);
   const [selectedParentNodeId, setSelectedParentNodeId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [rangeStartCode, setRangeStartCode] = useState('');
   const [rangeEndCode, setRangeEndCode] = useState('');
-  
+
   const [allSegmentCodes, setAllSegmentCodes] = useState<SegmentCode[]>([]);
   const [availableSummaryCodes, setAvailableSummaryCodes] = useState<SegmentCode[]>([]);
   const [availableDetailCodes, setAvailableDetailCodes] = useState<SegmentCode[]>([]);
 
-  useEffect(() => {
+ useEffect(() => {
+    setIsLoading(true);
+    console.log("BuildSegmentTreePage: useEffect triggered with hierarchySetId:", hierarchySetId, "segmentHierarchyId:", segmentHierarchyId);
+
     if (hierarchySetId) {
       const hs = getHierarchySetById(hierarchySetId);
-      setHierarchySet(hs || null);
+      console.log("BuildSegmentTreePage: Fetched HierarchySet from context:", hs ? `ID: ${hs.id}, SegHierarchies: ${JSON.stringify(hs.segmentHierarchies.map(s => s.id))}` : 'Not Found');
+
       if (hs && segmentHierarchyId) {
         const sh = hs.segmentHierarchies.find(s => s.id === segmentHierarchyId);
-        setSegmentHierarchy(sh || null);
+        console.log("BuildSegmentTreePage: Found SegmentHierarchyInSet in hs:", sh ? `ID: ${sh.id}` : 'Not Found');
+
         if (sh) {
-          setTreeNodes(JSON.parse(JSON.stringify(sh.treeNodes || []))); // Deep copy
           const seg = getSegmentById(sh.segmentId);
-          setSegmentDetails(seg || null);
-          if (seg) {
-             const codesForSegment = (mockSegmentCodesData[seg.id] || [])
+          console.log("BuildSegmentTreePage: Fetched SegmentDetails:", seg ? `ID: ${seg.id}` : 'Not Found');
+
+          if (seg) { // Only proceed if all three critical pieces of data are found
+            setHierarchySet(hs);
+            setSegmentHierarchy(sh);
+            setSegmentDetails(seg);
+            setTreeNodes(JSON.parse(JSON.stringify(sh.treeNodes || []))); // Deep copy
+
+            const codesForSegment = (mockSegmentCodesData[seg.id] || [])
               .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
             setAllSegmentCodes(codesForSegment);
+            setIsLoading(false); // Data loaded successfully
+            return; // Exit early from useEffect
+          } else {
+            console.error("BuildSegmentTreePage: SegmentDetails NOT FOUND for segmentId:", sh.segmentId);
           }
+        } else {
+          console.error("BuildSegmentTreePage: SegmentHierarchyInSet NOT FOUND for ID:", segmentHierarchyId, "within set:", hs.id);
         }
+      } else {
+        if (!hs) console.error("BuildSegmentTreePage: HierarchySet NOT FOUND for ID:", hierarchySetId);
+        if (!segmentHierarchyId) console.error("BuildSegmentTreePage: segmentHierarchyId is missing from URL params.");
       }
+    } else {
+      console.error("BuildSegmentTreePage: hierarchySetId is missing from URL params.");
     }
+
+    // If we reach here, something critical was missing, so set all to null and stop loading
+    setHierarchySet(null);
+    setSegmentHierarchy(null);
+    setSegmentDetails(null);
+    setTreeNodes([]);
+    setAllSegmentCodes([]);
+    setIsLoading(false);
   }, [hierarchySetId, segmentHierarchyId, getHierarchySetById, getSegmentById]);
-  
-  useEffect(() => { 
+
+
+  useEffect(() => {
     if (allSegmentCodes.length > 0) {
         const filteredCodes = searchTerm
           ? allSegmentCodes.filter(
@@ -255,7 +286,7 @@ export default function BuildSegmentTreePage() {
             alert('Cannot add a detail code as a new root. Select a summary parent or add a summary code as a new root.'); return;
           }
           setTreeNodes(prevNodes => [...prevNodes, newNode]);
-          setSelectedParentNodeId(newNode.id); 
+          setSelectedParentNodeId(newNode.id);
         }
       }
     } catch (e) { console.error("Failed to process dropped code:", e); alert("Error processing dropped code."); }
@@ -295,12 +326,12 @@ export default function BuildSegmentTreePage() {
     codesInRange.forEach(code => {
       if (codeExistsInTree(currentTree, code.id)) { skippedExisting.push(code.code); return; }
       const newNode: HierarchyNode = { id: crypto.randomUUID(), segmentCode: code, children: [] };
-      
+
       const tempTree = addChildToNode(currentTree, selectedParentNodeId, newNode);
-      if (JSON.stringify(tempTree) !== JSON.stringify(currentTree)) { 
+      if (JSON.stringify(tempTree) !== JSON.stringify(currentTree)) {
           currentTree = tempTree;
           addedCount++;
-      } else if (!skippedExisting.includes(code.code)) { 
+      } else if (!skippedExisting.includes(code.code)) {
           skippedExisting.push(code.code + " (parent type restriction or already child)");
       }
     });
@@ -319,16 +350,16 @@ export default function BuildSegmentTreePage() {
   };
 
   const handleSaveTree = () => {
-    if (!hierarchySet || !segmentHierarchy) {
-      alert("Error: Hierarchy Set or Segment Hierarchy details are missing.");
+    if (!hierarchySet || !segmentHierarchy || !segmentDetails) { // Check all required data
+      alert("Error: Critical hierarchy details are missing. Cannot save.");
       return;
     }
-    const updatedSegmentHierarchies = hierarchySet.segmentHierarchies.map(sh => 
+    const updatedSegmentHierarchies = hierarchySet.segmentHierarchies.map(sh =>
       sh.id === segmentHierarchy.id ? { ...sh, treeNodes: treeNodes } : sh
     );
     const updatedHierarchySet = { ...hierarchySet, segmentHierarchies: updatedSegmentHierarchies, lastModifiedDate: new Date(), lastModifiedBy: "Current User" };
     updateHierarchySet(updatedHierarchySet);
-    alert(`Tree structure for segment "${segmentDetails?.displayName}" in set "${hierarchySet.name}" saved.`);
+    alert(`Tree structure for segment "${segmentDetails.displayName}" in set "${hierarchySet.name}" saved.`);
     router.push(`/configure/hierarchies/build?hierarchySetId=${hierarchySetId}`);
   };
 
@@ -336,21 +367,58 @@ export default function BuildSegmentTreePage() {
     router.push(`/configure/hierarchies/build?hierarchySetId=${hierarchySetId}`);
   };
 
-  if (!hierarchySet || !segmentHierarchy || !segmentDetails) {
-    return (
-      <div className="w-full max-w-7xl mx-auto p-6">
-        <p>Loading hierarchy details or invalid parameters...</p>
-        <Button onClick={() => router.push('/configure/hierarchies')}>Back to Hierarchy Sets</Button>
-      </div>
-    );
-  }
 
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
     { label: 'Hierarchy Sets', href: '/configure/hierarchies' },
-    { label: `Edit Set: ${hierarchySet.name}`, href: `/configure/hierarchies/build?hierarchySetId=${hierarchySet.id}` },
-    { label: `Build Tree: ${segmentDetails.displayName}` },
+    { label: `Edit Set: ${hierarchySet?.name || 'Loading Set...'}`, href: hierarchySetId ? `/configure/hierarchies/build?hierarchySetId=${hierarchySetId}` : '/configure/hierarchies' },
+    { label: `Build Tree: ${segmentDetails?.displayName || 'Loading Segment...'}` },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="w-full max-w-7xl mx-auto p-6 flex justify-center items-center h-screen">
+        <div className="flex flex-col items-center">
+          <Workflow className="h-12 w-12 text-primary animate-spin mb-4" />
+          <p className="text-lg text-muted-foreground">Loading Tree Builder...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hierarchySet || !segmentHierarchy || !segmentDetails) {
+    return (
+      <div className="w-full max-w-7xl mx-auto p-6">
+        <Breadcrumbs items={[{ label: "Error Loading Hierarchy Configuration"}]} />
+        <Card className="mt-4">
+            <CardHeader>
+                <CardTitle className="text-destructive flex items-center">
+                    <AlertTriangle className="mr-2 h-6 w-6" />
+                    Error Loading Hierarchy Details
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p className="text-muted-foreground mb-1">The system could not load the necessary details to build the hierarchy tree.</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                    This might be due to invalid or missing parameters in the URL, or the requested data could not be found. Please ensure the Hierarchy Set and Segment Hierarchy IDs are correct.
+                </p>
+                <ul className="text-xs list-disc list-inside text-muted-foreground/80 mb-4">
+                    <li>Hierarchy Set ID from URL: {hierarchySetId || 'Not provided'}</li>
+                    <li>Segment Hierarchy ID from URL: {segmentHierarchyId || 'Not provided'}</li>
+                    <li>Hierarchy Set found in context: {hierarchySet ? 'Yes' : 'No'}</li>
+                    <li>Segment Hierarchy found in Set: {segmentHierarchy ? 'Yes' : 'No'}</li>
+                    <li>Segment Details found: {segmentDetails ? 'Yes' : 'No'}</li>
+                </ul>
+                <Button onClick={() => router.push(hierarchySetId ? `/configure/hierarchies/build?hierarchySetId=${hierarchySetId}` : '/configure/hierarchies')}>
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Hierarchy Set
+                </Button>
+            </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col h-full">
@@ -366,7 +434,7 @@ export default function BuildSegmentTreePage() {
           </CardDescription>
         </header>
       </div>
-      
+
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-y-auto px-4 md:px-6 lg:px-8 pb-4">
           <Card className="flex flex-col">
             <CardHeader className="pt-4 pb-2">
@@ -389,7 +457,7 @@ export default function BuildSegmentTreePage() {
                       <div><div className="font-medium text-sm">{code.code}</div><div className="text-xs text-muted-foreground">{code.description}</div></div>
                     </div>
                   ))}
-                  {availableSummaryCodes.length === 0 && <p className="text-xs text-muted-foreground p-2">{searchTerm ? 'No matching summary codes.' : 'No summary codes.'}</p>}
+                  {availableSummaryCodes.length === 0 && <p className="text-xs text-muted-foreground p-2">{searchTerm ? 'No matching summary codes.' : 'No summary codes available for this segment.'}</p>}
                 </ScrollArea>
                 <div className="px-3 pt-3 pb-1 border-t"><h4 className="text-md font-semibold text-muted-foreground">Detail Codes (Children)</h4></div>
                 <ScrollArea className="px-3 pb-1 flex-1 min-h-0">
@@ -399,7 +467,7 @@ export default function BuildSegmentTreePage() {
                         <div><div className="font-medium text-sm">{code.code}</div><div className="text-xs text-muted-foreground">{code.description}</div></div>
                     </div>
                   ))}
-                  {availableDetailCodes.length === 0 && <p className="text-xs text-muted-foreground p-2">{searchTerm ? 'No matching detail codes.' : 'No detail codes.'}</p>}
+                  {availableDetailCodes.length === 0 && <p className="text-xs text-muted-foreground p-2">{searchTerm ? 'No matching detail codes.' : 'No detail codes available for this segment.'}</p>}
                 </ScrollArea>
               </div>
             </CardContent>
@@ -437,12 +505,12 @@ export default function BuildSegmentTreePage() {
                 )}
               </ScrollArea>
               {selectedParentNodeDetails && selectedParentNodeDetails.segmentCode.summaryIndicator && (
-                  <div className="mt-2 p-2 border border-dashed border-green-500 rounded-md bg-green-50/70 text-center text-xs text-green-700 shrink-0"> 
+                  <div className="mt-2 p-2 border border-dashed border-green-500 rounded-md bg-green-50/70 text-center text-xs text-green-700 shrink-0">
                       Adding to: '{selectedParentNodeDetails.segmentCode.code}'. Drag/drop or use 'Add Range'.
                   </div>
               )}
               {!selectedParentNodeId && treeNodes.length > 0 && (
-                  <div className="mt-2 p-2 border border-dashed border-blue-500 rounded-md bg-blue-50/70 text-center text-xs text-blue-700 shrink-0"> 
+                  <div className="mt-2 p-2 border border-dashed border-blue-500 rounded-md bg-blue-50/70 text-center text-xs text-blue-700 shrink-0">
                       No parent selected. Drag new SUMMARY code for another root, or click existing SUMMARY node.
                   </div>
               )}
@@ -462,5 +530,4 @@ export default function BuildSegmentTreePage() {
     </div>
   );
 }
-
     
