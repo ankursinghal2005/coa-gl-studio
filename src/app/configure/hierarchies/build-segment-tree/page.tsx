@@ -474,7 +474,7 @@ export default function BuildSegmentTreePage() {
               </div>
               <div className="flex flex-col flex-1">
                 <div className="px-3 pt-3 pb-1"><h4 className="text-md font-semibold text-muted-foreground">Summary Codes (Parents)</h4></div>
-                <ScrollArea className="px-3 flex-1 min-h-0">
+                <ScrollArea className="px-3 max-h-52 min-h-16">
                   {availableSummaryCodes.map(code => (
                     <div 
                       key={code.id} 
@@ -489,7 +489,7 @@ export default function BuildSegmentTreePage() {
                   {availableSummaryCodes.length === 0 && <p className="text-xs text-muted-foreground p-2">{searchTerm ? 'No matching summary codes.' : 'No summary codes available for this segment.'}</p>}
                 </ScrollArea>
                 <div className="px-3 pt-3 pb-1 border-t"><h4 className="text-md font-semibold text-muted-foreground">Detail Codes (Children)</h4></div>
-                <ScrollArea className="px-3 pb-1 flex-1 min-h-0">
+                <ScrollArea className="px-3 pb-1 max-h-52 min-h-16">
                   {availableDetailCodes.map(code => (
                     <div 
                       key={code.id} 
@@ -573,3 +573,4 @@ export default function BuildSegmentTreePage() {
     
 
     
+
