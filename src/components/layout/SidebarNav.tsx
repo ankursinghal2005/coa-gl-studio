@@ -18,11 +18,11 @@ import {
   sidebarMenuButtonVariants,
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem, // Ensure this is imported
-  SidebarTrigger, 
+  SidebarMenuSubItem,
+  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button'; // Import Button
+import { Button } from '@/components/ui/button';
 import {
   Accordion,
   AccordionContent,
@@ -35,27 +35,27 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area'; 
-import { SheetTitle } from '@/components/ui/sheet'; 
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { SheetTitle } from '@/components/ui/sheet';
 
 interface SidebarNavProps {
   className?: string;
 }
 
 export function SidebarNav({ className }: SidebarNavProps) {
-  const { state: sidebarState, toggleSidebar, isMobile } = useSidebar(); 
+  const { state: sidebarState, toggleSidebar, isMobile } = useSidebar();
   const pathname = usePathname();
 
   const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false) => {
     return items.map((item, index) => {
       if (!item.href && !item.children) {
-        if (isSubmenu) { 
+        if (isSubmenu) {
           return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{item.title}</DropdownMenuItem>;
         }
         return (
           <SidebarMenuItem key={`${item.title}-${index}-span`} className="px-2 py-1.5 text-sm text-muted-foreground">
             {item.icon && <span className="mr-2 w-5 h-5 inline-flex items-center justify-center">{item.icon}</span>}
-            {item.title}
+            <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
           </SidebarMenuItem>
         );
       }
@@ -101,10 +101,8 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   <AccordionTrigger
                     disabled={item.disabled}
                     className={cn(
-                      sidebarMenuButtonVariants({variant: "default", size: "default"}), // Use variants
-                      // Override AccordionTrigger's default hover:underline and py-4
-                      "!hover:no-underline !py-2 !px-2 !h-8", 
-                      // Ensure justify-between is still applied so the internal chevron goes to the right
+                      sidebarMenuButtonVariants({variant: "default", size: "default"}),
+                      "!hover:no-underline !py-2 !px-2 !h-8",
                       "justify-between group-data-[collapsible=icon]:justify-center"
                     )}
                   >
@@ -161,7 +159,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
   if (isMobile) {
     return (
       <>
-        {/* Screen reader title for the sheet */}
         <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
         <SidebarHeader className="p-2 border-b border-sidebar-border">
            <div className="flex items-center gap-2 px-2 py-2">
@@ -176,8 +173,8 @@ export function SidebarNav({ className }: SidebarNavProps) {
         </SidebarHeader>
 
         <SidebarContent className="p-0">
-           <ScrollArea className="h-full"> 
-              <SidebarMenu className="p-2"> 
+           <ScrollArea className="h-full">
+              <SidebarMenu className="p-2">
                 {renderNavItems(mainNavItems)}
               </SidebarMenu>
            </ScrollArea>
@@ -195,27 +192,26 @@ export function SidebarNav({ className }: SidebarNavProps) {
 
   return (
     <Sidebar
-      variant="sidebar" 
-      collapsible="icon" 
-      className={cn("hidden md:flex", className)} 
+      variant="sidebar"
+      collapsible="icon"
+      className={cn("hidden md:flex", className)}
       side="left"
     >
-      <SidebarHeader className="p-2 border-b border-sidebar-border">
-         <div className="flex items-center justify-between w-full px-1"> {/* Adjusted for spacing */}
+      <SidebarHeader className="p-2 border-b border-sidebar-border flex flex-col items-center">
             {/* Logo Area: Button when collapsed, Link when expanded */}
             {sidebarState === 'collapsed' && !isMobile ? (
               <Button
                 variant="ghost"
-                size="icon" 
+                size="icon"
                 className="h-9 w-9 p-0 flex items-center justify-center rounded hover:bg-sidebar-accent"
                 onClick={toggleSidebar}
                 aria-label="Expand sidebar"
-                title="Expand sidebar" 
+                title="Expand sidebar"
               >
                 <span className="text-lg font-bold bg-primary text-primary-foreground h-7 w-7 flex items-center justify-center rounded">F</span>
               </Button>
             ) : (
-              <Link href="/" className="flex items-center gap-2 ml-1"> {/* ml-1 for slight spacing if no trigger */}
+              <Link href="/" className="flex items-center gap-2 mb-2"> {/* Added mb-2 for spacing */}
                   <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded">F</span>
                   <div className="group-data-[collapsible=icon]:hidden">
                       <span className="font-semibold text-lg text-primary">Financial</span>
@@ -224,13 +220,12 @@ export function SidebarNav({ className }: SidebarNavProps) {
               </Link>
             )}
             {/* Trigger to collapse (only shown when expanded on desktop) */}
-            <SidebarTrigger className="hidden md:flex data-[state=expanded]:flex data-[state=collapsed]:hidden" /> 
-        </div>
+            <SidebarTrigger className="hidden md:flex data-[state=expanded]:flex data-[state=collapsed]:hidden" />
       </SidebarHeader>
 
-      <SidebarContent className="p-0"> 
-         <ScrollArea className="h-full"> 
-            <SidebarMenu className="p-2"> 
+      <SidebarContent className="p-0">
+         <ScrollArea className="h-full">
+            <SidebarMenu className="p-2">
               {renderNavItems(mainNavItems)}
             </SidebarMenu>
          </ScrollArea>
@@ -244,4 +239,3 @@ export function SidebarNav({ className }: SidebarNavProps) {
     </Sidebar>
   );
 }
-
