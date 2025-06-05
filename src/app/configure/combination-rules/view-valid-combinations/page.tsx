@@ -3,7 +3,6 @@
 
 import React, { useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { format } from 'date-fns';
 import {
   Table,
@@ -19,27 +18,28 @@ import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCombinationRules } from '@/contexts/CombinationRulesContext';
 import { useSegments } from '@/contexts/SegmentsContext';
-import type { CombinationRule, CombinationRuleCriterion, CombinationRuleMappingEntry } from '@/lib/combination-rule-types';
+import type { CombinationRuleCriterion, CombinationRuleMappingEntry } from '@/lib/combination-rule-types';
 import type { Segment, SegmentCode } from '@/lib/segment-types';
-import { mockSegmentCodesData } from '@/lib/segment-types'; // Using mock data for code validity
+import { mockSegmentCodesData } from '@/lib/segment-types';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
-interface ProcessedMappingEntry extends CombinationRuleMappingEntry {
+type EffectiveStatus = 'Effective' | 'Segment A Code Inactive' | 'Segment B Code Inactive' | 'Both Codes Inactive' | 'Code Validity Unknown';
+
+interface DisplayableCombinationEntry {
+  id: string; // Mapping Entry ID
   ruleName: string;
-  segmentAName: string;
-  segmentBName: string;
-  statusOnDate: 'Effective' | 'Segment A Code Inactive' | 'Segment B Code Inactive' | 'Both Codes Inactive' | 'Code Validity Unknown';
+  [segmentId: string]: string | EffectiveStatus; // Dynamic properties for each active segment's criterion display
+  effectiveStatus: EffectiveStatus;
 }
 
+
 const isCodeValidOnDate = (code: SegmentCode | undefined, targetDate: Date): boolean => {
-  if (!code) return false; // If code itself is not found, it's not valid.
+  if (!code) return false;
   if (!code.isActive) return false;
   
   const fromDate = new Date(code.validFrom);
-  // If targetDate is before validFrom, it's not valid.
   if (targetDate.setHours(0,0,0,0) < fromDate.setHours(0,0,0,0)) return false;
   
-  // If validTo exists and targetDate is after validTo, it's not valid.
   if (code.validTo) {
     const toDate = new Date(code.validTo);
     if (targetDate.setHours(0,0,0,0) > toDate.setHours(0,0,0,0)) return false;
@@ -54,15 +54,15 @@ const getSegmentCode = (segmentId: string, codeValue: string): SegmentCode | und
 };
 
 
-const renderCriterionDisplay = (criterion: CombinationRuleCriterion, segmentName?: string): string => {
-    const namePrefix = segmentName ? `${segmentName} ` : '';
+const renderCriterionDisplay = (criterion: CombinationRuleCriterion): string => {
+    // Segment name prefix is removed as it will be part of the column header
     switch (criterion.type) {
       case 'CODE':
-        return `${namePrefix}Code: ${criterion.codeValue}`;
+        return `Code: ${criterion.codeValue}`;
       case 'RANGE':
-        return `${namePrefix}Range: ${criterion.rangeStartValue} - ${criterion.rangeEndValue}`;
+        return `Range: ${criterion.rangeStartValue} - ${criterion.rangeEndValue}`;
       case 'HIERARCHY_NODE':
-        return `${namePrefix}Hierarchy Node: ${criterion.hierarchyNodeId}${criterion.includeChildren ? ' (and children)' : ''}`;
+        return `Node: ${criterion.hierarchyNodeId}${criterion.includeChildren ? ' (+children)' : ''}`;
       default:
         return 'Invalid Criterion';
     }
@@ -75,7 +75,16 @@ export default function ViewValidCombinationsPage() {
   const dateString = searchParams.get('date');
   
   const { combinationRules } = useCombinationRules();
-  const { getSegmentById } = useSegments();
+  const { segments: allSegments, getSegmentById } = useSegments();
+
+  const activeSegments = useMemo(() => {
+    return allSegments.filter(s => s.isActive).sort((a, b) => {
+        // Optional: Consistent ordering, e.g., core segments first, then by name
+        if (a.isCore && !b.isCore) return -1;
+        if (!a.isCore && b.isCore) return 1;
+        return a.displayName.localeCompare(b.displayName);
+    });
+  }, [allSegments]);
 
   const selectedDate = useMemo(() => {
     if (!dateString) return null;
@@ -83,63 +92,72 @@ export default function ViewValidCombinationsPage() {
     return isNaN(date.getTime()) ? null : date;
   }, [dateString]);
 
-  const processedEntries = useMemo(() => {
+  const processedEntries = useMemo((): DisplayableCombinationEntry[] => {
     if (!selectedDate) return [];
 
-    const activeRules = combinationRules.filter(rule => rule.status === 'Active');
-    const entries: ProcessedMappingEntry[] = [];
+    const activeCombinationRules = combinationRules.filter(rule => rule.status === 'Active');
+    const entriesToDisplay: DisplayableCombinationEntry[] = [];
 
-    activeRules.forEach(rule => {
-      const segmentA = getSegmentById(rule.segmentAId);
-      const segmentB = getSegmentById(rule.segmentBId);
-
+    activeCombinationRules.forEach(rule => {
       rule.mappingEntries.forEach(entry => {
-        let statusOnDate: ProcessedMappingEntry['statusOnDate'] = 'Effective';
-        let segmentAValid = true;
-        let segmentBValid = true;
+        if (entry.behavior !== 'Include') return;
 
+        let currentEffectiveStatus: EffectiveStatus = 'Effective';
+        let segmentAValidOnDate = true;
+        let segmentBValidOnDate = true;
+
+        // Check validity for Segment A code
         if (entry.segmentACriterion.type === 'CODE' && entry.segmentACriterion.codeValue) {
           const codeA = getSegmentCode(rule.segmentAId, entry.segmentACriterion.codeValue);
-          segmentAValid = codeA ? isCodeValidOnDate(codeA, selectedDate) : false;
-           if (!codeA) statusOnDate = 'Code Validity Unknown'; // Code not found in mock data
-        } else {
-           // For RANGE or HIERARCHY_NODE, we simplify and assume validity if rule is active
-           // A more robust solution would check all codes in range/hierarchy
-           statusOnDate = 'Code Validity Unknown'; // Mark as unknown for non-CODE types for now
+          segmentAValidOnDate = codeA ? isCodeValidOnDate(codeA, selectedDate) : false;
+          if (!codeA && currentEffectiveStatus !== 'Code Validity Unknown') currentEffectiveStatus = 'Code Validity Unknown';
+        } else if (entry.segmentACriterion.type !== 'CODE') {
+           if (currentEffectiveStatus !== 'Code Validity Unknown') currentEffectiveStatus = 'Code Validity Unknown';
         }
         
+        // Check validity for Segment B code
         if (entry.segmentBCriterion.type === 'CODE' && entry.segmentBCriterion.codeValue) {
           const codeB = getSegmentCode(rule.segmentBId, entry.segmentBCriterion.codeValue);
-          segmentBValid = codeB ? isCodeValidOnDate(codeB, selectedDate) : false;
-          if (!codeB && statusOnDate !== 'Code Validity Unknown') statusOnDate = 'Code Validity Unknown';
-        } else if (statusOnDate !== 'Code Validity Unknown') {
-            // Also mark as unknown if Segment B is not a specific code.
-           statusOnDate = 'Code Validity Unknown';
-        }
-
-
-        if (statusOnDate !== 'Code Validity Unknown') { // Only proceed if codes were found
-            if (!segmentAValid && !segmentBValid) {
-            statusOnDate = 'Both Codes Inactive';
-            } else if (!segmentAValid) {
-            statusOnDate = 'Segment A Code Inactive';
-            } else if (!segmentBValid) {
-            statusOnDate = 'Segment B Code Inactive';
-            }
+          segmentBValidOnDate = codeB ? isCodeValidOnDate(codeB, selectedDate) : false;
+          if (!codeB && currentEffectiveStatus !== 'Code Validity Unknown') currentEffectiveStatus = 'Code Validity Unknown';
+        } else if (entry.segmentBCriterion.type !== 'CODE') {
+           if (currentEffectiveStatus !== 'Code Validity Unknown') currentEffectiveStatus = 'Code Validity Unknown';
         }
         
+        // Determine overall status if not already 'Code Validity Unknown'
+        if (currentEffectiveStatus !== 'Code Validity Unknown') {
+            if (!segmentAValidOnDate && !segmentBValidOnDate) {
+                currentEffectiveStatus = 'Both Codes Inactive';
+            } else if (!segmentAValidOnDate) {
+                currentEffectiveStatus = 'Segment A Code Inactive';
+            } else if (!segmentBValidOnDate) {
+                currentEffectiveStatus = 'Segment B Code Inactive';
+            }
+        }
 
-        entries.push({
-          ...entry,
-          ruleName: rule.name,
-          segmentAName: segmentA?.displayName || rule.segmentAId,
-          segmentBName: segmentB?.displayName || rule.segmentBId,
-          statusOnDate,
-        });
+        // Only include if the specific codes in rule are effective OR if validity is unknown (for ranges/hierarchies)
+        if (currentEffectiveStatus === 'Effective' || currentEffectiveStatus === 'Code Validity Unknown') {
+          const rowData: DisplayableCombinationEntry = {
+            id: entry.id,
+            ruleName: rule.name,
+            effectiveStatus: currentEffectiveStatus,
+          };
+
+          activeSegments.forEach(activeSeg => {
+            if (activeSeg.id === rule.segmentAId) {
+              rowData[activeSeg.id] = renderCriterionDisplay(entry.segmentACriterion);
+            } else if (activeSeg.id === rule.segmentBId) {
+              rowData[activeSeg.id] = renderCriterionDisplay(entry.segmentBCriterion);
+            } else {
+              rowData[activeSeg.id] = "Any Valid Code";
+            }
+          });
+          entriesToDisplay.push(rowData);
+        }
       });
     });
-    return entries;
-  }, [selectedDate, combinationRules, getSegmentById]);
+    return entriesToDisplay;
+  }, [selectedDate, combinationRules, getSegmentById, activeSegments]);
 
   if (!selectedDate) {
     return (
@@ -170,7 +188,7 @@ export default function ViewValidCombinationsPage() {
     { label: `Valid Combinations for ${format(selectedDate, 'MM/dd/yyyy')}` },
   ];
   
-  const getStatusIndicator = (status: ProcessedMappingEntry['statusOnDate']) => {
+  const getStatusIndicator = (status: EffectiveStatus) => {
     switch(status) {
         case 'Effective': return <CheckCircle className="h-5 w-5 text-green-600" />;
         case 'Segment A Code Inactive':
@@ -184,15 +202,16 @@ export default function ViewValidCombinationsPage() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto"> {/* Increased max-width for wider table */}
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-primary">
-            Valid Combination Rule Entries
+            Valid Combinations by Rule Entry
           </h1>
           <p className="text-md text-muted-foreground mt-1">
-            Showing combination rule entries and their code validity as of <span className="font-semibold text-primary">{format(selectedDate, 'PPP')}</span>.
+            Showing 'Include' rule entries from active rules, and their code validity as of <span className="font-semibold text-primary">{format(selectedDate, 'PPP')}</span>.
+            <br/>"Any Valid Code" indicates the segment is not restricted by this specific 2-segment rule entry.
           </p>
         </div>
         <Button onClick={() => router.push('/configure/combination-rules')} variant="outline">
@@ -203,9 +222,9 @@ export default function ViewValidCombinationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Rule Entries Status on {format(selectedDate, 'MM/dd/yyyy')}</CardTitle>
+          <CardTitle>Rule Entries Effective on {format(selectedDate, 'MM/dd/yyyy')}</CardTitle>
           <CardDescription>
-            This table lists mapping entries from active combination rules. The 'Status on Date' column indicates if the specific codes mentioned in an entry are active and valid on the selected date. 'Code Validity Unknown' means the criterion was not a specific code (e.g., a range or hierarchy node) or the code was not found, and its date validity cannot be determined with the current simplified logic.
+            This table lists 'Include' mapping entries from active combination rules. The 'Effective Status' indicates if specific codes in the Segment A/B criteria are active on the selected date. 'Code Validity Unknown' applies if criteria are ranges/hierarchies or codes were not found.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -214,28 +233,26 @@ export default function ViewValidCombinationsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Rule Name</TableHead>
-                    <TableHead>Behavior</TableHead>
-                    <TableHead>Segment A Criterion</TableHead>
-                    <TableHead>Segment B Criterion</TableHead>
-                    <TableHead className="text-center">Status on Date</TableHead>
+                    <TableHead className="min-w-[150px]">Mapping Entry ID</TableHead>
+                    <TableHead className="min-w-[200px]">Rule Name</TableHead>
+                    {activeSegments.map(seg => (
+                        <TableHead key={seg.id} className="min-w-[150px]">{seg.displayName}</TableHead>
+                    ))}
+                    <TableHead className="text-center min-w-[150px]">Effective Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {processedEntries.map(entry => (
                     <TableRow key={entry.id}>
-                      <TableCell className="font-medium">{entry.ruleName}</TableCell>
-                      <TableCell
-                        className={entry.behavior === 'Include' ? 'text-green-600' : 'text-red-600'}
-                      >
-                        {entry.behavior}
-                      </TableCell>
-                      <TableCell>{renderCriterionDisplay(entry.segmentACriterion, entry.segmentAName)}</TableCell>
-                      <TableCell>{renderCriterionDisplay(entry.segmentBCriterion, entry.segmentBName)}</TableCell>
+                      <TableCell className="font-medium">{entry.id}</TableCell>
+                      <TableCell>{entry.ruleName}</TableCell>
+                      {activeSegments.map(seg => (
+                        <TableCell key={`${entry.id}-${seg.id}`}>{entry[seg.id]}</TableCell>
+                      ))}
                       <TableCell className="text-center">
                         <div className="flex flex-col items-center">
-                           {getStatusIndicator(entry.statusOnDate)}
-                           <span className="text-xs mt-1">{entry.statusOnDate}</span>
+                           {getStatusIndicator(entry.effectiveStatus)}
+                           <span className="text-xs mt-1">{entry.effectiveStatus}</span>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -245,7 +262,7 @@ export default function ViewValidCombinationsPage() {
             </ScrollArea>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No active combination rule entries to display for the selected date, or no rules configured.
+              No 'Include' rule entries are effectively active for the selected date, or no relevant rules configured.
             </p>
           )}
         </CardContent>
@@ -253,5 +270,3 @@ export default function ViewValidCombinationsPage() {
     </div>
   );
 }
-
-    
