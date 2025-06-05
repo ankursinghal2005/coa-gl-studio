@@ -4,6 +4,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { format } from 'date-fns'; // Import format
 import {
   Table,
   TableHeader,
@@ -108,14 +109,14 @@ export default function HierarchySetsPage() {
                       </TableCell>
                       <TableCell>{set.status}</TableCell>
                       <TableCell>
-                        {set.validFrom ? new Date(set.validFrom).toLocaleDateString() : 'N/A'}
+                        {set.validFrom ? format(set.validFrom, 'MM/dd/yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        {set.validTo ? new Date(set.validTo).toLocaleDateString() : 'N/A'}
+                        {set.validTo ? format(set.validTo, 'MM/dd/yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
                         {set.lastModifiedDate
-                          ? `${new Date(set.lastModifiedDate).toLocaleDateString()} by ${set.lastModifiedBy || 'Unknown'}`
+                          ? `${format(set.lastModifiedDate, 'MM/dd/yyyy')} by ${set.lastModifiedBy || 'Unknown'}`
                           : 'N/A'}
                       </TableCell>
                       <TableCell className="text-center">
@@ -157,3 +158,4 @@ export default function HierarchySetsPage() {
     </div>
   );
 }
+
