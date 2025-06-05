@@ -15,13 +15,14 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  sidebarMenuButtonVariants, // Import variants
+  sidebarMenuButtonVariants,
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  SidebarMenuSubItem, // Ensure this is imported
   SidebarTrigger, 
   useSidebar,
 } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button'; // Import Button
 import {
   Accordion,
   AccordionContent,
@@ -42,18 +43,15 @@ interface SidebarNavProps {
 }
 
 export function SidebarNav({ className }: SidebarNavProps) {
-  const { state: sidebarState, isMobile } = useSidebar(); 
+  const { state: sidebarState, toggleSidebar, isMobile } = useSidebar(); 
   const pathname = usePathname();
 
   const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false) => {
     return items.map((item, index) => {
       if (!item.href && !item.children) {
-        // This case is for section headers within a dropdown or mobile accordion,
-        // or non-interactive labels in the main sidebar.
-        if (isSubmenu) { // e.g. in a DropdownMenu for collapsed sidebar
+        if (isSubmenu) { 
           return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{item.title}</DropdownMenuItem>;
         }
-        // For expanded sidebar, a non-interactive label:
         return (
           <SidebarMenuItem key={`${item.title}-${index}-span`} className="px-2 py-1.5 text-sm text-muted-foreground">
             {item.icon && <span className="mr-2 w-5 h-5 inline-flex items-center justify-center">{item.icon}</span>}
@@ -63,7 +61,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
       }
 
       if (item.children && item.children.length > 0) {
-        // Collapsed Desktop Sidebar: Use DropdownMenu for sub-items
         if (sidebarState === 'collapsed' && !isMobile) {
           return (
             <SidebarMenuItem key={`${item.title}-${index}-dd`}>
@@ -97,29 +94,24 @@ export function SidebarNav({ className }: SidebarNavProps) {
             </SidebarMenuItem>
           );
         } else {
-          // Expanded Desktop Sidebar or Mobile Sheet: Use Accordion for sub-items
           return (
             <SidebarMenuItem key={`${item.title}-${index}-acc`} className="p-0">
               <Accordion type="multiple" className="w-full">
                 <AccordionItem value={item.title} className="border-b-0">
-                  <AccordionTrigger // NO asChild
+                  <AccordionTrigger
                     disabled={item.disabled}
                     className={cn(
-                      // Base styling from SidebarMenuButton, but adapted for AccordionTrigger
-                      "flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm outline-none ring-sidebar-ring transition-colors",
-                      "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground",
-                      "disabled:pointer-events-none disabled:opacity-50",
+                      sidebarMenuButtonVariants({variant: "default", size: "default"}), // Use variants
                       // Override AccordionTrigger's default hover:underline and py-4
-                      "!hover:no-underline !py-2", 
+                      "!hover:no-underline !py-2 !px-2 !h-8", 
                       // Ensure justify-between is still applied so the internal chevron goes to the right
                       "justify-between group-data-[collapsible=icon]:justify-center"
                     )}
                   >
-                    <span className="flex items-center gap-2"> {/* Use gap here for icon and text */}
-                      {item.icon && <span className="w-5 h-5 flex items-center justify-center shrink-0">{item.icon}</span>}
-                      <span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>
-                    </span>
-                    {/* AccordionTrigger from ui/accordion.tsx will add its own ChevronDown */}
+                     <span className="flex items-center gap-2">
+                        {item.icon && <span className="w-5 h-5 flex items-center justify-center shrink-0">{item.icon}</span>}
+                        <span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>
+                      </span>
                   </AccordionTrigger>
                   <AccordionContent className="pb-0 group-data-[collapsible=icon]:hidden">
                     <SidebarMenuSub>
@@ -146,7 +138,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
           );
         }
       } else {
-        // Top-level item without children
         return (
           <SidebarMenuItem key={`${item.title}-${index}-link`}>
             <Link href={item.href || '#'} legacyBehavior passHref>
@@ -170,6 +161,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
   if (isMobile) {
     return (
       <>
+        {/* Screen reader title for the sheet */}
         <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
         <SidebarHeader className="p-2 border-b border-sidebar-border">
            <div className="flex items-center gap-2 px-2 py-2">
@@ -209,15 +201,30 @@ export function SidebarNav({ className }: SidebarNavProps) {
       side="left"
     >
       <SidebarHeader className="p-2 border-b border-sidebar-border">
-         <div className="flex items-center gap-2 px-2 py-2">
-            <SidebarTrigger className="hidden md:flex data-[state=collapsed]:hidden mr-1" /> 
-            <Link href="/" className="flex items-center gap-2">
-                <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded">F</span>
-                <div className="group-data-[collapsible=icon]:hidden">
-                    <span className="font-semibold text-lg text-primary">Financial</span>
-                    <span className="text-xs block text-muted-foreground">by OpenGov</span>
-                </div>
-            </Link>
+         <div className="flex items-center justify-between w-full px-1"> {/* Adjusted for spacing */}
+            {/* Logo Area: Button when collapsed, Link when expanded */}
+            {sidebarState === 'collapsed' && !isMobile ? (
+              <Button
+                variant="ghost"
+                size="icon" 
+                className="h-9 w-9 p-0 flex items-center justify-center rounded hover:bg-sidebar-accent"
+                onClick={toggleSidebar}
+                aria-label="Expand sidebar"
+                title="Expand sidebar" 
+              >
+                <span className="text-lg font-bold bg-primary text-primary-foreground h-7 w-7 flex items-center justify-center rounded">F</span>
+              </Button>
+            ) : (
+              <Link href="/" className="flex items-center gap-2 ml-1"> {/* ml-1 for slight spacing if no trigger */}
+                  <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded">F</span>
+                  <div className="group-data-[collapsible=icon]:hidden">
+                      <span className="font-semibold text-lg text-primary">Financial</span>
+                      <span className="text-xs block text-muted-foreground">by OpenGov</span>
+                  </div>
+              </Link>
+            )}
+            {/* Trigger to collapse (only shown when expanded on desktop) */}
+            <SidebarTrigger className="hidden md:flex data-[state=expanded]:flex data-[state=collapsed]:hidden" /> 
         </div>
       </SidebarHeader>
 
@@ -237,3 +244,4 @@ export function SidebarNav({ className }: SidebarNavProps) {
     </Sidebar>
   );
 }
+
