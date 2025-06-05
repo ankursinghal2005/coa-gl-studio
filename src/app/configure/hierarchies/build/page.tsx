@@ -562,7 +562,7 @@ export default function HierarchySetBuildPage() {
                   control={form.control}
                   name="status"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Status *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
