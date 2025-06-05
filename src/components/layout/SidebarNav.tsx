@@ -15,11 +15,11 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  sidebarMenuButtonVariants,
+  sidebarMenuButtonVariants, // Ensure this is exported and imported
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem,
-  SidebarTrigger,
+  SidebarMenuSubItem, // Ensure this is imported
+  SidebarTrigger, // Keep for mobile
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SheetTitle } from '@/components/ui/sheet';
+import { SheetTitle } from '@/components/ui/sheet'; // For accessibility
 
 interface SidebarNavProps {
   className?: string;
@@ -61,6 +61,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
       }
 
       if (item.children && item.children.length > 0) {
+        // Collapsed Desktop View: Use DropdownMenu
         if (sidebarState === 'collapsed' && !isMobile) {
           return (
             <SidebarMenuItem key={`${item.title}-${index}-dd`}>
@@ -94,6 +95,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
             </SidebarMenuItem>
           );
         } else {
+          // Expanded Desktop or Mobile View: Use Accordion
           return (
             <SidebarMenuItem key={`${item.title}-${index}-acc`} className="p-0">
               <Accordion type="multiple" className="w-full">
@@ -102,11 +104,11 @@ export function SidebarNav({ className }: SidebarNavProps) {
                     disabled={item.disabled}
                     className={cn(
                       sidebarMenuButtonVariants({variant: "default", size: "default"}),
-                      "!hover:no-underline !py-2 !px-2 !h-8",
+                      "!hover:no-underline !py-2 !px-2 !h-8", // Overrides for AccordionTrigger default
                       "justify-between group-data-[collapsible=icon]:justify-center"
                     )}
                   >
-                     <span className="flex items-center gap-2">
+                     <span className="flex items-center gap-2"> {/* Wrapper for icon and title */}
                         {item.icon && <span className="w-5 h-5 flex items-center justify-center shrink-0">{item.icon}</span>}
                         <span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>
                       </span>
@@ -136,6 +138,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
           );
         }
       } else {
+        // Regular link item
         return (
           <SidebarMenuItem key={`${item.title}-${index}-link`}>
             <Link href={item.href || '#'} legacyBehavior passHref>
@@ -156,9 +159,11 @@ export function SidebarNav({ className }: SidebarNavProps) {
     });
   };
 
+  // Mobile Sheet View (uses Sheet component from ui/sidebar which wraps Radix Dialog)
   if (isMobile) {
     return (
       <>
+        {/* SheetTitle is crucial for accessibility for Radix Dialog (used by Sheet) */}
         <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
         <SidebarHeader className="p-2 border-b border-sidebar-border">
            <div className="flex items-center gap-2 px-2 py-2">
@@ -189,7 +194,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
     );
   }
 
-
+  // Desktop Sidebar View
   return (
     <Sidebar
       variant="sidebar"
@@ -198,29 +203,28 @@ export function SidebarNav({ className }: SidebarNavProps) {
       side="left"
     >
       <SidebarHeader className="p-2 border-b border-sidebar-border flex flex-col items-center">
-            {/* Logo Area: Button when collapsed, Link when expanded */}
-            {sidebarState === 'collapsed' && !isMobile ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 p-0 flex items-center justify-center rounded hover:bg-sidebar-accent"
-                onClick={toggleSidebar}
-                aria-label="Expand sidebar"
-                title="Expand sidebar"
-              >
-                <span className="text-lg font-bold bg-primary text-primary-foreground h-7 w-7 flex items-center justify-center rounded">F</span>
-              </Button>
-            ) : (
-              <Link href="/" className="flex items-center gap-2 mb-2"> {/* Added mb-2 for spacing */}
-                  <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded">F</span>
-                  <div className="group-data-[collapsible=icon]:hidden">
-                      <span className="font-semibold text-lg text-primary">Financial</span>
-                      <span className="text-xs block text-muted-foreground">by OpenGov</span>
-                  </div>
-              </Link>
-            )}
-            {/* Trigger to collapse (only shown when expanded on desktop) */}
-            <SidebarTrigger className="hidden md:flex data-[state=expanded]:flex data-[state=collapsed]:hidden" />
+        {/* Unified Logo/Toggler Button for Desktop */}
+        <Button
+          variant="ghost"
+          className={cn(
+            "flex items-center gap-2 w-full h-auto py-2 px-2",
+            sidebarState === 'collapsed' ? "justify-center" : "justify-start",
+            "hover:bg-sidebar-accent" 
+          )}
+          onClick={toggleSidebar}
+          aria-label={sidebarState === 'collapsed' ? "Expand sidebar" : "Collapse sidebar"}
+          title={sidebarState === 'collapsed' ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded shrink-0">
+            F
+          </span>
+          {/* Text part is hidden by group-data CSS when sidebar is collapsed */}
+          <div className="group-data-[collapsible=icon]:hidden text-left">
+            <span className="font-semibold text-lg text-primary">Financial</span>
+            <span className="text-xs block text-muted-foreground">by OpenGov</span>
+          </div>
+        </Button>
+        {/* SidebarTrigger (hamburger icon) removed from here for desktop */}
       </SidebarHeader>
 
       <SidebarContent className="p-0">
