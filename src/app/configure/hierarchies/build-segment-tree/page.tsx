@@ -152,7 +152,7 @@ export default function BuildSegmentTreePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getSegmentById } = useSegments();
-  const { getHierarchySetById, updateHierarchySet } = useHierarchies();
+  const { hierarchySets: allSetsFromContext, getHierarchySetById, updateHierarchySet } = useHierarchies();
 
   const hierarchySetId = searchParams.get('hierarchySetId');
   const segmentHierarchyId = searchParams.get('segmentHierarchyId');
@@ -177,6 +177,11 @@ export default function BuildSegmentTreePage() {
     console.log("BuildSegmentTreePage: useEffect triggered with hierarchySetId:", hierarchySetId, "segmentHierarchyId:", segmentHierarchyId);
 
     if (hierarchySetId) {
+      // Log all HierarchySet IDs currently in context for diagnosis
+      const idsInContext = allSetsFromContext.map(s => s.id);
+      console.log("BuildSegmentTreePage: IDs in context at lookup:", idsInContext);
+      console.log("BuildSegmentTreePage: Searching for ID:", hierarchySetId);
+
       const hs = getHierarchySetById(hierarchySetId);
       console.log("BuildSegmentTreePage: Fetched HierarchySet from context:", hs ? `ID: ${hs.id}, SegHierarchies: ${JSON.stringify(hs.segmentHierarchies.map(s => s.id))}` : 'Not Found');
 
@@ -220,7 +225,7 @@ export default function BuildSegmentTreePage() {
     setTreeNodes([]);
     setAllSegmentCodes([]);
     setIsLoading(false);
-  }, [hierarchySetId, segmentHierarchyId, getHierarchySetById, getSegmentById]);
+  }, [hierarchySetId, segmentHierarchyId, getHierarchySetById, getSegmentById, allSetsFromContext]);
 
 
   useEffect(() => {
@@ -530,4 +535,6 @@ export default function BuildSegmentTreePage() {
     </div>
   );
 }
+    
+
     
