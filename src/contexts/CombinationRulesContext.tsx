@@ -11,7 +11,7 @@ interface CombinationRulesContextType {
   addCombinationRule: (newRule: CombinationRule) => void;
   updateCombinationRule: (updatedRule: CombinationRule) => void;
   getCombinationRuleById: (ruleId: string) => CombinationRule | undefined;
-  // Future: deleteCombinationRule
+  deleteCombinationRule: (ruleId: string) => void;
 }
 
 const CombinationRulesContext = createContext<CombinationRulesContextType | undefined>(undefined);
@@ -33,9 +33,9 @@ export const CombinationRulesProvider = ({ children }: { children: ReactNode }) 
     return combinationRules.find(rule => rule.id === ruleId);
   }, [combinationRules]);
 
-  // const deleteCombinationRule = useCallback((ruleId: string) => {
-  //   setCombinationRules(prevRules => prevRules.filter(rule => rule.id !== ruleId));
-  // }, []);
+  const deleteCombinationRule = useCallback((ruleId: string) => {
+    setCombinationRules(prevRules => prevRules.filter(rule => rule.id !== ruleId));
+  }, []);
 
   return (
     <CombinationRulesContext.Provider
@@ -44,6 +44,7 @@ export const CombinationRulesProvider = ({ children }: { children: ReactNode }) 
         addCombinationRule,
         updateCombinationRule,
         getCombinationRuleById,
+        deleteCombinationRule,
       }}
     >
       {children}
@@ -58,3 +59,5 @@ export const useCombinationRules = (): CombinationRulesContextType => {
   }
   return context;
 };
+
+    

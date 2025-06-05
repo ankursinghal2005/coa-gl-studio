@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react'; 
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -19,20 +19,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PlusCircle, Eye, Edit2, Trash2, MoreHorizontal } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
+import { PlusCircle, Eye, Edit2, Trash2, MoreHorizontal, CalendarCheck } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCombinationRules } from '@/contexts/CombinationRulesContext';
 import { useSegments } from '@/contexts/SegmentsContext';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'; 
-import { Label } from '@/components/ui/label'; 
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 export default function CombinationRulesPage() {
   const router = useRouter();
-  const { combinationRules } = useCombinationRules();
+  const { combinationRules, deleteCombinationRule } = useCombinationRules(); // Assuming deleteCombinationRule is added to context
   const { getSegmentById } = useSegments();
   const [defaultUnmatchedBehavior, setDefaultUnmatchedBehavior] = useState<'Allowed' | 'Not Allowed'>('Not Allowed');
+
+  const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
+  const [selectedDateForView, setSelectedDateForView] = useState<Date | undefined>(new Date());
 
   const handleCreateRule = () => {
     router.push('/configure/combination-rules/build');
@@ -46,10 +51,27 @@ export default function CombinationRulesPage() {
     router.push(`/configure/combination-rules/build?ruleId=${ruleId}`);
   };
 
-  const handleDeleteRule = (ruleId: string) => {
-    console.log('Delete Combination Rule ID:', ruleId);
-    alert('Combination rule deletion logic not yet implemented.');
+  const handleDeleteRule = (ruleId: string, ruleName: string) => {
+    if (window.confirm(`Are you sure you want to delete the combination rule "${ruleName}"?`)) {
+      deleteCombinationRule(ruleId);
+      alert(`Combination rule "${ruleName}" deleted.`);
+    }
   };
+  
+  const handleOpenDateDialog = () => {
+    setSelectedDateForView(new Date()); // Reset to current date
+    setIsDateDialogOpen(true);
+  };
+
+  const handleViewValidCombinations = () => {
+    if (!selectedDateForView) {
+      alert("Please select a date.");
+      return;
+    }
+    router.push(`/configure/combination-rules/view-valid-combinations?date=${selectedDateForView.toISOString()}`);
+    setIsDateDialogOpen(false);
+  };
+
 
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
@@ -57,10 +79,9 @@ export default function CombinationRulesPage() {
   ];
 
   return (
-    // Removed p-4/sm:p-6/lg:p-8, min-h-screen, bg-background. Added w-full, max-w-6xl, mx-auto.
     <div className="w-full max-w-6xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
-      <header className="mb-6 flex justify-between items-center">
+      <header className="mb-6 flex flex-wrap justify-between items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-primary">
             Manage Combination Rules
@@ -69,10 +90,16 @@ export default function CombinationRulesPage() {
             Define and manage rules for valid segment code combinations.
           </p>
         </div>
-        <Button onClick={handleCreateRule}>
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Create Rule
-        </Button>
+        <div className="flex gap-2">
+            <Button onClick={handleOpenDateDialog} variant="outline">
+                <CalendarCheck className="mr-2 h-5 w-5" />
+                View Valid Combinations by Date
+            </Button>
+            <Button onClick={handleCreateRule}>
+                <PlusCircle className="mr-2 h-5 w-5" />
+                Create Rule
+            </Button>
+        </div>
       </header>
 
       <Card className="mb-6">
@@ -154,7 +181,7 @@ export default function CombinationRulesPage() {
                                 <Edit2 className="mr-2 h-4 w-4" /> Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleDeleteRule(rule.id)}
+                                onClick={() => handleDeleteRule(rule.id, rule.name)}
                                 className="text-destructive focus:text-destructive focus:bg-destructive/10"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -175,6 +202,33 @@ export default function CombinationRulesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isDateDialogOpen} onOpenChange={setIsDateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>View Valid Combinations</DialogTitle>
+            <DialogDescription>
+              Select a date to view combination rule entries that are effective on that day.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="combination-date">Effective Date</Label>
+            <DatePicker 
+              value={selectedDateForView}
+              onValueChange={setSelectedDateForView}
+              placeholder="Select a date"
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleViewValidCombinations}>View Combinations</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+    
