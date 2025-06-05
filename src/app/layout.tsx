@@ -9,11 +9,13 @@ import { HierarchiesProvider } from '@/contexts/HierarchiesContext';
 import { CombinationRulesProvider } from '@/contexts/CombinationRulesContext';
 import { AccountAccessControlProvider } from '@/contexts/AccountAccessControlContext';
 import { SidebarNav } from '@/components/layout/SidebarNav';
+import { Button } from '@/components/ui/button'; // Added for mobile trigger
+import { Menu } from 'lucide-react'; // Added for mobile trigger
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
-  variable: '--font-sans', 
-  weight: ['400', '500', '700'], 
+  variable: '--font-sans',
+  weight: ['400', '500', '700'],
 });
 
 export const metadata: Metadata = {
@@ -36,19 +38,24 @@ export default function RootLayout({
           <HierarchiesProvider>
             <CombinationRulesProvider>
               <AccountAccessControlProvider>
-                <div className="relative flex min-h-screen flex-col">
-                  <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                    <div className="container flex h-14 max-w-screen-2xl items-center">
-                      <SidebarNav />
-                       <div className="flex flex-1 items-center justify-center">
-                         <span className="text-xl font-bold text-primary">Opengov Financials</span>
-                       </div>
-                       <div className="flex items-center space-x-2">
-                         {/* Future: Add theme toggle or user profile icon here */}
-                       </div>
-                    </div>
-                  </header>
-                  <main className="flex-1">{children}</main>
+                <div className="relative flex min-h-screen flex-col md:flex-row">
+                  {/* SidebarNav will render itself as fixed on desktop or provide a trigger for mobile */}
+                  <SidebarNav />
+                  
+                  {/* Main content area */}
+                  <div className="flex flex-1 flex-col">
+                    {/* Mobile-only header for hamburger and title */}
+                    <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 md:hidden">
+                        {/* The SidebarNav component itself will render its SheetTrigger for mobile */}
+                        {/* This space can be used for page titles or other controls on mobile header */}
+                        <div className="flex-1">
+                           {/* Example: Page title can go here, dynamically */}
+                        </div>
+                    </header>
+                    <main className="flex-1 p-4 md:p-6 lg:p-8">
+                      {children}
+                    </main>
+                  </div>
                 </div>
               </AccountAccessControlProvider>
             </CombinationRulesProvider>
