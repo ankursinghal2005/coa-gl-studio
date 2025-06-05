@@ -4,163 +4,220 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu } from 'lucide-react';
 
 import { mainNavItems, footerNavItems, type NavItemConfig } from '@/config/nav.tsx';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import {
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem, // Ensure this is imported
+  SidebarTrigger, 
+  useSidebar,
+} from '@/components/ui/sidebar';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { useIsMobile } from '@/hooks/use-mobile'; // Assuming this hook exists
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area'; 
+import { SheetTitle } from '@/components/ui/sheet'; // For accessibility
 
 interface SidebarNavProps {
   className?: string;
 }
 
 export function SidebarNav({ className }: SidebarNavProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const isMobile = useIsMobile();
+  const { state: sidebarState, isMobile } = useSidebar(); 
+  const pathname = usePathname();
 
-  const NavContent = ({ inSheet = false }: { inSheet?: boolean }) => (
-    <div className={cn(
-      "flex h-full flex-col",
-      !inSheet && "bg-sidebar text-sidebar-foreground border-r border-sidebar-border"
-    )}>
-      <div className="px-4 py-6 border-b border-sidebar-border">
-        <Link href="/" className="flex items-center gap-2" onClick={() => inSheet && setIsOpen(false)}>
-          <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded">F</span>
-          <div>
-            <span className="font-semibold text-lg text-primary">Financial</span>
-            <span className="text-xs block text-muted-foreground">by OpenGov</span>
-          </div>
-        </Link>
-      </div>
+  const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false) => {
+    return items.map((item, index) => {
+      if (!item.href && !item.children) {
+        if (isSubmenu) {
+          return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{item.title}</DropdownMenuItem>;
+        }
+        return (
+          <SidebarMenuItem key={`${item.title}-${index}-span`} className="px-2 py-1.5 text-sm text-muted-foreground">
+            {item.icon && <span className="mr-2 w-5 h-5 inline-flex items-center justify-center">{item.icon}</span>}
+            {item.title}
+          </SidebarMenuItem>
+        );
+      }
 
-      <ScrollArea className="flex-1 px-3 py-4">
-        <div className="flex flex-col space-y-1">
-          {mainNavItems.map((item, index) =>
-            item.children && item.children.length > 0 ? (
-              <Accordion type="multiple" className="w-full" key={`${item.title}-main-${index}`}>
+      if (item.children && item.children.length > 0) {
+        if (sidebarState === 'collapsed' && !isMobile) {
+          return (
+            <SidebarMenuItem key={`${item.title}-${index}-dd`}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    aria-label={item.title}
+                    disabled={item.disabled}
+                    className="w-full"
+                  >
+                    {item.icon && <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                    <span className="sr-only">{item.title}</span>
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="right" align="start" className="ml-1 w-56">
+                  <DropdownMenuItem className="font-semibold mb-1 cursor-default focus:bg-transparent">
+                    {item.icon && <span className="mr-2 w-5 h-5">{item.icon}</span>}
+                    {item.title}
+                  </DropdownMenuItem>
+                  {item.children.map((child, childIndex) => (
+                    <DropdownMenuItem key={`${child.title}-${childIndex}-dd-child`} asChild disabled={child.disabled}>
+                      <Link href={child.href || '#'} className={cn(child.disabled && "pointer-events-none opacity-60")}>
+                        {child.icon && <span className="mr-2 w-5 h-5">{child.icon}</span>}
+                        {child.title}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          );
+        } else {
+          return (
+            <SidebarMenuItem key={`${item.title}-${index}-acc`} className="p-0">
+              <Accordion type="multiple" className="w-full">
                 <AccordionItem value={item.title} className="border-b-0">
-                  <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline [&[data-state=open]>svg]:rotate-180 rounded-md hover:bg-accent hover:text-accent-foreground px-2">
-                    <span className="flex items-center">
-                      {item.icon && <span className="mr-2 w-5 h-5">{item.icon}</span>}
-                      {item.title}
-                    </span>
+                  <AccordionTrigger asChild>
+                     <SidebarMenuButton disabled={item.disabled} className="w-full justify-between pr-2 group-data-[collapsible=icon]:justify-center">
+                        <span className="flex items-center">
+                          {item.icon && <span className="mr-2 w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                          <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                        </span>
+                      </SidebarMenuButton>
                   </AccordionTrigger>
-                  <AccordionContent className="pb-0 pl-5">
-                    <div className="flex flex-col space-y-1 mt-1">
+                  <AccordionContent className="pb-0 group-data-[collapsible=icon]:hidden">
+                    <SidebarMenuSub>
                       {item.children.map((child, childIndex) => (
-                        <NavItemLink
-                          key={`${child.title}-child-${childIndex}`}
-                          item={child}
-                          onClose={() => inSheet && setIsOpen(false)}
-                        />
+                        <SidebarMenuSubItem key={`${child.title}-${childIndex}-acc-child`}>
+                          <Link href={child.href || '#'} legacyBehavior passHref>
+                            <SidebarMenuSubButton
+                              isActive={pathname === child.href}
+                              disabled={child.disabled}
+                              aria-disabled={child.disabled}
+                              tabIndex={child.disabled ? -1 : undefined}
+                            >
+                              {child.icon && <span className="mr-2 w-5 h-5 flex items-center justify-center">{child.icon}</span>}
+                              {child.title}
+                            </SidebarMenuSubButton>
+                          </Link>
+                        </SidebarMenuSubItem>
                       ))}
-                    </div>
+                    </SidebarMenuSub>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
-            ) : item.href ? (
-              <NavItemLink
-                key={`${item.title}-main-link-${index}`}
-                item={item}
-                onClose={() => inSheet && setIsOpen(false)}
-              />
-            ) : (
-               <span key={`${item.title}-main-span-${index}`} className="flex w-full cursor-not-allowed items-center rounded-md p-2 text-sm text-muted-foreground">
-                 {item.title}
-               </span>
-            )
-          )}
-        </div>
-      </ScrollArea>
-
-      <div className="mt-auto p-3 border-t border-sidebar-border space-y-1">
-        {footerNavItems.map((item, index) => (
-           <NavItemLink
-              key={`${item.title}-footer-${index}`}
-              item={item}
-              onClose={() => inSheet && setIsOpen(false)}
-            />
-        ))}
-      </div>
-    </div>
-  );
+            </SidebarMenuItem>
+          );
+        }
+      } else {
+        return (
+          <SidebarMenuItem key={`${item.title}-${index}-link`}>
+            <Link href={item.href || '#'} legacyBehavior passHref>
+              <SidebarMenuButton
+                tooltip={item.title}
+                aria-label={item.title}
+                isActive={pathname === item.href}
+                disabled={item.disabled}
+                className="w-full"
+              >
+                {item.icon && <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>}
+                <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+        );
+      }
+    });
+  };
 
   if (isMobile) {
+    // For mobile, we use the Sheet component from ui/sidebar
     return (
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            className="px-0 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 md:hidden"
-            aria-label="Open menu"
-          >
-            <Menu className="h-6 w-6" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="pl-0 pr-0 pt-0 w-72 sm:w-80 data-[state=open]:bg-sidebar">
-           {/* SheetHeader and SheetTitle removed as per previous fix, title now in NavContent if needed or sr-only */}
-          <NavContent inSheet={true} />
-        </SheetContent>
-      </Sheet>
+      <>
+        {/* This SheetTitle is important for accessibility for Radix UI Dialog (which Sheet uses) */}
+        <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
+        <SidebarHeader className="p-2 border-b border-sidebar-border">
+           <div className="flex items-center gap-2 px-2 py-2">
+              <Link href="/" className="flex items-center gap-2">
+                  <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded">F</span>
+                  <div>
+                      <span className="font-semibold text-lg text-primary">Financial</span>
+                      <span className="text-xs block text-muted-foreground">by OpenGov</span>
+                  </div>
+              </Link>
+          </div>
+        </SidebarHeader>
+
+        <SidebarContent className="p-0">
+           <ScrollArea className="h-full"> 
+              <SidebarMenu className="p-2"> 
+                {renderNavItems(mainNavItems)}
+              </SidebarMenu>
+           </ScrollArea>
+        </SidebarContent>
+
+        <SidebarFooter className="p-2 border-t border-sidebar-border">
+          <SidebarMenu>
+            {renderNavItems(footerNavItems)}
+          </SidebarMenu>
+        </SidebarFooter>
+      </>
     );
   }
 
-  // Desktop view: always visible sidebar
-  return (
-    <aside className={cn("h-screen w-64 hidden md:block", className)}>
-      <NavContent />
-    </aside>
-  );
-}
-
-interface NavItemLinkProps {
-  item: NavItemConfig;
-  onClose?: () => void;
-}
-
-function NavItemLink({ item, onClose }: NavItemLinkProps) {
-  const pathname = usePathname();
-  if (!item.href && !item.children) {
-     return (
-       <span className={cn(
-         "flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium",
-         item.disabled ? "cursor-not-allowed opacity-60 text-muted-foreground" : "text-sidebar-foreground/80"
-         )}
-       >
-         {item.icon && <span className="mr-2 w-5 h-5">{item.icon}</span>}
-         {item.title}
-       </span>
-     );
-  }
 
   return (
-    <Link
-      href={item.href || '#'}
-      target={item.external ? '_blank' : undefined}
-      rel={item.external ? 'noopener noreferrer' : undefined}
-      className={cn(
-        'flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground',
-        pathname === item.href ? 'bg-accent text-accent-foreground' : 'text-sidebar-foreground/80 hover:text-accent-foreground',
-        item.disabled && 'cursor-not-allowed opacity-60'
-      )}
-      onClick={() => {
-        if (onClose) onClose();
-      }}
-      aria-disabled={item.disabled}
-      tabIndex={item.disabled ? -1 : undefined}
+    <Sidebar
+      variant="sidebar" 
+      collapsible="icon" 
+      className={cn("hidden md:flex", className)} 
+      side="left"
     >
-      {item.icon && <span className="mr-2 w-5 h-5">{item.icon}</span>}
-      {item.title}
-      {item.label && <span className="ml-auto text-muted-foreground">{item.label}</span>}
-    </Link>
+      <SidebarHeader className="p-2 border-b border-sidebar-border">
+         <div className="flex items-center gap-2 px-2 py-2">
+            <SidebarTrigger className="hidden md:flex data-[state=collapsed]:hidden mr-1" /> 
+            <Link href="/" className="flex items-center gap-2">
+                <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded">F</span>
+                <div className="group-data-[collapsible=icon]:hidden">
+                    <span className="font-semibold text-lg text-primary">Financial</span>
+                    <span className="text-xs block text-muted-foreground">by OpenGov</span>
+                </div>
+            </Link>
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent className="p-0"> 
+         <ScrollArea className="h-full"> 
+            <SidebarMenu className="p-2"> 
+              {renderNavItems(mainNavItems)}
+            </SidebarMenu>
+         </ScrollArea>
+      </SidebarContent>
+
+      <SidebarFooter className="p-2 border-t border-sidebar-border">
+        <SidebarMenu>
+          {renderNavItems(footerNavItems)}
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
