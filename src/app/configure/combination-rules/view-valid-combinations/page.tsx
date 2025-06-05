@@ -26,9 +26,7 @@ import { ArrowLeft, AlertTriangle, FilterX } from 'lucide-react';
 
 interface DisplayableCombination {
   mappingEntryId: string; 
-  // ruleName: string; // Removed as per request
   segmentCriteriaDisplay: Record<string, string>; // Key is segmentId, value is the code or "Any Valid Code"
-  // effectiveStatus: EffectiveStatus; // Potentially remove or simplify
 }
 
 
@@ -44,12 +42,6 @@ const isCodeValidOnDate = (code: SegmentCode | undefined, targetDate: Date): boo
     if (targetDate.setHours(0,0,0,0) > toDate.setHours(0,0,0,0)) return false;
   }
   return true;
-};
-
-const getSegmentCodeByValue = (segmentId: string, codeValue: string): SegmentCode | undefined => {
-    const codesForSegment = mockSegmentCodesData[segmentId];
-    if (!codesForSegment) return undefined;
-    return codesForSegment.find(sc => sc.code === codeValue);
 };
 
 // Helper to get individual codes from a criterion (code or range)
@@ -280,7 +272,7 @@ export default function ViewValidCombinationsPage() {
       <Card>
         <CardContent className="pt-6">
           {filteredCombinations.length > 0 ? (
-            <ScrollArea className="w-full whitespace-nowrap">
+            <ScrollArea className="w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
