@@ -506,7 +506,6 @@ export default function HierarchySetBuildPage() {
   );
 
   return (
-    // Removed p-4/sm:p-6/lg:p-8, min-h-screen, bg-background. Added w-full, max-w-7xl, mx-auto.
     <div className="w-full max-w-7xl mx-auto">
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
@@ -551,7 +550,7 @@ export default function HierarchySetBuildPage() {
                   control={form.control}
                   name="status"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col"> {/* Ensure vertical stacking */}
+                    <FormItem className="flex flex-col">
                       <FormLabel>Status *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
@@ -684,14 +683,14 @@ export default function HierarchySetBuildPage() {
               setIsTreeBuilderModalOpen(true);
           }
       }}>
-        <DialogContent className="max-w-5xl min-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Build Hierarchy for: {editingSegmentHierarchyConfig?.segmentName || 'Segment'}</DialogTitle>
             <DialogDesc>Drag codes from the left panel to the structure on the right. Select summary codes in the tree to add children to them.</DialogDesc>
           </DialogHeader>
           
           {editingSegmentHierarchyConfig && (
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden pt-2">
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-y-auto pt-2">
               <Card className="flex flex-col">
                 <CardHeader className="pt-2 pb-2">
                   <CardTitle className="text-lg">Available Codes: {editingSegmentHierarchyConfig.segmentName}</CardTitle>
@@ -733,7 +732,7 @@ export default function HierarchySetBuildPage() {
                 <CardHeader className="pt-2 pb-2">
                   <CardTitle className="text-lg">Tree Structure</CardTitle>
                 </CardHeader>
-                <CardContent className="flex-1 flex flex-col overflow-hidden p-3 bg-slate-50">
+                <CardContent className="flex-1 flex flex-col p-3 bg-slate-50">
                   {modalSelectedParentNodeDetails && modalSelectedParentNodeDetails.segmentCode.summaryIndicator && (
                     <Card className="mb-3 p-3 shadow shrink-0">
                       <h3 className="text-md font-semibold mb-1 text-primary">Add Codes to: {modalSelectedParentNodeDetails.segmentCode.code}</h3>
@@ -783,3 +782,4 @@ export default function HierarchySetBuildPage() {
     </div>
   );
 }
+
