@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link'; // Added for navigation
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,9 +27,9 @@ import {
   FormMessage,
   FormDescription
 } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescUI } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
-import { PlusCircle, Edit3, Trash2, Workflow } from 'lucide-react';
+import { PlusCircle, Edit3, Trash2, Workflow, AlertTriangle } from 'lucide-react';
 import { useSegments } from '@/contexts/SegmentsContext';
 import { useHierarchies } from '@/contexts/HierarchiesContext';
 import type { SegmentHierarchyInSet, HierarchySet } from '@/lib/hierarchy-types';
@@ -96,35 +96,34 @@ export default function HierarchySetBuildPage() {
         setCurrentHierarchySetId(existingSet.id);
         setIsEditMode(true);
       } else {
-        alert("Hierarchy Set not found. Starting new set.");
-        router.replace('/configure/hierarchies/build');
-        setIsEditMode(false);
-        setCurrentHierarchySetId(null);
-        form.reset();
-        setSegmentHierarchiesInSet([]);
+        // If ID in query param but not found, treat as error or redirect
+        alert("Hierarchy Set not found with the provided ID. Navigating back.");
+        router.push('/configure/hierarchies');
       }
     } else {
+      // No ID in query param, this is for creating a new set
       setIsEditMode(false);
-      setCurrentHierarchySetId(null);
-      form.reset();
+      setCurrentHierarchySetId(null); // Important: ID is null until first save
+      form.reset({ // Reset to defaults for a new form
+        name: '',
+        status: 'Active',
+        description: '',
+        validFrom: new Date(),
+        validTo: undefined,
+      });
       setSegmentHierarchiesInSet([]);
     }
   }, [hierarchySetIdQueryParam, getHierarchySetById, form, router]);
 
   const onSubmit = (values: HierarchySetFormValues) => {
-    if (segmentHierarchiesInSet.length === 0) {
-      alert("Please add and define at least one segment hierarchy for this set.");
-      return;
-    }
-
     const hierarchySetData: HierarchySet = {
-      id: currentHierarchySetId || crypto.randomUUID(),
+      id: currentHierarchySetId || crypto.randomUUID(), // Use current ID if editing, or generate new if it was null
       name: values.name,
       status: values.status,
       description: values.description,
       validFrom: values.validFrom,
       validTo: values.validTo,
-      segmentHierarchies: segmentHierarchiesInSet, // This now holds the latest tree structures
+      segmentHierarchies: segmentHierarchiesInSet,
       lastModifiedDate: new Date(),
       lastModifiedBy: "Current User", 
     };
@@ -132,11 +131,21 @@ export default function HierarchySetBuildPage() {
     if (isEditMode && currentHierarchySetId) {
       updateHierarchySet(hierarchySetData);
       alert(`Hierarchy Set "${values.name}" updated successfully!`);
-    } else {
+      // No navigation needed, stay on page for further edits or to manage segment hierarchies
+    } else { // This is a new set being saved for the first time
+      const newId = hierarchySetData.id; // ID was generated above
       addHierarchySet(hierarchySetData);
-      alert(`Hierarchy Set "${values.name}" saved successfully!`);
+      alert(`Hierarchy Set "${values.name}" saved successfully! You can now add segment hierarchies.`);
+      // Replace URL to reflect that it's now an existing set, allowing segment hierarchy editing
+      router.replace(`/configure/hierarchies/build?hierarchySetId=${newId}`, { scroll: false });
+      // Manually update state to reflect edit mode immediately without full effect reload if needed,
+      // or rely on useEffect to pick up hierarchySetIdQueryParam on next render cycle.
+      // For simplicity, useEffect will handle it, but this means a quick re-render.
+      // Alternatively, directly call:
+      // setIsEditMode(true);
+      // setCurrentHierarchySetId(newId);
+      // form.reset(values); // To keep form values consistent with saved data
     }
-    router.push('/configure/hierarchies');
   };
 
   const handleCancel = () => {
@@ -144,6 +153,10 @@ export default function HierarchySetBuildPage() {
   };
   
   const handleAddSegmentToSet = () => {
+    if (!isEditMode) {
+        alert("Please save the Hierarchy Set details first.");
+        return;
+    }
     if (!segmentToAdd) {
       alert("Please select a segment to add.");
       return;
@@ -153,9 +166,9 @@ export default function HierarchySetBuildPage() {
       return;
     }
     const newSegmentHierarchy: SegmentHierarchyInSet = {
-      id: crypto.randomUUID(), // Unique ID for this segment's presence in *this* set
+      id: crypto.randomUUID(), 
       segmentId: segmentToAdd,
-      treeNodes: [], // Start with an empty tree
+      treeNodes: [], 
     };
     setSegmentHierarchiesInSet(prev => [...prev, newSegmentHierarchy]);
     setSegmentToAdd(''); 
@@ -178,7 +191,7 @@ export default function HierarchySetBuildPage() {
   );
 
   return (
-    <div className="w-full max-w-5xl mx-auto"> {/* Adjusted max-width based on content */}
+    <div className="w-full max-w-5xl mx-auto"> 
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center">
@@ -192,7 +205,7 @@ export default function HierarchySetBuildPage() {
           <Card>
             <CardHeader>
               <CardTitle>Hierarchy Set Details</CardTitle>
-              <CardDescription>Define the general properties for this collection of hierarchies.</CardDescription>
+              <CardDescUI>Define the general properties for this collection of hierarchies.</CardDescUI>
             </CardHeader>
             <CardContent className="space-y-6">
               <FormField
@@ -273,73 +286,91 @@ export default function HierarchySetBuildPage() {
           <Card>
             <CardHeader>
               <CardTitle>Segment Hierarchies in this Set</CardTitle>
-              <CardDescription>Define or edit the tree structure for each segment included in this Hierarchy Set.</CardDescription>
+              <CardDescUI>Define or edit the tree structure for each segment included in this Hierarchy Set.</CardDescUI>
             </CardHeader>
             <CardContent>
-              <div className="mb-6 p-4 border rounded-md bg-muted/30">
-                <Label htmlFor="segmentToAdd">Add Segment to this Set</Label>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Select value={segmentToAdd} onValueChange={setSegmentToAdd}>
-                    <SelectTrigger id="segmentToAdd" className="flex-grow">
-                      <SelectValue placeholder="Select a segment..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableSegmentsForAdding.length > 0 ? (
-                        availableSegmentsForAdding.map(seg => (
-                          <SelectItem key={seg.id} value={seg.id}>{seg.displayName}</SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="none" disabled>All segments already added or no segments available.</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <Button type="button" onClick={handleAddSegmentToSet} disabled={!segmentToAdd || segmentToAdd === 'none'}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Segment
-                  </Button>
+              {!isEditMode ? (
+                 <div className="border-l-4 border-yellow-400 bg-yellow-50 p-4 rounded-md">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                        <AlertTriangle className="h-5 w-5 text-yellow-500" aria-hidden="true" />
+                        </div>
+                        <div className="ml-3">
+                        <p className="text-sm text-yellow-700">
+                            Please save the Hierarchy Set details above first to enable adding and editing segment hierarchies.
+                        </p>
+                        </div>
+                    </div>
                 </div>
-                 {availableSegmentsForAdding.length === 0 && segmentHierarchiesInSet.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2">All available segments have been added to this set.</p>
-                )}
-              </div>
-
-              {segmentHierarchiesInSet.length === 0 ? (
-                <p className="text-center text-muted-foreground py-6">No segment hierarchies defined for this set yet. Add a segment above to begin.</p>
               ) : (
-                <div className="space-y-4">
-                  {segmentHierarchiesInSet.map((sh) => {
-                    const segmentDetails = getSegmentById(sh.segmentId);
-                    const treeNodeCount = sh.treeNodes?.length || 0; 
-                    return (
-                      <Card key={sh.id} className="shadow">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                          <CardTitle className="text-xl">{segmentDetails?.displayName || 'Unknown Segment'}</CardTitle>
-                          <div className="flex space-x-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              asChild // Use asChild to make the Button a Link
-                            >
-                              <Link href={`/configure/hierarchies/build-segment-tree?hierarchySetId=${currentHierarchySetId}&segmentHierarchyId=${sh.id}`}>
-                                <Edit3 className="mr-2 h-4 w-4" /> Edit Tree
-                              </Link>
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleRemoveSegmentFromSet(sh.id)}>
-                              <Trash2 className="mr-2 h-4 w-4" /> Remove
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">
-                            {sh.description || `Hierarchy for ${segmentDetails?.displayName || 'this segment'}.`}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {treeNodeCount > 0 ? `${treeNodeCount} root node(s) defined.` : 'No tree structure defined yet.'}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+                <>
+                  <div className="mb-6 p-4 border rounded-md bg-muted/30">
+                    <Label htmlFor="segmentToAdd">Add Segment to this Set</Label>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <Select value={segmentToAdd} onValueChange={setSegmentToAdd} disabled={!isEditMode}>
+                        <SelectTrigger id="segmentToAdd" className="flex-grow">
+                          <SelectValue placeholder="Select a segment..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableSegmentsForAdding.length > 0 ? (
+                            availableSegmentsForAdding.map(seg => (
+                              <SelectItem key={seg.id} value={seg.id}>{seg.displayName}</SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="none" disabled>All segments already added or no segments available.</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" onClick={handleAddSegmentToSet} disabled={!segmentToAdd || segmentToAdd === 'none' || !isEditMode}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Segment
+                      </Button>
+                    </div>
+                    {availableSegmentsForAdding.length === 0 && segmentHierarchiesInSet.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2">All available segments have been added to this set.</p>
+                    )}
+                  </div>
+
+                  {segmentHierarchiesInSet.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-6">No segment hierarchies defined for this set yet. Add a segment above to begin.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {segmentHierarchiesInSet.map((sh) => {
+                        const segmentDetails = getSegmentById(sh.segmentId);
+                        const treeNodeCount = sh.treeNodes?.length || 0; 
+                        return (
+                          <Card key={sh.id} className="shadow">
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                              <CardTitle className="text-xl">{segmentDetails?.displayName || 'Unknown Segment'}</CardTitle>
+                              <div className="flex space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  asChild 
+                                  disabled={!currentHierarchySetId} // Disable if set ID not yet available (should be rare with save first)
+                                >
+                                  <Link href={`/configure/hierarchies/build-segment-tree?hierarchySetId=${currentHierarchySetId}&segmentHierarchyId=${sh.id}`}>
+                                    <Edit3 className="mr-2 h-4 w-4" /> Edit Tree
+                                  </Link>
+                                </Button>
+                                <Button variant="destructive" size="sm" onClick={() => handleRemoveSegmentFromSet(sh.id)}>
+                                  <Trash2 className="mr-2 h-4 w-4" /> Remove
+                                </Button>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-sm text-muted-foreground">
+                                {sh.description || `Hierarchy for ${segmentDetails?.displayName || 'this segment'}.`}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {treeNodeCount > 0 ? `${treeNodeCount} root node(s) defined.` : 'No tree structure defined yet.'}
+                              </p>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -347,7 +378,7 @@ export default function HierarchySetBuildPage() {
           <div className="mt-8 flex justify-end space-x-3">
             <Button type="button" variant="outline" onClick={handleCancel}>Cancel</Button>
             <Button type="submit">
-              {isEditMode ? 'Update Hierarchy Set' : 'Save Hierarchy Set'}
+              {isEditMode ? 'Update Hierarchy Set' : 'Save and Continue'}
             </Button>
           </div>
         </form>
@@ -355,5 +386,6 @@ export default function HierarchySetBuildPage() {
     </div>
   );
 }
-
     
+
+      
