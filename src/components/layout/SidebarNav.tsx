@@ -6,11 +6,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 
-import { mainNavItems, type NavItemConfig } from '@/config/nav';
+import { mainNavItems, type NavItemConfig } from '@/config/nav.tsx';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
   Accordion,
   AccordionContent,
@@ -45,6 +45,9 @@ export function SidebarNav() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="pl-1 pr-0 pt-8 w-72 sm:w-80">
+          <SheetHeader>
+            <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
+          </SheetHeader>
           <ScrollArea className="my-4 h-[calc(100vh-8rem)] pb-10 pl-6">
             <div className="flex flex-col space-y-2"> {/* Changed space-y-3 to space-y-2 for tighter packing */}
               {mainNavItems.map((item, index) =>
