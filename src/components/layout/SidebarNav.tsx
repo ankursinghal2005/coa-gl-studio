@@ -19,7 +19,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarTrigger, 
+  // SidebarTrigger, // No longer used directly here, ui/sidebar.tsx handles its own trigger
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -51,18 +51,15 @@ export function SidebarNav({ className }: SidebarNavProps) {
 
   const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false): React.ReactNode[] => {
     return items.map((item, index) => {
-      // Only create iconSpan if it's not a submenu and the item has an icon
       const iconSpan = !isSubmenu && item.icon ? <span className="flex items-center justify-center shrink-0">{item.icon}</span> : null;
-      const childIconSpan = (childItem: NavItemConfig) => childItem.icon && !isSubmenu ? <span className="mr-2 flex items-center justify-center shrink-0">{childItem.icon}</span> : null;
-
 
       if (!item.href && !item.children) {
         if (isSubmenu && sidebarState === 'collapsed' && !isMobile) { 
-          return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{/* Icon removed for subitems */}{item.title}</DropdownMenuItem>;
+          return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{item.title}</DropdownMenuItem>;
         }
         return (
           <SidebarMenuItem key={`${item.title}-${index}-label`} className="px-2 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
-            {iconSpan} {/* Remains for top-level if applicable, but this path is for non-link, non-children items */}
+            {iconSpan}
             <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
           </SidebarMenuItem>
         );
@@ -84,12 +81,10 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent side="right" align="start" className="ml-1 w-56">
                      {item.children.map((child, childIndex) => {
-                        // const grandChildIconSpanRender = (grandChildItem: NavItemConfig) => grandChildItem.icon ? <span className="mr-2 flex items-center justify-center shrink-0">{grandChildItem.icon}</span> : null;
                         if (child.children && child.children.length > 0) {
                            return (
                             <RadixDropdownMenuSub key={`${child.title}-${childIndex}-dd-sub`}>
                               <DropdownMenuSubTrigger disabled={child.disabled}>
-                                {/* Icon removed for subitems */}
                                 <span>{child.title}</span>
                               </DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>
@@ -97,7 +92,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
                                   return (
                                     <DropdownMenuItem key={`${grandChild.title}-${grandChildIndex}-dd-grandchild`} asChild disabled={grandChild.disabled}>
                                       <Link href={grandChild.href || '#'} className={cn("flex items-center", grandChild.disabled && "pointer-events-none opacity-60")}>
-                                        {/* Icon removed for subitems */}
                                         {grandChild.title}
                                       </Link>
                                     </DropdownMenuItem>
@@ -110,7 +104,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
                         return (
                           <DropdownMenuItem key={`${child.title}-${childIndex}-dd-child`} asChild disabled={child.disabled}>
                             <Link href={child.href || '#'} className={cn("flex items-center", child.disabled && "pointer-events-none opacity-60")}>
-                              {/* Icon removed for subitems */}
                               {child.title}
                             </Link>
                           </DropdownMenuItem>
@@ -127,20 +120,19 @@ export function SidebarNav({ className }: SidebarNavProps) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton tooltip={item.title} aria-label={item.title} disabled={item.disabled} className="w-full">
-                    {iconSpan} {/* Top-level icon */}
+                    {iconSpan}
                     <span className="sr-only">{item.title}</span>
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="right" align="start" className="ml-1 w-56">
                   <DropdownMenuItem className="font-semibold mb-1 cursor-default focus:bg-transparent flex items-center gap-2">
-                    {iconSpan} {/* Top-level icon in dropdown header */}
+                    {iconSpan}
                     {item.title}
                   </DropdownMenuItem>
                   {item.children.map((child, childIndex) => {
                     return (
                       <DropdownMenuItem key={`${child.title}-${childIndex}-dd-child`} asChild disabled={child.disabled}>
                         <Link href={child.href || '#'} className={cn("flex items-center", child.disabled && "pointer-events-none opacity-60")}>
-                          {/* Icon removed for subitems */}
                           {child.title}
                         </Link>
                       </DropdownMenuItem>
@@ -164,13 +156,13 @@ export function SidebarNav({ className }: SidebarNavProps) {
                     )}
                   >
                      <span className="flex items-center gap-2">
-                        {iconSpan} {/* Top-level icon */}
-                        <span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>
+                        {iconSpan}{/*
+                        */}<span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>
                       </span>
                   </AccordionTrigger>
                   <AccordionContent className="pb-0 group-data-[collapsible=icon]:hidden">
                     <SidebarMenuSub>
-                      {renderNavItems(item.children, true)} {/* Pass isSubmenu = true */}
+                      {renderNavItems(item.children, true)}
                     </SidebarMenuSub>
                   </AccordionContent>
                 </AccordionItem>
@@ -182,7 +174,6 @@ export function SidebarNav({ className }: SidebarNavProps) {
         if (isSubmenu) {
           return (
             <SidebarMenuSubItem key={`${item.title}-${index}-sublink`}>
-              {/* <Link href={item.href || '#'} legacyBehavior passHref> */}
                 <SidebarMenuSubButton
                   isActive={pathname === item.href}
                   disabled={item.disabled}
@@ -192,11 +183,9 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   asChild
                 >
                   <Link href={item.href || '#'} className="block w-full">
-                    {/* Icon removed for subitems */}
                     <span className="truncate">{item.title}</span>
                   </Link>
                 </SidebarMenuSubButton>
-              {/* </Link> */}
             </SidebarMenuSubItem>
           );
         } else {
@@ -210,8 +199,8 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   disabled={item.disabled}
                   className="w-full"
                 >
-                  {iconSpan} {/* Top-level icon */}
-                  <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                  {iconSpan}{/*
+                  */}<span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
@@ -222,6 +211,8 @@ export function SidebarNav({ className }: SidebarNavProps) {
   };
 
   if (isMobile) {
+    // ui/sidebar.tsx now handles SheetTitle for mobile.
+    // This component just provides the content FOR the sheet.
     return (
       <>
         <SidebarHeader className="p-2 border-b border-sidebar-border">
@@ -299,3 +290,4 @@ export function SidebarNav({ className }: SidebarNavProps) {
     </Sidebar>
   );
 }
+
