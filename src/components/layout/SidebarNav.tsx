@@ -39,7 +39,7 @@ import {
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SheetTitle } from '@/components/ui/sheet'; 
+// Removed SheetTitle import as it's now handled by ui/sidebar.tsx
 
 interface SidebarNavProps {
   className?: string;
@@ -51,7 +51,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
 
   const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false): React.ReactNode[] => {
     return items.map((item, index) => {
-      const iconSpan = item.icon ? <span className="w-4 h-4 flex items-center justify-center shrink-0">{item.icon}</span> : null;
+      const iconSpan = item.icon ? <span className="flex items-center justify-center shrink-0">{item.icon}</span> : null;
 
       if (!item.href && !item.children) {
         if (isSubmenu && sidebarState === 'collapsed' && !isMobile) { 
@@ -81,7 +81,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent side="right" align="start" className="ml-1 w-56">
                      {item.children.map((child, childIndex) => {
-                        const childIconSpan = child.icon ? <span className="mr-2 w-4 h-4 flex items-center justify-center shrink-0">{child.icon}</span> : null;
+                        const childIconSpan = child.icon ? <span className="mr-2 flex items-center justify-center shrink-0">{child.icon}</span> : null;
                         if (child.children && child.children.length > 0) {
                            return (
                             <RadixDropdownMenuSub key={`${child.title}-${childIndex}-dd-sub`}>
@@ -91,7 +91,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
                               </DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>
                                 {child.children.map((grandChild, grandChildIndex) => {
-                                  const grandChildIconSpan = grandChild.icon ? <span className="mr-2 w-4 h-4 flex items-center justify-center shrink-0">{grandChild.icon}</span> : null;
+                                  const grandChildIconSpan = grandChild.icon ? <span className="mr-2 flex items-center justify-center shrink-0">{grandChild.icon}</span> : null;
                                   return (
                                     <DropdownMenuItem key={`${grandChild.title}-${grandChildIndex}-dd-grandchild`} asChild disabled={grandChild.disabled}>
                                       <Link href={grandChild.href || '#'} className={cn("flex items-center", grandChild.disabled && "pointer-events-none opacity-60")}>
@@ -134,7 +134,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
                     {item.title}
                   </DropdownMenuItem>
                   {item.children.map((child, childIndex) => {
-                     const childIconSpan = child.icon ? <span className="mr-2 w-4 h-4 flex items-center justify-center shrink-0">{child.icon}</span> : null;
+                     const childIconSpan = child.icon ? <span className="mr-2 flex items-center justify-center shrink-0">{child.icon}</span> : null;
                     return (
                       <DropdownMenuItem key={`${child.title}-${childIndex}-dd-child`} asChild disabled={child.disabled}>
                         <Link href={child.href || '#'} className={cn("flex items-center", child.disabled && "pointer-events-none opacity-60")}>
@@ -217,9 +217,11 @@ export function SidebarNav({ className }: SidebarNavProps) {
   };
 
   if (isMobile) {
+    // The content for the mobile sheet is now structured by these Sidebar* components
+    // SheetTitle is rendered by the ui/sidebar.tsx component itself when mobile.
     return (
       <>
-        <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
+        {/* SheetTitle removed from here */}
         <SidebarHeader className="p-2 border-b border-sidebar-border">
            <div className="flex items-center gap-2 px-2 py-2">
               <Link href="/" className="flex items-center gap-2">
@@ -249,6 +251,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
     );
   }
 
+  // Desktop sidebar structure
   return (
     <Sidebar
       variant="sidebar"
