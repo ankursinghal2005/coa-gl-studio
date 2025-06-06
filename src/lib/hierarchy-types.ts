@@ -155,7 +155,7 @@ export const initialHierarchiesData: HierarchySet[] = [
     description: "Automatically generated and updated based on 'Default Parent Code' in segment code definitions. Managed by the system.",
     validFrom: new Date(2023, 0, 1), // Jan 1, 2023 (or an early system date)
     segmentHierarchies: [], // Will be populated by the logic in segment-codes page
-    lastModifiedDate: new Date(),
+    lastModifiedDate: undefined, // Changed from new Date()
     lastModifiedBy: 'System',
   }
 ];
