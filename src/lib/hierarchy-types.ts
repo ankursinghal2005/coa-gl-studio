@@ -23,8 +23,6 @@ export interface HierarchySet {
   name: string;
   status: 'Active' | 'Inactive' | 'Deprecated';
   description?: string;
-  validFrom: Date;
-  validTo?: Date;
   segmentHierarchies: SegmentHierarchyInSet[]; // Array of segment-specific hierarchies
   lastModifiedDate?: Date;
   lastModifiedBy?: string; // Placeholder for user tracking
@@ -37,8 +35,6 @@ export const initialHierarchiesData: HierarchySet[] = [
     name: 'GASB General Purpose Reporting Structure',
     status: 'Active',
     description: 'Standard reporting structure for city-wide GASB financial statements.',
-    validFrom: new Date(Date.UTC(2024, 0, 1)), // Jan 1, 2024
-    validTo: new Date(Date.UTC(2024, 11, 31)), // Dec 31, 2024
     segmentHierarchies: [
       {
         id: 'sh-gasb-fund',
@@ -47,27 +43,27 @@ export const initialHierarchiesData: HierarchySet[] = [
         treeNodes: [
           {
             id: 'gasb-fund-root-gov',
-            segmentCode: { id: 'fb-f-100', code: '100', description: 'Governmental Funds (GASB)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: '' },
+            segmentCode: { id: 'fb-f-100', code: '100', description: 'General Fund (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: '' },
             children: [
               {
                 id: 'gasb-fund-child-101',
-                segmentCode: { id: 'fb-f-101', code: '101', description: 'General Operating Fund', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: '100' },
+                segmentCode: { id: 'fb-f-101', code: '101', description: 'Governmental Operating Fund', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: '100' },
                 children: []
               },
               {
                 id: 'gasb-fund-child-103',
-                segmentCode: { id: 'fb-f-103', code: '103', description: 'Special Revenue - Grants (GASB)', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: '100' },
+                segmentCode: { id: 'fb-f-103', code: '103', description: 'Special Revenue Fund - Grants', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: '100' },
                 children: []
               }
             ]
           },
           {
             id: 'gasb-fund-root-ent',
-            segmentCode: { id: 'fb-f-200', code: '200', description: 'Enterprise Funds (GASB)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,6,1)), validTo: new Date(Date.UTC(2024,11,31)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: '' },
+            segmentCode: { id: 'fb-f-200', code: '200', description: 'Enterprise Funds (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,6,1)), validTo: new Date(Date.UTC(2024,11,31)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: '' },
             children: [
                {
-                id: 'gasb-fund-child-102', // Re-using existing code, assuming it fits
-                segmentCode: { id: 'fb-f-102', code: '102', description: 'Parking Enterprise Fund', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: '200' },
+                id: 'gasb-fund-child-102', 
+                segmentCode: { id: 'fb-f-102', code: '102', description: 'Enterprise Parking Fund', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: '200' },
                 children: []
               }
             ]
@@ -75,28 +71,28 @@ export const initialHierarchiesData: HierarchySet[] = [
         ]
       },
       {
-        id: 'sh-gasb-dept', // Example: Department hierarchy for functional expense reporting
+        id: 'sh-gasb-dept', 
         segmentId: 'department',
         description: 'Functional department rollup for statement of activities.',
         treeNodes: [
            {
             id: 'gasb-dept-root-govops',
-            segmentCode: { id: 'fb-d-GOV', code: 'GOV', description: 'General Government (GASB Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: '' },
+            segmentCode: { id: 'fb-d-GOV', code: 'GOV', description: 'General Government (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: '' },
             children: [
               {
                 id: 'gasb-dept-child-finance',
-                segmentCode: { id: 'fb-d-FIN', code: 'FIN', description: 'Finance & Accounting Dept Summary', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: 'GOV' },
+                segmentCode: { id: 'fb-d-FIN', code: 'FIN', description: 'Finance Department', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: 'GOV' },
                 children: [
                     {
                         id: 'gasb-dept-grandchild-fin-acc',
-                        segmentCode: { id: 'fb-d-FIN-ACC', code: 'FIN-ACC', description: 'Finance & Accounting', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: 'FIN' },
+                        segmentCode: { id: 'fb-d-FIN-ACC', code: 'FIN-ACC', description: 'Accounting Division', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: 'FIN' },
                         children: []
                     }
                 ]
               },
               {
                 id: 'gasb-dept-child-hr',
-                segmentCode: { id: 'fb-d-HR', code: 'HR', description: 'Human Resources Dept', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: 'GOV' },
+                segmentCode: { id: 'fb-d-HR', code: 'HR', description: 'Human Resources Dept', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: 'GOV' },
                 children: []
               }
             ]
@@ -104,7 +100,7 @@ export const initialHierarchiesData: HierarchySet[] = [
         ]
       },
       {
-        id: 'sh-gasb-object', // Example: Object hierarchy for expense classification
+        id: 'sh-gasb-object', 
         segmentId: 'object',
         description: 'Object code rollup for natural expense classification.',
         treeNodes: [
@@ -114,7 +110,7 @@ export const initialHierarchiesData: HierarchySet[] = [
             children: [
                 {
                   id: 'gasb-obj-child-pers',
-                  segmentCode: { id: 'fb-o-5000', code: '5000', description: 'Personnel Services (GASB)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: 'EXP' },
+                  segmentCode: { id: 'fb-o-5000', code: '5000', description: 'Personnel Services (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, defaultParentCode: 'EXP' },
                   children: []
                 }
             ]
@@ -122,7 +118,7 @@ export const initialHierarchiesData: HierarchySet[] = [
         ]
       }
     ],
-    lastModifiedDate: new Date(Date.UTC(2024, 1, 15)), // Feb 15, 2024
+    lastModifiedDate: new Date(Date.UTC(2024, 1, 15)), 
     lastModifiedBy: 'SysAdmin',
   },
   {
@@ -130,22 +126,21 @@ export const initialHierarchiesData: HierarchySet[] = [
     name: 'FY2025 Budget Preparation Hierarchy',
     status: 'Active',
     description: 'Hierarchy set used for preparing the Fiscal Year 2025 budget.',
-    validFrom: new Date(Date.UTC(2024, 6, 1)), // July 1, 2024
     segmentHierarchies: [
       {
         id: 'sh-budget-dept',
         segmentId: 'department',
         description: 'Departmental rollup for budget allocation and control.',
-        treeNodes: [] // Empty tree for now, to be built by budget officers
+        treeNodes: [] 
       },
       {
         id: 'sh-budget-object',
         segmentId: 'object',
         description: 'Object code hierarchy for detailed budget line items.',
-        treeNodes: [] // Empty tree for now
+        treeNodes: [] 
       }
     ],
-    lastModifiedDate: new Date(Date.UTC(2024, 2, 1)), // Mar 1, 2024
+    lastModifiedDate: new Date(Date.UTC(2024, 2, 1)), 
     lastModifiedBy: 'BudgetDirector',
   },
   {
@@ -153,9 +148,8 @@ export const initialHierarchiesData: HierarchySet[] = [
     name: 'Default Code Structures (System)',
     status: 'Active',
     description: "Automatically generated and updated based on 'Default Parent Code' in segment code definitions. Managed by the system.",
-    validFrom: new Date(Date.UTC(2023, 0, 1)), // Jan 1, 2023
     segmentHierarchies: [],
     lastModifiedDate: undefined,
-    lastModifiedBy: 'System',
+    lastModifiedBy: 'System (Initial Build)',
   }
 ];

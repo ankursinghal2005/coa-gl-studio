@@ -29,11 +29,10 @@ import {
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescUI } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
-import { PlusCircle, Edit3, Trash2, Workflow, AlertTriangle, Eye } from 'lucide-react'; // Added Eye
+import { PlusCircle, Edit3, Trash2, Workflow, AlertTriangle, Eye } from 'lucide-react'; 
 import { useSegments } from '@/contexts/SegmentsContext';
 import { useHierarchies } from '@/contexts/HierarchiesContext';
 import type { SegmentHierarchyInSet, HierarchySet, HierarchyNode } from '@/lib/hierarchy-types';
-import { DatePicker } from '@/components/ui/date-picker';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { mockSegmentCodesData, type SegmentCode } from '@/lib/segment-types';
@@ -46,16 +45,6 @@ const hierarchySetFormSchema = z.object({
     required_error: 'Status is required.',
   }),
   description: z.string().optional(),
-  validFrom: z.date({ required_error: "Valid From date is required." }),
-  validTo: z.date().optional(),
-}).refine(data => {
-  if (data.validFrom && data.validTo) {
-    return data.validTo >= data.validFrom;
-  }
-  return true;
-}, {
-  message: "Valid To date must be after or the same as Valid From date.",
-  path: ["validTo"],
 });
 
 type HierarchySetFormValues = z.infer<typeof hierarchySetFormSchema>;
@@ -81,8 +70,6 @@ export default function HierarchySetBuildPage() {
       name: '',
       status: 'Active',
       description: '',
-      validFrom: new Date(),
-      validTo: undefined,
     },
   });
 
@@ -94,8 +81,6 @@ export default function HierarchySetBuildPage() {
           name: existingSet.name,
           status: existingSet.status,
           description: existingSet.description || '',
-          validFrom: new Date(existingSet.validFrom),
-          validTo: existingSet.validTo ? new Date(existingSet.validTo) : undefined,
         });
         setSegmentHierarchiesInSet(existingSet.segmentHierarchies.map(sh => ({...sh, treeNodes: [...(sh.treeNodes || [])]})));
         setCurrentHierarchySetId(existingSet.id);
@@ -111,49 +96,37 @@ export default function HierarchySetBuildPage() {
         name: '',
         status: 'Active',
         description: '',
-        validFrom: new Date(),
-        validTo: undefined,
       });
       setSegmentHierarchiesInSet([]);
     }
   }, [hierarchySetIdQueryParam, getHierarchySetById, form, router]);
 
   const onSubmit = (values: HierarchySetFormValues) => {
-    const hierarchySetData: HierarchySet = {
+    const hierarchySetData: Omit<HierarchySet, 'lastModifiedDate' | 'lastModifiedBy'> & { id: string, lastModifiedDate?: Date, lastModifiedBy?: string} = {
       id: currentHierarchySetId || crypto.randomUUID(), 
       name: values.name,
       status: values.status,
       description: values.description,
-      validFrom: values.validFrom,
-      validTo: values.validTo,
       segmentHierarchies: segmentHierarchiesInSet,
-      lastModifiedDate: new Date(),
-      lastModifiedBy: "Current User", 
     };
 
     if (isEditMode && currentHierarchySetId) {
-      updateHierarchySet(hierarchySetData);
+      updateHierarchySet({ ...hierarchySetData, lastModifiedDate: new Date(), lastModifiedBy: "Current User" });
       alert(`Hierarchy Set "${values.name}" updated successfully!`);
     } else { 
       const newId = hierarchySetData.id; 
-      addHierarchySet(hierarchySetData); 
+      addHierarchySet({ ...hierarchySetData, lastModifiedDate: new Date(), lastModifiedBy: "Current User" }); 
       
-      // Update local state to reflect the newly created set and switch to edit mode
       setCurrentHierarchySetId(newId);
       setIsEditMode(true);
-      // Reset form with the data that was just saved
       form.reset({
         name: hierarchySetData.name,
         status: hierarchySetData.status,
         description: hierarchySetData.description,
-        validFrom: hierarchySetData.validFrom, // Already Date objects
-        validTo: hierarchySetData.validTo,     // Already Date object or undefined
       });
-      // Ensure local segment hierarchies are initialized if needed (usually empty for new set)
       setSegmentHierarchiesInSet(hierarchySetData.segmentHierarchies.map(sh => ({...sh, treeNodes: [...(sh.treeNodes || [])]})));
       
       alert(`Hierarchy Set "${values.name}" saved successfully! You can now add segment hierarchies.`);
-      // Replace URL to reflect edit mode for the new set
       router.replace(`/configure/hierarchies/build?hierarchySetId=${newId}`, { scroll: false });
     }
   };
@@ -193,21 +166,17 @@ export default function HierarchySetBuildPage() {
       }
       
       const updatedSetData: HierarchySet = {
-        ...currentSetFromContext, // Spread existing set data from context
-        name: form.getValues('name'), // Get current form values for other fields
+        ...currentSetFromContext, 
+        name: form.getValues('name'), 
         status: form.getValues('status'),
         description: form.getValues('description'),
-        validFrom: form.getValues('validFrom'),
-        validTo: form.getValues('validTo'),
-        segmentHierarchies: updatedLocalSegmentHierarchies, // Use the locally updated segment hierarchies
+        segmentHierarchies: updatedLocalSegmentHierarchies, 
         lastModifiedDate: new Date(),
         lastModifiedBy: "Current User (Segment Added)",
       };
-      updateHierarchySet(updatedSetData); // Update context immediately
-      setSegmentHierarchiesInSet(updatedLocalSegmentHierarchies); // Update local state
+      updateHierarchySet(updatedSetData); 
+      setSegmentHierarchiesInSet(updatedLocalSegmentHierarchies); 
     } else {
-      // This branch should ideally not be hit if "Save first" is enforced.
-      // However, if it is, we just update local state.
       setSegmentHierarchiesInSet(updatedLocalSegmentHierarchies);
     }
     setSegmentToAdd(''); 
@@ -225,8 +194,6 @@ export default function HierarchySetBuildPage() {
           name: formValues.name,
           status: formValues.status,
           description: formValues.description,
-          validFrom: formValues.validFrom,
-          validTo: formValues.validTo,
           segmentHierarchies: updatedSegmentHierarchies,
           lastModifiedDate: new Date(),
           lastModifiedBy: "Current User (Segment Removed)",
@@ -286,56 +253,24 @@ export default function HierarchySetBuildPage() {
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col"> {/* Ensure vertical stacking */}
-                      <FormLabel>Status *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="Active">Active</SelectItem>
-                          <SelectItem value="Inactive">Inactive</SelectItem>
-                          <SelectItem value="Deprecated">Deprecated</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="validFrom"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Valid From *</FormLabel>
-                      <DatePicker value={field.value} onValueChange={field.onChange} placeholder="Select start date" />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="validTo"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Valid To</FormLabel>
-                      <DatePicker 
-                        value={field.value} 
-                        onValueChange={field.onChange} 
-                        placeholder="Optional: Select end date" 
-                        disableDates={(date) => {
-                            const validFrom = form.getValues("validFrom");
-                            return validFrom instanceof Date ? date < validFrom : false;
-                        }}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="Active">Active</SelectItem>
+                        <SelectItem value="Inactive">Inactive</SelectItem>
+                        <SelectItem value="Deprecated">Deprecated</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 
@@ -447,3 +382,4 @@ export default function HierarchySetBuildPage() {
       
 
     
+

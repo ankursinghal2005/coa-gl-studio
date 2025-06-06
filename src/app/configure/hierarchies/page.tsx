@@ -89,8 +89,6 @@ export default function HierarchySetsPage() {
                   <TableRow>
                     <TableHead className="min-w-[250px]">Set Name</TableHead>
                     <TableHead className="min-w-[100px]">Status</TableHead>
-                    <TableHead className="min-w-[120px]">Valid From</TableHead>
-                    <TableHead className="min-w-[120px]">Valid To</TableHead>
                     <TableHead className="min-w-[150px]">Last Modified</TableHead>
                     <TableHead className="text-center w-[100px]">Actions</TableHead>
                   </TableRow>
@@ -109,14 +107,8 @@ export default function HierarchySetsPage() {
                       </TableCell>
                       <TableCell>{set.status}</TableCell>
                       <TableCell>
-                        {set.validFrom ? format(new Date(set.validFrom), 'MM/dd/yyyy') : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        {set.validTo ? format(new Date(set.validTo), 'MM/dd/yyyy') : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        {set.lastModifiedDate
-                          ? `${format(new Date(set.lastModifiedDate), 'MM/dd/yyyy')} by ${set.lastModifiedBy || 'Unknown'}`
+                        {set.lastModifiedDate && set.lastModifiedBy
+                          ? `${format(new Date(set.lastModifiedDate), 'MM/dd/yyyy')} by ${set.lastModifiedBy}`
                           : 'N/A'}
                       </TableCell>
                       <TableCell className="text-center">
