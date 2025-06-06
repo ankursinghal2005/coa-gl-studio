@@ -61,6 +61,10 @@ import { cn } from '@/lib/utils';
 import { useSegments } from '@/contexts/SegmentsContext';
 import type { Segment, SegmentCode, CustomFieldDefinition } from '@/lib/segment-types';
 import { mockSegmentCodesData } from '@/lib/segment-types';
+import { useHierarchies } from '@/contexts/HierarchiesContext';
+import type { HierarchyNode, HierarchySet, SegmentHierarchyInSet } from '@/lib/hierarchy-types';
+import { useToast } from "@/hooks/use-toast"
+
 
 const submoduleOptions = [
   'General Ledger', 
@@ -87,6 +91,7 @@ const segmentCodeFormSchema = z.object({
   availableForBudgeting: z.boolean().default(false),
   allowedSubmodules: z.array(z.string()).optional(),
   customFieldValues: z.record(z.string(), z.any().optional()).optional(),
+  defaultParentCode: z.string().optional(), // New field
 }).refine(data => {
   if (data.validFrom && data.validTo) {
     return data.validTo >= data.validFrom;
@@ -115,11 +120,37 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   availableForBudgeting: false,
   allowedSubmodules: [...submoduleOptions], 
   customFieldValues: {},
+  defaultParentCode: '', // New field
+};
+
+// Helper: Checks if a segment code (by its ID) exists anywhere in a tree of HierarchyNodes
+const codeExistsInSegmentHierarchy = (nodes: HierarchyNode[], segmentCodeId: string): boolean => {
+  for (const node of nodes) {
+    if (node.segmentCode.id === segmentCodeId) return true;
+    if (node.children && codeExistsInSegmentHierarchy(node.children, segmentCodeId)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+// Helper: Finds a HierarchyNode by its segmentCode.id
+const findNodeBySegmentCodeIdRecursive = (nodes: HierarchyNode[], segmentCodeId: string): HierarchyNode | null => {
+  for (const node of nodes) {
+    if (node.segmentCode.id === segmentCodeId) return node;
+    if (node.children) {
+      const found = findNodeBySegmentCodeIdRecursive(node.children, segmentCodeId);
+      if (found) return found;
+    }
+  }
+  return null;
 };
 
 
 export default function SegmentCodesPage() {
   const { segments: allAvailableSegments } = useSegments();
+  const { addHierarchySet, updateHierarchySet, getHierarchySetById } = useHierarchies();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const querySegmentIdParam = searchParams.get('segmentId');
   
@@ -169,7 +200,7 @@ export default function SegmentCodesPage() {
   useEffect(() => {
     if (isCodeFormOpen) {
       if (dialogMode === 'add') {
-        form.reset({...defaultCodeFormValues, customFieldValues: {}});
+        form.reset({...defaultCodeFormValues, customFieldValues: {}, defaultParentCode: ''});
         setCurrentEditingCode(null);
       } else if ((dialogMode === 'view' || dialogMode === 'edit') && currentEditingCode) {
         form.reset({
@@ -178,10 +209,11 @@ export default function SegmentCodesPage() {
           validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
           allowedSubmodules: currentEditingCode.allowedSubmodules || [],
           customFieldValues: currentEditingCode.customFieldValues || {},
+          defaultParentCode: currentEditingCode.defaultParentCode || '',
         });
       }
     } else {
-      form.reset({...defaultCodeFormValues, customFieldValues: {}});
+      form.reset({...defaultCodeFormValues, customFieldValues: {}, defaultParentCode: ''});
       setCurrentEditingCode(null);
       setDialogMode('add');
     }
@@ -200,7 +232,10 @@ export default function SegmentCodesPage() {
   }, [selectedSegmentId, segmentCodesData]);
 
   const handleSaveCodeSubmit = (values: SegmentCodeFormValues) => {
-    if (!selectedSegmentId) return;
+    if (!selectedSegmentId || !selectedSegment) {
+        toast({ title: "Error", description: "No segment selected.", variant: "destructive" });
+        return;
+    }
 
     const dataToSave: SegmentCode = {
       id: values.id || `${selectedSegmentId}-code-${crypto.randomUUID()}`,
@@ -219,15 +254,25 @@ export default function SegmentCodesPage() {
       availableForBudgeting: values.availableForBudgeting,
       allowedSubmodules: values.allowedSubmodules || [],
       customFieldValues: values.customFieldValues || {},
+      defaultParentCode: values.defaultParentCode?.trim() || undefined,
     };
 
-
+    // Save the code itself first
     if (dialogMode === 'add') {
+      // Check for duplicate code string before adding
+      if ((segmentCodesData[selectedSegmentId] || []).some(c => c.code === dataToSave.code)) {
+        form.setError("code", { type: "manual", message: "This code already exists for this segment." });
+        toast({ title: "Validation Error", description: "This code already exists for this segment.", variant: "destructive" });
+        return;
+      }
       setSegmentCodesData(prev => ({
         ...prev,
         [selectedSegmentId]: [...(prev[selectedSegmentId] || []), dataToSave],
       }));
+      toast({ title: "Success", description: `Code "${dataToSave.code}" added successfully.` });
     } else if (dialogMode === 'edit' && currentEditingCode) {
+      // Check for duplicate code string if code was changed (ID remains same, code string might change if allowed)
+      // For now, assuming 'code' field is disabled in edit mode, so no duplicate check needed here based on string.
       const updatedCode = { ...currentEditingCode, ...dataToSave };
       setSegmentCodesData(prev => ({
         ...prev,
@@ -235,11 +280,81 @@ export default function SegmentCodesPage() {
           code.id === currentEditingCode.id ? updatedCode : code
         ),
       }));
-      setCurrentEditingCode(updatedCode); 
-      setDialogMode('view'); 
-      return;
+      setCurrentEditingCode(updatedCode);
+      toast({ title: "Success", description: `Code "${dataToSave.code}" updated successfully.` });
     }
-    setIsCodeFormOpen(false);
+
+    // --- Hierarchy Logic ---
+    if (dataToSave.defaultParentCode) {
+      const DEFAULT_HIERARCHY_SET_ID = 'hset-system-default-code-hierarchy';
+      const DEFAULT_HIERARCHY_SET_NAME = "Default Code Structures (System)";
+      
+      let hierarchySet = getHierarchySetById(DEFAULT_HIERARCHY_SET_ID);
+      let createdNewSet = false;
+
+      if (!hierarchySet) {
+        hierarchySet = { 
+          id: DEFAULT_HIERARCHY_SET_ID, 
+          name: DEFAULT_HIERARCHY_SET_NAME, 
+          status: 'Active', 
+          validFrom: new Date(), 
+          segmentHierarchies: [], 
+          lastModifiedDate: new Date(), 
+          lastModifiedBy: "System" 
+        };
+        addHierarchySet(hierarchySet);
+        createdNewSet = true;
+        // Re-fetch or use the one just added. For simplicity, we'll assume addHierarchySet updates the context state
+        // that getHierarchySetById will then retrieve. If context updates are batched, direct use might be needed.
+         hierarchySet = getHierarchySetById(DEFAULT_HIERARCHY_SET_ID);
+         if (!hierarchySet) { // Should not happen if context updates synchronously
+            toast({ title: "Hierarchy Error", description: "Failed to create or retrieve default hierarchy set.", variant: "destructive"});
+            return;
+         }
+      }
+      
+      // Clone hierarchySet for modification to ensure context updates properly
+      let hierarchySetToUpdate = JSON.parse(JSON.stringify(hierarchySet)) as HierarchySet;
+
+
+      const parentSegmentCodeObj = (segmentCodesData[selectedSegmentId] || []).find(sc => sc.code === dataToSave.defaultParentCode);
+
+      if (!parentSegmentCodeObj) {
+        toast({ title: "Hierarchy Info", description: `Default parent code "${dataToSave.defaultParentCode}" not found for segment "${selectedSegment.displayName}". Hierarchy not updated.`, variant: "default" });
+      } else if (!parentSegmentCodeObj.summaryIndicator) {
+        toast({ title: "Hierarchy Info", description: `Default parent code "${dataToSave.defaultParentCode}" must be a summary code. Hierarchy not updated.`, variant: "default" });
+      } else {
+        let segmentHierarchy = hierarchySetToUpdate.segmentHierarchies.find(sh => sh.segmentId === selectedSegmentId);
+        if (!segmentHierarchy) {
+          segmentHierarchy = { id: `${DEFAULT_HIERARCHY_SET_ID}-${selectedSegmentId}-sh`, segmentId: selectedSegmentId, treeNodes: [] };
+          hierarchySetToUpdate.segmentHierarchies.push(segmentHierarchy);
+        }
+
+        if (codeExistsInSegmentHierarchy(segmentHierarchy.treeNodes, dataToSave.id)) {
+          toast({ title: "Hierarchy Info", description: `Code "${dataToSave.code}" already exists in the default hierarchy for "${selectedSegment.displayName}". No changes made to hierarchy.`, variant: "default" });
+        } else {
+          let parentNodeInTree = findNodeBySegmentCodeIdRecursive(segmentHierarchy.treeNodes, parentSegmentCodeObj.id);
+          
+          if (!parentNodeInTree) { // Parent code exists but not in tree, add it as a root
+            parentNodeInTree = { id: crypto.randomUUID(), segmentCode: parentSegmentCodeObj, children: [] };
+            segmentHierarchy.treeNodes.push(parentNodeInTree);
+          }
+
+          const childHierarchyNode: HierarchyNode = { id: crypto.randomUUID(), segmentCode: dataToSave, children: [] };
+          parentNodeInTree.children.push(childHierarchyNode);
+          
+          updateHierarchySet(hierarchySetToUpdate);
+          toast({ title: "Hierarchy Update", description: `Code "${dataToSave.code}" added to default hierarchy under parent "${parentSegmentCodeObj.code}".`, variant: "default" });
+        }
+      }
+    }
+    // --- End Hierarchy Logic ---
+
+    if (dialogMode === 'edit') {
+        setDialogMode('view'); // Stay in dialog, switch to view mode
+    } else {
+        setIsCodeFormOpen(false); // Close dialog for 'add' mode
+    }
   };
 
   const handleCodeStatusToggle = (codeId: string) => {
@@ -285,14 +400,12 @@ export default function SegmentCodesPage() {
 
   const isFieldDisabled = dialogMode === 'view';
 
-  // Retaining current root structure as it's a multi-pane layout.
-  // Padding for breadcrumbs moved inside the initial div for better control with this specific layout.
   return (
-    <div className="flex flex-col h-full"> {/* Use h-full to work with layout's flex */}
-      <div className="p-0 md:px-0 lg:px-0"> {/* Adjusted padding for breadcrumbs to be inside scrollable area potentially */}
+    <div className="flex flex-col h-full"> 
+      <div className="p-0 md:px-0 lg:px-0"> 
          <Breadcrumbs items={breadcrumbItems} />
       </div>
-      <div className="flex flex-1 overflow-hidden"> {/* This flex-1 makes this part take remaining height */}
+      <div className="flex flex-1 overflow-hidden"> 
         <aside className="w-1/4 min-w-[200px] max-w-[300px] border-r bg-card p-4 space-y-2 overflow-y-auto">
           <h2 className="text-lg font-semibold mb-3 text-primary flex items-center">
             <ListFilter className="mr-2 h-5 w-5" /> Segments
@@ -357,7 +470,7 @@ export default function SegmentCodesPage() {
                             <FormItem>
                               <FormLabel>Segment Code *</FormLabel>
                               <FormControl>
-                                <Input {...field} disabled={isFieldDisabled || dialogMode === 'edit'} />
+                                <Input {...field} disabled={isFieldDisabled || (dialogMode === 'edit' && !!currentEditingCode?.id)} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -376,6 +489,21 @@ export default function SegmentCodesPage() {
                             </FormItem>
                           )}
                         />
+                         <FormField
+                          control={form.control}
+                          name="defaultParentCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Default Parent Code (for Hierarchy)</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="Enter code of parent (optional)" value={field.value ?? ''} disabled={isFieldDisabled} />
+                              </FormControl>
+                              <CardDesc className="text-xs text-muted-foreground pt-1">If provided, this code will be added under the specified parent in a system-generated default hierarchy. Parent must be a summary code within this segment.</CardDesc>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
@@ -709,6 +837,7 @@ export default function SegmentCodesPage() {
                                   validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
                                   allowedSubmodules: currentEditingCode.allowedSubmodules || [],
                                   customFieldValues: currentEditingCode.customFieldValues || {},
+                                  defaultParentCode: currentEditingCode.defaultParentCode || '',
                                 });
                               }}>Cancel</Button>
                               <Button type="submit">Save Changes</Button>
@@ -734,6 +863,7 @@ export default function SegmentCodesPage() {
                         <TableRow>
                           <TableHead className="min-w-[100px]">Code</TableHead>
                           <TableHead className="min-w-[200px]">Description</TableHead>
+                          <TableHead className="min-w-[150px]">Default Parent</TableHead>
                           <TableHead className="text-center min-w-[100px]">Summary</TableHead>
                           <TableHead className="text-center min-w-[100px]">Status</TableHead>
                         </TableRow>
@@ -747,6 +877,7 @@ export default function SegmentCodesPage() {
                               </span>
                             </TableCell>
                             <TableCell className="whitespace-normal break-words">{code.description}</TableCell>
+                            <TableCell>{code.defaultParentCode || 'N/A'}</TableCell>
                             <TableCell className="text-center">
                               {code.summaryIndicator ? <CheckCircle className="h-5 w-5 text-green-500 inline" /> : <XCircle className="h-5 w-5 text-muted-foreground inline" />}
                             </TableCell>
