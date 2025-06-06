@@ -1,12 +1,13 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from "date-fns";
+import { format, parse as parseDateFns } from "date-fns";
 import { useSearchParams } from 'next/navigation'; 
+import * as XLSX from 'xlsx';
 import {
   Table,
   TableHeader,
@@ -53,7 +54,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { PlusCircle, ListFilter, CheckCircle, XCircle, ChevronsUpDown } from 'lucide-react';
+import { PlusCircle, ListFilter, CheckCircle, XCircle, ChevronsUpDown, DownloadCloud, UploadCloud, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -91,7 +92,7 @@ const segmentCodeFormSchema = z.object({
   availableForBudgeting: z.boolean().default(false),
   allowedSubmodules: z.array(z.string()).optional(),
   customFieldValues: z.record(z.string(), z.any().optional()).optional(),
-  defaultParentCode: z.string().optional(), // New field
+  defaultParentCode: z.string().optional(),
 }).refine(data => {
   if (data.validFrom && data.validTo) {
     return data.validTo >= data.validFrom;
@@ -120,10 +121,9 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   availableForBudgeting: false,
   allowedSubmodules: [...submoduleOptions], 
   customFieldValues: {},
-  defaultParentCode: '', // New field
+  defaultParentCode: '',
 };
 
-// Helper: Checks if a segment code (by its ID) exists anywhere in a tree of HierarchyNodes
 const codeExistsInSegmentHierarchy = (nodes: HierarchyNode[], segmentCodeId: string): boolean => {
   for (const node of nodes) {
     if (node.segmentCode.id === segmentCodeId) return true;
@@ -134,7 +134,6 @@ const codeExistsInSegmentHierarchy = (nodes: HierarchyNode[], segmentCodeId: str
   return false;
 };
 
-// Helper: Finds a HierarchyNode by its segmentCode.id
 const findNodeBySegmentCodeIdRecursive = (nodes: HierarchyNode[], segmentCodeId: string): HierarchyNode | null => {
   for (const node of nodes) {
     if (node.segmentCode.id === segmentCodeId) return node;
@@ -155,6 +154,8 @@ export default function SegmentCodesPage() {
   const querySegmentIdParam = searchParams.get('segmentId');
   
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [segmentCodesData, setSegmentCodesData] = useState<Record<string, SegmentCode[]>>(() => {
     const initialData: Record<string, SegmentCode[]> = {};
@@ -231,6 +232,104 @@ export default function SegmentCodesPage() {
     return segmentCodesData[selectedSegmentId];
   }, [selectedSegmentId, segmentCodesData]);
 
+
+  const saveSegmentCodeAndUpdateHierarchy = (
+    codeToSave: SegmentCode, 
+    targetSegmentId: string, 
+    targetSegment: Segment,
+    currentCodesForSegment: SegmentCode[]
+  ): { savedCode: SegmentCode | null, hierarchyMessage?: string } => {
+    
+    let existingCodeIndex = currentCodesForSegment.findIndex(c => c.id === codeToSave.id || c.code === codeToSave.code);
+    let savedCode: SegmentCode;
+    let operation: 'added' | 'updated' = 'added';
+
+    if (existingCodeIndex !== -1) { // Update existing
+        savedCode = { ...currentCodesForSegment[existingCodeIndex], ...codeToSave };
+        operation = 'updated';
+        setSegmentCodesData(prev => {
+            const updatedSegmentCodes = [...(prev[targetSegmentId] || [])];
+            updatedSegmentCodes[existingCodeIndex] = savedCode;
+            return { ...prev, [targetSegmentId]: updatedSegmentCodes };
+        });
+    } else { // Add new
+        savedCode = { ...codeToSave, id: codeToSave.id || `${targetSegmentId}-code-${crypto.randomUUID()}` };
+        setSegmentCodesData(prev => ({
+            ...prev,
+            [targetSegmentId]: [...(prev[targetSegmentId] || []), savedCode],
+        }));
+    }
+    
+    setCurrentEditingCode(savedCode); // Ensure currentEditingCode is updated if in dialog mode
+
+    let hierarchyMessage: string | undefined;
+
+    // --- Hierarchy Logic ---
+    if (savedCode.defaultParentCode) {
+      const DEFAULT_HIERARCHY_SET_ID = 'hset-system-default-code-hierarchy';
+      const DEFAULT_HIERARCHY_SET_NAME = "Default Code Structures (System)";
+      
+      let hierarchySet = getHierarchySetById(DEFAULT_HIERARCHY_SET_ID);
+
+      if (!hierarchySet) {
+        hierarchySet = { 
+          id: DEFAULT_HIERARCHY_SET_ID, 
+          name: DEFAULT_HIERARCHY_SET_NAME, 
+          status: 'Active', 
+          validFrom: new Date(Date.UTC(2023, 0, 1)), 
+          segmentHierarchies: [], 
+          lastModifiedDate: new Date(), 
+          lastModifiedBy: "System (Excel Upload)" 
+        };
+        addHierarchySet(hierarchySet);
+        hierarchySet = getHierarchySetById(DEFAULT_HIERARCHY_SET_ID); // Re-fetch
+         if (!hierarchySet) {
+            return { savedCode, hierarchyMessage: `Failed to create/retrieve default hierarchy set for ${savedCode.code}.` };
+         }
+      }
+      
+      let hierarchySetToUpdate = JSON.parse(JSON.stringify(hierarchySet)) as HierarchySet;
+      const allCodesForCurrentSegment = segmentCodesData[targetSegmentId] || [savedCode]; // Use updated list
+
+      const parentSegmentCodeObj = allCodesForCurrentSegment.find(sc => sc.code === savedCode.defaultParentCode);
+
+      if (!parentSegmentCodeObj) {
+        hierarchyMessage = `Default parent code "${savedCode.defaultParentCode}" not found for code "${savedCode.code}". Hierarchy not updated.`;
+      } else if (!parentSegmentCodeObj.summaryIndicator) {
+        hierarchyMessage = `Default parent code "${savedCode.defaultParentCode}" for code "${savedCode.code}" must be a summary code. Hierarchy not updated.`;
+      } else {
+        let segmentHierarchy = hierarchySetToUpdate.segmentHierarchies.find(sh => sh.segmentId === targetSegmentId);
+        if (!segmentHierarchy) {
+          segmentHierarchy = { id: `${DEFAULT_HIERARCHY_SET_ID}-${targetSegmentId}-sh`, segmentId: targetSegmentId, treeNodes: [] };
+          hierarchySetToUpdate.segmentHierarchies.push(segmentHierarchy);
+        }
+
+        // Ensure parent node is in tree if it's not already
+        let parentNodeInTree = findNodeBySegmentCodeIdRecursive(segmentHierarchy.treeNodes, parentSegmentCodeObj.id);
+        if (!parentNodeInTree) {
+          parentNodeInTree = { id: crypto.randomUUID(), segmentCode: parentSegmentCodeObj, children: [] };
+          segmentHierarchy.treeNodes.push(parentNodeInTree);
+        }
+
+        // Check if the current code (savedCode) is already in the tree. If so, don't re-add.
+        if (!codeExistsInSegmentHierarchy(segmentHierarchy.treeNodes, savedCode.id)) {
+            const childHierarchyNode: HierarchyNode = { id: crypto.randomUUID(), segmentCode: savedCode, children: [] };
+            parentNodeInTree.children.push(childHierarchyNode); // Add to the found/created parent
+            hierarchySetToUpdate.lastModifiedDate = new Date();
+            hierarchySetToUpdate.lastModifiedBy = "System (Code Update)";
+            updateHierarchySet(hierarchySetToUpdate);
+            hierarchyMessage = `Code "${savedCode.code}" ${operation} and added to default hierarchy under "${parentSegmentCodeObj.code}".`;
+        } else {
+            hierarchyMessage = `Code "${savedCode.code}" ${operation}. It already exists in the default hierarchy.`;
+        }
+      }
+    } else {
+       hierarchyMessage = `Code "${savedCode.code}" ${operation}. No default parent specified.`;
+    }
+    return { savedCode, hierarchyMessage };
+  };
+
+
   const handleSaveCodeSubmit = (values: SegmentCodeFormValues) => {
     if (!selectedSegmentId || !selectedSegment) {
         toast({ title: "Error", description: "No segment selected.", variant: "destructive" });
@@ -238,7 +337,7 @@ export default function SegmentCodesPage() {
     }
 
     const dataToSave: SegmentCode = {
-      id: values.id || `${selectedSegmentId}-code-${crypto.randomUUID()}`,
+      id: values.id || `${selectedSegmentId}-code-${crypto.randomUUID()}`, // Ensure ID for new codes
       code: values.code,
       description: values.description,
       external1: values.external1,
@@ -256,106 +355,33 @@ export default function SegmentCodesPage() {
       customFieldValues: values.customFieldValues || {},
       defaultParentCode: values.defaultParentCode?.trim() || undefined,
     };
+    
+    // Check for duplicate code string before adding/updating (if code string can change)
+    const isAdding = dialogMode === 'add';
+    const codeExists = (segmentCodesData[selectedSegmentId] || []).some(
+        c => c.code === dataToSave.code && (isAdding || c.id !== dataToSave.id)
+    );
 
-    // Save the code itself first
-    if (dialogMode === 'add') {
-      // Check for duplicate code string before adding
-      if ((segmentCodesData[selectedSegmentId] || []).some(c => c.code === dataToSave.code)) {
+    if (codeExists) {
         form.setError("code", { type: "manual", message: "This code already exists for this segment." });
         toast({ title: "Validation Error", description: "This code already exists for this segment.", variant: "destructive" });
         return;
-      }
-      setSegmentCodesData(prev => ({
-        ...prev,
-        [selectedSegmentId]: [...(prev[selectedSegmentId] || []), dataToSave],
-      }));
-      toast({ title: "Success", description: `Code "${dataToSave.code}" added successfully.` });
-    } else if (dialogMode === 'edit' && currentEditingCode) {
-      // Check for duplicate code string if code was changed (ID remains same, code string might change if allowed)
-      // For now, assuming 'code' field is disabled in edit mode, so no duplicate check needed here based on string.
-      const updatedCode = { ...currentEditingCode, ...dataToSave };
-      setSegmentCodesData(prev => ({
-        ...prev,
-        [selectedSegmentId]: (prev[selectedSegmentId] || []).map(code =>
-          code.id === currentEditingCode.id ? updatedCode : code
-        ),
-      }));
-      setCurrentEditingCode(updatedCode);
-      toast({ title: "Success", description: `Code "${dataToSave.code}" updated successfully.` });
     }
+    
+    const { savedCode, hierarchyMessage } = saveSegmentCodeAndUpdateHierarchy(dataToSave, selectedSegmentId, selectedSegment, currentSegmentCodes);
 
-    // --- Hierarchy Logic ---
-    if (dataToSave.defaultParentCode) {
-      const DEFAULT_HIERARCHY_SET_ID = 'hset-system-default-code-hierarchy';
-      const DEFAULT_HIERARCHY_SET_NAME = "Default Code Structures (System)";
-      
-      let hierarchySet = getHierarchySetById(DEFAULT_HIERARCHY_SET_ID);
-      let createdNewSet = false;
-
-      if (!hierarchySet) {
-        hierarchySet = { 
-          id: DEFAULT_HIERARCHY_SET_ID, 
-          name: DEFAULT_HIERARCHY_SET_NAME, 
-          status: 'Active', 
-          validFrom: new Date(), 
-          segmentHierarchies: [], 
-          lastModifiedDate: new Date(), 
-          lastModifiedBy: "System" 
-        };
-        addHierarchySet(hierarchySet);
-        createdNewSet = true;
-        // Re-fetch or use the one just added. For simplicity, we'll assume addHierarchySet updates the context state
-        // that getHierarchySetById will then retrieve. If context updates are batched, direct use might be needed.
-         hierarchySet = getHierarchySetById(DEFAULT_HIERARCHY_SET_ID);
-         if (!hierarchySet) { // Should not happen if context updates synchronously
-            toast({ title: "Hierarchy Error", description: "Failed to create or retrieve default hierarchy set.", variant: "destructive"});
-            return;
-         }
-      }
-      
-      // Clone hierarchySet for modification to ensure context updates properly
-      let hierarchySetToUpdate = JSON.parse(JSON.stringify(hierarchySet)) as HierarchySet;
-
-
-      const parentSegmentCodeObj = (segmentCodesData[selectedSegmentId] || []).find(sc => sc.code === dataToSave.defaultParentCode);
-
-      if (!parentSegmentCodeObj) {
-        toast({ title: "Hierarchy Info", description: `Default parent code "${dataToSave.defaultParentCode}" not found for segment "${selectedSegment.displayName}". Hierarchy not updated.`, variant: "default" });
-      } else if (!parentSegmentCodeObj.summaryIndicator) {
-        toast({ title: "Hierarchy Info", description: `Default parent code "${dataToSave.defaultParentCode}" must be a summary code. Hierarchy not updated.`, variant: "default" });
-      } else {
-        let segmentHierarchy = hierarchySetToUpdate.segmentHierarchies.find(sh => sh.segmentId === selectedSegmentId);
-        if (!segmentHierarchy) {
-          segmentHierarchy = { id: `${DEFAULT_HIERARCHY_SET_ID}-${selectedSegmentId}-sh`, segmentId: selectedSegmentId, treeNodes: [] };
-          hierarchySetToUpdate.segmentHierarchies.push(segmentHierarchy);
-        }
-
-        if (codeExistsInSegmentHierarchy(segmentHierarchy.treeNodes, dataToSave.id)) {
-          toast({ title: "Hierarchy Info", description: `Code "${dataToSave.code}" already exists in the default hierarchy for "${selectedSegment.displayName}". No changes made to hierarchy.`, variant: "default" });
+    if (savedCode) {
+        toast({ title: "Success", description: hierarchyMessage || `Code "${savedCode.code}" processed.` });
+        if (dialogMode === 'edit') {
+            setDialogMode('view'); 
         } else {
-          let parentNodeInTree = findNodeBySegmentCodeIdRecursive(segmentHierarchy.treeNodes, parentSegmentCodeObj.id);
-          
-          if (!parentNodeInTree) { // Parent code exists but not in tree, add it as a root
-            parentNodeInTree = { id: crypto.randomUUID(), segmentCode: parentSegmentCodeObj, children: [] };
-            segmentHierarchy.treeNodes.push(parentNodeInTree);
-          }
-
-          const childHierarchyNode: HierarchyNode = { id: crypto.randomUUID(), segmentCode: dataToSave, children: [] };
-          parentNodeInTree.children.push(childHierarchyNode);
-          
-          updateHierarchySet(hierarchySetToUpdate);
-          toast({ title: "Hierarchy Update", description: `Code "${dataToSave.code}" added to default hierarchy under parent "${parentSegmentCodeObj.code}".`, variant: "default" });
+            setIsCodeFormOpen(false); 
         }
-      }
-    }
-    // --- End Hierarchy Logic ---
-
-    if (dialogMode === 'edit') {
-        setDialogMode('view'); // Stay in dialog, switch to view mode
     } else {
-        setIsCodeFormOpen(false); // Close dialog for 'add' mode
+        toast({ title: "Error", description: "Failed to save code.", variant: "destructive" });
     }
   };
+
 
   const handleCodeStatusToggle = (codeId: string) => {
     if (!selectedSegmentId) return;
@@ -400,6 +426,204 @@ export default function SegmentCodesPage() {
 
   const isFieldDisabled = dialogMode === 'view';
 
+  const handleDownloadTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const standardizedDate = (date: Date | undefined) => date ? format(date, 'yyyy-MM-dd') : '';
+    const booleanToString = (val: boolean | undefined) => val === true ? 'TRUE' : (val === false ? 'FALSE' : '');
+
+    allAvailableSegments.forEach(segment => {
+      const headers = [
+        'Code*', 'Description*', 'DefaultParentCode', 
+        'External1', 'External2', 'External3', 'External4', 'External5',
+        'SummaryIndicator (TRUE/FALSE)*', 'IsActive (TRUE/FALSE)*', 
+        'ValidFrom (YYYY-MM-DD)*', 'ValidTo (YYYY-MM-DD)',
+        'AvailableForTransactionCoding (TRUE/FALSE)*', 'AvailableForBudgeting (TRUE/FALSE)*',
+        'AllowedSubmodules (comma-separated)'
+      ];
+      (segment.customFields || []).forEach(cf => {
+        headers.push(`${cf.label}${cf.required ? '*' : ''}`);
+      });
+
+      const sheetData: (string | boolean | number | Date | undefined)[][] = [headers];
+      // Add an example row or leave empty
+       const exampleRow = [
+        segment.defaultCode || 'EXAMPLE101', // Code
+        'Example Description', // Description
+        '', // DefaultParentCode
+        '', '', '', '', '', // Externals
+        'FALSE', // SummaryIndicator
+        'TRUE',  // IsActive
+        standardizedDate(new Date()), // ValidFrom
+        '', // ValidTo
+        'TRUE', // AvailableForTransactionCoding
+        'TRUE', // AvailableForBudgeting
+        submoduleOptions.join(','), // AllowedSubmodules
+      ];
+      (segment.customFields || []).forEach(cf => {
+        exampleRow.push(cf.type === 'Boolean' ? 'FALSE' : (cf.type === 'Date' ? standardizedDate(new Date()) : 'Example Value'));
+      });
+      sheetData.push(exampleRow);
+
+
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+      // Sanitize sheet name
+      const sheetName = segment.displayName.replace(/[\/\?\[\]\*:]/g, "").substring(0, 31);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+
+    XLSX.writeFile(wb, "SegmentCodes_Template.xlsx");
+    toast({ title: "Success", description: "Template downloaded." });
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedSegment) {
+      if (!selectedSegment) toast({ title: "Error", description: "Please select a segment first to upload codes to.", variant: "destructive" });
+      return;
+    }
+    setIsUploading(true);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        let codesProcessed = 0;
+        let codesAdded = 0;
+        let codesUpdated = 0;
+        let errorsFound = 0;
+        let errorMessages: string[] = [];
+
+        const segmentMap = new Map(allAvailableSegments.map(s => [s.displayName.replace(/[\/\?\[\]\*:]/g, "").substring(0, 31), s]));
+
+        workbook.SheetNames.forEach(sheetName => {
+          const targetSegment = segmentMap.get(sheetName);
+          if (!targetSegment) {
+            errorMessages.push(`Sheet "${sheetName}" does not match any known segment. Skipping.`);
+            errorsFound++;
+            return;
+          }
+
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 , raw: false, dateNF: 'yyyy-mm-dd'});
+          
+          if (jsonData.length < 1) return; // Skip empty sheets or sheets with only header
+
+          const headers: string[] = jsonData[0].map((h:any) => String(h).trim());
+          const rows = jsonData.slice(1);
+
+          rows.forEach((rowArray, rowIndex) => {
+            codesProcessed++;
+            const row: Record<string, any> = {};
+            headers.forEach((header, index) => {
+                // Remove asterisk from header for key mapping
+                const cleanHeader = header.replace(/\s?\*$/, '').replace(/\s\(.*\)$/, '');
+                row[cleanHeader] = rowArray[index];
+            });
+
+            try {
+              const customFieldValues: Record<string, any> = {};
+              (targetSegment.customFields || []).forEach(cf => {
+                const excelHeader = cf.label; // Header in Excel matches label
+                if (row[excelHeader] !== undefined) {
+                  let val = row[excelHeader];
+                  if (cf.type === 'Boolean') val = ['TRUE', 'YES', '1'].includes(String(val).toUpperCase());
+                  else if (cf.type === 'Date') val = val instanceof Date ? val : (val ? parseDateFns(String(val), 'yyyy-MM-dd', new Date()) : undefined);
+                  else if (cf.type === 'Number') val = val !== undefined && val !== '' ? parseFloat(String(val)) : undefined;
+                  customFieldValues[cf.id] = val;
+                } else if (cf.required) {
+                    throw new Error(`Custom field "${cf.label}" is required.`);
+                }
+              });
+              
+              const parseBoolean = (val: any) => {
+                if (val === undefined || val === null || String(val).trim() === '') return undefined; // Treat empty as undefined
+                const sVal = String(val).toUpperCase();
+                return ['TRUE', 'YES', '1'].includes(sVal);
+              };
+              
+              const validFromStr = String(row['ValidFrom'] || '').trim();
+              const validToStr = String(row['ValidTo'] || '').trim();
+
+              const parsedData = {
+                code: String(row['Code'] || '').trim(),
+                description: String(row['Description'] || '').trim(),
+                defaultParentCode: String(row['DefaultParentCode'] || '').trim() || undefined,
+                external1: String(row['External1'] || '').trim() || undefined,
+                external2: String(row['External2'] || '').trim() || undefined,
+                external3: String(row['External3'] || '').trim() || undefined,
+                external4: String(row['External4'] || '').trim() || undefined,
+                external5: String(row['External5'] || '').trim() || undefined,
+                summaryIndicator: parseBoolean(row['SummaryIndicator']) ?? false, // Default to false if empty/invalid
+                isActive: parseBoolean(row['IsActive']) ?? true, // Default to true
+                validFrom: validFromStr ? parseDateFns(validFromStr, 'yyyy-MM-dd', new Date()) : undefined,
+                validTo: validToStr ? parseDateFns(validToStr, 'yyyy-MM-dd', new Date()) : undefined,
+                availableForTransactionCoding: parseBoolean(row['AvailableForTransactionCoding']) ?? false,
+                availableForBudgeting: parseBoolean(row['AvailableForBudgeting']) ?? false,
+                allowedSubmodules: String(row['AllowedSubmodules'] || '').split(',').map(s => s.trim()).filter(Boolean),
+                customFieldValues: customFieldValues,
+              };
+
+              // Validate with Zod (ensure date objects are passed if required)
+              const validationResult = segmentCodeFormSchema.safeParse({
+                  ...parsedData,
+                  // Zod expects Date objects for date fields if they are not optional
+                  validFrom: parsedData.validFrom || new Date(0), // Provide default if undefined for required fields
+              });
+
+              if (!validationResult.success) {
+                errorsFound++;
+                const errorDetails = validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+                errorMessages.push(`Sheet "${sheetName}", Row ${rowIndex + 2}: ${errorDetails}`);
+                console.error(`Validation error for row ${rowIndex + 2} in sheet ${sheetName}:`, validationResult.error.flatten());
+                return;
+              }
+
+              const codeToProcess: SegmentCode = {
+                ...validationResult.data,
+                id: (segmentCodesData[targetSegment.id] || []).find(c => c.code === validationResult.data.code)?.id || `${targetSegment.id}-code-${crypto.randomUUID()}`,
+              };
+
+              const existingCodeIndex = (segmentCodesData[targetSegment.id] || []).findIndex(c => c.code === codeToProcess.code);
+              
+              saveSegmentCodeAndUpdateHierarchy(codeToProcess, targetSegment.id, targetSegment, segmentCodesData[targetSegment.id] || []);
+
+              if (existingCodeIndex !== -1) codesUpdated++; else codesAdded++;
+
+            } catch (parseError: any) {
+              errorsFound++;
+              errorMessages.push(`Sheet "${sheetName}", Row ${rowIndex + 2}: Error parsing data - ${parseError.message}`);
+              console.error(`Error processing row ${rowIndex + 2} in sheet ${sheetName}:`, parseError);
+            }
+          });
+        });
+
+        if (errorsFound > 0) {
+          toast({
+            title: "Upload Complete with Errors",
+            description: `${codesAdded} codes added, ${codesUpdated} updated. ${errorsFound} errors occurred. Check console for details. ${errorMessages.slice(0,3).join(' ')}`,
+            variant: "destructive",
+            duration: 7000,
+          });
+        } else {
+          toast({
+            title: "Upload Successful",
+            description: `${codesAdded} codes added, ${codesUpdated} updated.`,
+          });
+        }
+
+      } catch (error: any) {
+        toast({ title: "Upload Failed", description: `Error reading Excel file: ${error.message}`, variant: "destructive" });
+        console.error("Excel upload error:", error);
+      } finally {
+        setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = ''; // Reset file input
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+
   return (
     <div className="flex flex-col h-full"> 
       <div className="p-0 md:px-0 lg:px-0"> 
@@ -435,16 +659,31 @@ export default function SegmentCodesPage() {
                   Manage Codes for: {selectedSegment.displayName}
                 </h1>
                 <p className="text-md text-muted-foreground mt-1">
-                  Define and manage codes associated with the selected segment.
+                  Define and manage codes associated with the selected segment. You can also download a template or upload codes using an Excel file.
                 </p>
               </header>
 
-              <div className="mb-6 flex justify-end">
+              <div className="mb-6 flex flex-col sm:flex-row justify-end gap-2">
+                 <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept=".xlsx, .xls"
+                    style={{ display: 'none' }}
+                    id="excel-upload-input"
+                  />
+                <Button onClick={handleDownloadTemplate} variant="outline" disabled={isUploading}>
+                  <DownloadCloud className="mr-2 h-5 w-5" /> Download Template
+                </Button>
+                <Button onClick={() => fileInputRef.current?.click()} variant="outline" disabled={isUploading}>
+                  {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
+                  Upload Codes
+                </Button>
                 <Dialog open={isCodeFormOpen} onOpenChange={handleDialogClose}>
                   <DialogTrigger asChild>
-                    <Button onClick={handleOpenAddCodeDialog}>
+                    <Button onClick={handleOpenAddCodeDialog} disabled={isUploading}>
                       <PlusCircle className="mr-2 h-5 w-5" />
-                      Add Code
+                      Add Code Manually
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-2xl md:max-w-3xl max-h-[80vh]">
@@ -895,7 +1134,7 @@ export default function SegmentCodesPage() {
                     </ScrollArea>
                   ) : (
                     <p className="text-muted-foreground text-center py-8">
-                      No codes defined for {selectedSegment.displayName}. Click "Add Code" to get started.
+                      No codes defined for {selectedSegment.displayName}. Click "Add Code" to get started or upload an Excel file.
                     </p>
                   )}
                 </CardContent>
@@ -915,3 +1154,4 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
+
