@@ -485,7 +485,7 @@ export default function SegmentsPage() {
                 </SheetDescription>
               </SheetHeader>
               <ScrollArea className="flex-1 min-h-0">
-                <div className="py-4 pr-6">
+                <div className="p-4">
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                       <FormField

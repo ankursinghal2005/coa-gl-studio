@@ -513,8 +513,8 @@ export default function AccountAccessControlBuildPage() {
               Define the segment conditions for this specific access restriction and the type of access it grants/denies.
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[65vh] p-1 pr-3">
-            <div className="space-y-6 py-4">
+          <ScrollArea className="max-h-[65vh]">
+            <div className="space-y-6 p-4">
               <div className="space-y-2">
                 <Label htmlFor="restrictionDescription">Restriction Description (Optional)</Label>
                 <Input 

@@ -494,8 +494,8 @@ export default function CombinationRuleBuildPage() {
               Define a specific combination scenario, its behavior, and the conditions for relevant segments.
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[65vh] p-1 pr-3">
-            <div className="space-y-6 py-4">
+          <ScrollArea className="max-h-[65vh]">
+            <div className="space-y-6 p-4">
                <div>
                 <Label htmlFor="entryDescription">Entry Description (Optional)</Label>
                 <Input 

@@ -710,7 +710,7 @@ export default function SegmentCodesPage() {
                       </SheetDescription>
                     </SheetHeader>
                     <ScrollArea className="flex-1 min-h-0">
-                      <div className="py-4 pr-6">
+                      <div className="p-4">
                         <Form {...form}>
                           <form onSubmit={form.handleSubmit(handleSaveCodeSubmit)} className="space-y-4">
                             <FormField
@@ -1131,7 +1131,7 @@ export default function SegmentCodesPage() {
                               </button>
                             </TableCell>
                             <TableCell className="whitespace-normal break-words">{code.description}</TableCell>
-                            <TableCell>{code.defaultParentCode}</TableCell>
+                            <TableCell>{code.defaultParentCode || ''}</TableCell>
                             <TableCell className="text-center">
                               {code.summaryIndicator ? <CheckCircle className="h-5 w-5 text-green-500 inline" /> : <XCircle className="h-5 w-5 text-muted-foreground inline" />}
                             </TableCell>
