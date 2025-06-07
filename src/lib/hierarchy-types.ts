@@ -85,7 +85,7 @@ export const initialHierarchiesData: HierarchySet[] = [
                 children: [
                     {
                         id: 'gasb-dept-grandchild-fin-acc',
-                        segmentCode: { id: 'fb-d-FIN-ACC', code: 'FIN-ACC', description: 'Accounting Division', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: 'FIN' },
+                        segmentCode: { id: 'fb-d-FIN-ACC', code: 'FINACC', description: 'Accounting Division', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, defaultParentCode: 'FIN' },
                         children: []
                     }
                 ]
@@ -153,3 +153,6 @@ export const initialHierarchiesData: HierarchySet[] = [
     lastModifiedBy: 'System (Initial Build)',
   }
 ];
+
+
+    

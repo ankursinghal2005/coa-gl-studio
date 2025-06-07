@@ -30,14 +30,14 @@ export interface Segment {
 export const initialSegmentsData: Segment[] = [
   { id: 'fund', displayName: 'Fund', segmentType: 'Fund', dataType: 'Alphanumeric', maxLength: 10, specialCharsAllowed: '', defaultCode: '101', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, customFields: [] },
   { id: 'object', displayName: 'Object', segmentType: 'Object', dataType: 'Alphanumeric', maxLength: 10, specialCharsAllowed: '', defaultCode: '4001', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, customFields: [] },
-  { id: 'department', displayName: 'Department', segmentType: 'Department', dataType: 'Alphanumeric', maxLength: 15, specialCharsAllowed: '', defaultCode: 'POL-1', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, customFields: [] },
+  { id: 'department', displayName: 'Department', segmentType: 'Department', dataType: 'Alphanumeric', maxLength: 15, specialCharsAllowed: '', defaultCode: 'POL1', separator: '-', isCustom: false, isMandatoryForCoding: true, isActive: true, isCore: true, customFields: [] },
   {
     id: 'project',
     displayName: 'Project',
     segmentType: 'Project',
     dataType: 'Alphanumeric',
     maxLength: 20,
-    specialCharsAllowed: '-_',
+    specialCharsAllowed: '_',
     defaultCode: 'BUILD',
     separator: '-',
     isCustom: false,
@@ -49,10 +49,10 @@ export const initialSegmentsData: Segment[] = [
       { id: 'proj-start-date-field', label: 'Project Start Date', type: 'Date', required: true }
     ]
   },
-  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', dataType: 'Alphanumeric', maxLength: 20, specialCharsAllowed: '-_', defaultCode: '1111', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, customFields: [] },
+  { id: 'grant', displayName: 'Grant', segmentType: 'Grant', dataType: 'Alphanumeric', maxLength: 20, specialCharsAllowed: '_', defaultCode: '1111', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, customFields: [] },
   { id: 'function', displayName: 'Function', segmentType: 'Function', dataType: 'Numeric', maxLength: 5, specialCharsAllowed: '', defaultCode: '2302', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, customFields: [] },
   { id: 'location', displayName: 'Location', segmentType: 'Location', dataType: 'Alphanumeric', maxLength: 10, specialCharsAllowed: '', defaultCode: 'KLN1', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, customFields: [] },
-  { id: 'program', displayName: 'Program', segmentType: 'Program', dataType: 'Text', maxLength: 50, specialCharsAllowed: '-_ ', defaultCode: '9999', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, customFields: [] },
+  { id: 'program', displayName: 'Program', segmentType: 'Program', dataType: 'Text', maxLength: 50, specialCharsAllowed: '_ ', defaultCode: '9999', separator: '-', isCustom: false, isMandatoryForCoding: false, isActive: true, isCore: false, customFields: [] },
 ];
 
 // Consolidated SegmentCode interface
@@ -121,24 +121,24 @@ export const mockSegmentCodesData: Record<string, SegmentCode[]> = {
 
     // Children of GOV
     { id: 'fb-d-FIN', code: 'FIN', description: 'Finance Department', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, allowedSubmodules: ['General Ledger'], customFieldValues: {}, defaultParentCode: 'GOV' },
-    { id: 'fb-d-FIN-ACC', code: 'FIN-ACC', description: 'Accounting Division', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'FIN' },
-    { id: 'fb-d-FIN-BUD', code: 'FIN-BUD', description: 'Budgeting Division', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'FIN' },
-    { id: 'fb-d-FIN-BUD-ANL', code: 'FIN-BUD-ANL', description: 'Budget Analysis Team', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'FIN-BUD' }, // Grandchild
+    { id: 'fb-d-FIN-ACC', code: 'FINACC', description: 'Accounting Division', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'FIN' },
+    { id: 'fb-d-FIN-BUD', code: 'FINBUD', description: 'Budgeting Division', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'FIN' },
+    { id: 'fb-d-FIN-BUD-ANL', code: 'FINBUDANL', description: 'Budget Analysis Team', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'FINBUD' }, // Grandchild
     { id: 'fb-d-HR', code: 'HR', description: 'Human Resources Dept', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, allowedSubmodules: ['Payroll'], customFieldValues: {}, defaultParentCode: 'GOV' },
-    { id: 'fb-d-HR-REC', code: 'HR-REC', description: 'Recruitment Section', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'HR' },
-    { id: 'fb-d-HR-BEN', code: 'HR-BEN', description: 'Benefits Administration', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'HR' },
+    { id: 'fb-d-HR-REC', code: 'HRREC', description: 'Recruitment Section', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'HR' },
+    { id: 'fb-d-HR-BEN', code: 'HRBEN', description: 'Benefits Administration', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'HR' },
     { id: 'fb-d-IT', code: 'IT', description: 'IT Department', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'GOV' },
-    { id: 'fb-d-IT-INFRA', code: 'IT-INFRA', description: 'IT Infrastructure', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'IT' },
-    { id: 'fb-d-IT-SUPPORT', code: 'IT-SUPPORT', description: 'IT Support Services', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'IT' },
+    { id: 'fb-d-IT-INFRA', code: 'ITINFRA', description: 'IT Infrastructure', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'IT' },
+    { id: 'fb-d-IT-SUPPORT', code: 'ITSUPPORT', description: 'IT Support Services', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'IT' },
 
 
     // Children of PS
     { id: 'fb-d-PD', code: 'PD', description: 'Police Department', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'PS' },
-    { id: 'fb-d-PD-PATROL', code: 'PD-PATROL', description: 'Patrol Division', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'PD' },
+    { id: 'fb-d-PD-PATROL', code: 'PDPATROL', description: 'Patrol Division', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'PD' },
     { id: 'fb-d-FD', code: 'FD', description: 'Fire Department', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'PS' },
-    { id: 'fb-d-FD-OPS', code: 'FD-OPS', description: 'Fire Operations', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'FD' },
+    { id: 'fb-d-FD-OPS', code: 'FDOPS', description: 'Fire Operations', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'FD' },
     { id: 'fb-d-PW', code: 'PW', description: 'Public Works', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'GOV'}, // Public Works often under General Gov.
-    { id: 'fb-d-PW-ROADS', code: 'PW-ROADS', description: 'Roads Maintenance', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'PW'},
+    { id: 'fb-d-PW-ROADS', code: 'PWROADS', description: 'Roads Maintenance', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'PW'},
   ],
   'object': [
     // Level 1 Parents
@@ -201,8 +201,8 @@ export const mockSegmentCodesData: Record<string, SegmentCode[]> = {
     },
   ],
    'grant': [
-    { id: 'grant-A', code: 'GR-A', description: 'Federal Infrastructure Grant', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Cash Receipts'], customFieldValues: {}, defaultParentCode: '' },
-    { id: 'grant-B', code: 'GR-B', description: 'State Education Grant', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Cash Receipts'], customFieldValues: {}, defaultParentCode: '' },
+    { id: 'grant-A', code: 'GRA', description: 'Federal Infrastructure Grant', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Cash Receipts'], customFieldValues: {}, defaultParentCode: '' },
+    { id: 'grant-B', code: 'GRB', description: 'State Education Grant', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, allowedSubmodules: ['General Ledger', 'Cash Receipts'], customFieldValues: {}, defaultParentCode: '' },
   ],
   'function': [
     { id: 'func-gov', code: '1000', description: 'General Government (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: '' },
@@ -212,11 +212,14 @@ export const mockSegmentCodesData: Record<string, SegmentCode[]> = {
   ],
   'location': [
     { id: 'loc-north', code: 'NORTH', description: 'North District (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: '' },
-    { id: 'loc-north-HQ', code: 'NORTH-HQ', description: 'North District HQ', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'NORTH' },
+    { id: 'loc-north-HQ', code: 'NORTHHQ', description: 'North District HQ', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'NORTH' },
     { id: 'loc-south', code: 'SOUTH', description: 'South District', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: '' },
   ],
    'program': [
     { id: 'prog-health', code: 'HEALTH', description: 'Public Health Programs (Summary)', summaryIndicator: true, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: false, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: '' },
-    { id: 'prog-health-vacc', code: 'HEALTH-VACC', description: 'Vaccination Program', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'HEALTH' },
+    { id: 'prog-health-vacc', code: 'HEALTHVACC', description: 'Vaccination Program', summaryIndicator: false, isActive: true, validFrom: new Date(Date.UTC(2023,0,1)), availableForTransactionCoding: true, availableForBudgeting: true, customFieldValues: {}, defaultParentCode: 'HEALTH' },
   ]
 };
+
+
+    
