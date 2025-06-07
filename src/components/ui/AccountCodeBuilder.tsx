@@ -47,10 +47,10 @@ export function AccountCodeBuilder({
   };
 
   const handleSegmentChange = (segmentId: string, selectedCodeValue: string | undefined) => {
-    const newSelections = { ...value, [segmentId]: selectedCodeValue };
+    const actualCodeToSet = selectedCodeValue === "_placeholder_clear_" ? undefined : selectedCodeValue;
+    const newSelections = { ...value, [segmentId]: actualCodeToSet };
     const displayString = buildDisplayString(newSelections);
     onChange(newSelections, displayString);
-    // Defer closing the popover to allow cmdk selection to fully process
     requestAnimationFrame(() => {
       setPopoverState(segmentId, false);
     });
@@ -69,7 +69,7 @@ export function AccountCodeBuilder({
   const currentDisplayString = useMemo(() => {
     return buildDisplayString(value);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, activeSegments]); // buildDisplayString is stable
+  }, [value, activeSegments]);
 
   const isPreviewPlaceholder = useMemo(() => {
     return !activeSegments.some(seg => !!value[seg.id]);
@@ -114,9 +114,9 @@ export function AccountCodeBuilder({
                       id={`${lineId}-${segment.id}-combobox-trigger`}
                       className={cn(
                         "h-9 justify-between focus:bg-accent/50 font-mono",
-                        `min-w-[${Math.max(60, segment.maxLength * 7 + 30)}px]`
+                        `min-w-[${Math.max(60, segment.maxLength * 8 + 24)}px]` // Adjusted min-width slightly
                       )}
-                      style={{ minWidth: `${Math.max(60, segment.maxLength * 7 + 30)}px`}}
+                      style={{ minWidth: `${Math.max(60, segment.maxLength * 8 + 24)}px`}} // Character width approx 8px, padding 24px
                       disabled={disabled}
                       aria-label={`Select ${segment.displayName}`}
                     >
@@ -129,6 +129,13 @@ export function AccountCodeBuilder({
                   <PopoverContent 
                     id={uniquePopoverId} 
                     className="p-0 w-auto min-w-[var(--radix-popover-trigger-width)] max-w-sm"
+                    onPointerDownOutside={(e) => {
+                      // If the click target is inside an element with 'cmdk-list' attribute (which cmdk uses)
+                      // prevent the popover from closing, so the item's onSelect can fire.
+                      if ((e.target as HTMLElement)?.closest('[cmdk-list=""]')) {
+                        e.preventDefault();
+                      }
+                    }}
                   >
                     <Command
                       filter={(itemValue, search) => {
@@ -161,7 +168,7 @@ export function AccountCodeBuilder({
                                   onSelect={(currentValue) => {
                                     handleSegmentChange(segment.id, currentValue);
                                   }}
-                                  onPointerDown={(e) => e.preventDefault()}
+                                  onPointerDown={(e) => e.preventDefault()} // Keep this for good measure
                                 >
                                   <Check
                                     className={cn(
