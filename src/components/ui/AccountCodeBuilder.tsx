@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -51,6 +51,8 @@ export function AccountCodeBuilder({
     const newSelections = { ...value, [segmentId]: actualCodeToSet };
     const displayString = buildDisplayString(newSelections);
     onChange(newSelections, displayString);
+    
+    // Close the popover after selection is processed
     requestAnimationFrame(() => {
       setPopoverState(segmentId, false);
     });
@@ -94,6 +96,7 @@ export function AccountCodeBuilder({
             : '_'.repeat(segment.maxLength > 0 ? Math.max(1, segment.maxLength) : 4);
           
           const uniquePopoverId = `${lineId}-${segment.id}-popover-content`;
+          const commandInputId = `${lineId}-${segment.id}-combobox-input`;
 
           return (
             <React.Fragment key={`${lineId}-${segment.id}`}>
@@ -104,7 +107,17 @@ export function AccountCodeBuilder({
                 >
                   {segment.displayName}
                 </Label>
-                <Popover open={openPopovers[segment.id] || false} onOpenChange={(isOpen) => setPopoverState(segment.id, isOpen)}>
+                <Popover 
+                  open={openPopovers[segment.id] || false} 
+                  onOpenChange={(isOpen) => {
+                    setPopoverState(segment.id, isOpen);
+                    if (isOpen) {
+                      setTimeout(() => {
+                        document.getElementById(commandInputId)?.focus();
+                      }, 0);
+                    }
+                  }}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -114,9 +127,10 @@ export function AccountCodeBuilder({
                       id={`${lineId}-${segment.id}-combobox-trigger`}
                       className={cn(
                         "h-9 justify-between focus:bg-accent/50 font-mono",
-                        `min-w-[${Math.max(60, segment.maxLength * 8 + 24)}px]` // Adjusted min-width slightly
+                        // Max width for button to ensure it doesn't get too wide, but can shrink
+                        "max-w-[200px]" 
                       )}
-                      style={{ minWidth: `${Math.max(60, segment.maxLength * 8 + 24)}px`}} // Character width approx 8px, padding 24px
+                       style={{ minWidth: `${Math.max(60, (segment.maxLength > 0 ? segment.maxLength : 4) * 8 + 32)}px` }} // Adjusted min-width calc
                       disabled={disabled}
                       aria-label={`Select ${segment.displayName}`}
                     >
@@ -129,11 +143,10 @@ export function AccountCodeBuilder({
                   <PopoverContent 
                     id={uniquePopoverId} 
                     className="p-0 w-auto min-w-[var(--radix-popover-trigger-width)] max-w-sm"
-                    onPointerDownOutside={(e) => {
-                      // If the click target is inside an element with 'cmdk-list' attribute (which cmdk uses)
-                      // prevent the popover from closing, so the item's onSelect can fire.
-                      if ((e.target as HTMLElement)?.closest('[cmdk-list=""]')) {
-                        e.preventDefault();
+                    onPointerDownOutside={(event) => {
+                      // Prevent popover from closing if the click is on a CommandItem or within the list.
+                      if ((event.target as HTMLElement)?.closest('[cmdk-list="true"], [cmdk-item="true"]')) {
+                        event.preventDefault();
                       }
                     }}
                   >
@@ -141,20 +154,28 @@ export function AccountCodeBuilder({
                       filter={(itemValue, search) => {
                         const codeObj = allSegmentCodes[segment.id]?.find(c => c.code === itemValue);
                         if (!codeObj) return 0;
+                        // Allow matching "clear selection" placeholder too
+                        if (itemValue === "_placeholder_clear_" && "clear selection".includes(search.toLowerCase())) return 1;
                         const textToSearch = `${codeObj.code} ${codeObj.description}`.toLowerCase();
                         return textToSearch.includes(search.toLowerCase()) ? 1 : 0;
                       }}
                     >
-                      <CommandInput placeholder={`Search ${segment.displayName}...`} />
-                      <CommandList>
+                      <CommandInput 
+                        id={commandInputId}
+                        placeholder={`Search ${segment.displayName}...`} 
+                      />
+                      <CommandList data-cmdk-list="true"> {/* Added data attribute for easier targeting */}
                         <ScrollArea className="max-h-60">
                            <CommandEmpty>No {segment.displayName} code found.</CommandEmpty>
                           <CommandGroup>
                             <CommandItem
                               value="_placeholder_clear_"
                               onSelect={() => handleSegmentChange(segment.id, undefined)}
-                              onPointerDown={(e) => e.preventDefault()}
-                              className={cn("text-muted-foreground italic", !value[segment.id] && "bg-accent text-accent-foreground")}
+                              data-cmdk-item="true" // Added for targeting
+                              className={cn(
+                                "text-muted-foreground italic hover:bg-accent/50", // Added hover style
+                                !value[segment.id] && "bg-accent text-accent-foreground"
+                              )}
                             >
                               <Check className={cn("mr-2 h-4 w-4", !value[segment.id] ? "opacity-100" : "opacity-0")} />
                               Clear selection
@@ -168,7 +189,8 @@ export function AccountCodeBuilder({
                                   onSelect={(currentValue) => {
                                     handleSegmentChange(segment.id, currentValue);
                                   }}
-                                  onPointerDown={(e) => e.preventDefault()} // Keep this for good measure
+                                  data-cmdk-item="true" // Added for targeting
+                                  className="hover:bg-accent/50" // Added hover style
                                 >
                                   <Check
                                     className={cn(
@@ -197,14 +219,15 @@ export function AccountCodeBuilder({
       </div>
       <Label className="text-xs text-muted-foreground">Full Account Code Preview:</Label>
       <div className="mt-1 p-2.5 border rounded-md bg-muted text-sm min-h-[40px] font-mono tracking-wider">
-        {currentDisplayString ? (
-          <span className={cn(isPreviewPlaceholder && "italic text-gray-400")}>
-             {currentDisplayString}
-          </span>
+        {activeSegments.length > 0 ? (
+            <span className={cn(isPreviewPlaceholder && "italic text-muted-foreground/70")}>
+                {currentDisplayString}
+            </span>
         ) : (
-          <span className="italic text-gray-400">Select codes above to build the account string.</span>
+          <span className="italic text-muted-foreground/70">No active segments configured to build account code.</span>
         )}
       </div>
     </div>
   );
 }
+
