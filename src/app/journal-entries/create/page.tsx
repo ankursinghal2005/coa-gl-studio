@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription as FormDescUI } from '@/components/ui/form';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,14 +42,14 @@ const journalEntryControlsSchema = z.object({
 
 const journalEntryLineSchema = z.object({
   id: z.string(),
-  accountCodeSelections: z.record(z.string().optional()), 
+  accountCodeSelections: z.record(z.string().optional()),
   accountCodeDisplay: z.string().min(1, "Account code is required."),
   description: z.string().optional(),
   debit: z.coerce.number().min(0).optional(),
   credit: z.coerce.number().min(0).optional(),
 }).refine(data => (data.debit || 0) > 0 || (data.credit || 0) > 0, {
   message: "Either Debit or Credit must be greater than 0.",
-  path: ["debit"], 
+  path: ["debit"],
 }).refine(data => !( (data.debit || 0) > 0 && (data.credit || 0) > 0), {
   message: "Cannot enter values for both Debit and Credit in a single line.",
   path: ["credit"],
@@ -412,7 +412,7 @@ export default function CreateJournalEntryPage() {
                                 <FormItem>
                                 <FormLabel>Line Description</FormLabel>
                                 <FormControl>
-                                    <Input {...field} placeholder="Optional line item description" />
+                                    <Input {...field} placeholder="Optional line item description" value={field.value ?? ''}/>
                                 </FormControl>
                                 <FormMessage />
                                 </FormItem>
@@ -426,8 +426,9 @@ export default function CreateJournalEntryPage() {
                               <FormItem>
                                 <FormLabel>Debit</FormLabel>
                                 <FormControl>
-                                  <Input type="number" {...field} placeholder="0.00" step="0.01" 
+                                  <Input type="number" {...field} placeholder="0.00" step="0.01"
                                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                   value={field.value ?? ''}
                                   />
                                 </FormControl>
                                 <FormMessage />
@@ -443,6 +444,7 @@ export default function CreateJournalEntryPage() {
                                 <FormControl>
                                   <Input type="number" {...field} placeholder="0.00" step="0.01"
                                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                   value={field.value ?? ''}
                                   />
                                 </FormControl>
                                 <FormMessage />
@@ -488,3 +490,4 @@ export default function CreateJournalEntryPage() {
     </div>
   );
 }
+
