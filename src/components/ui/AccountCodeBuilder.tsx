@@ -29,7 +29,7 @@ interface AccountCodeBuilderProps {
   activeSegments: Segment[];
   allSegmentCodes: Record<string, SegmentCode[]>;
   disabled?: boolean;
-  lineId: string; 
+  lineId: string;
 }
 
 export function AccountCodeBuilder({
@@ -114,9 +114,9 @@ export function AccountCodeBuilder({
                       id={`${lineId}-${segment.id}-combobox-trigger`}
                       className={cn(
                         "h-9 justify-between focus:bg-accent/50 font-mono",
-                        `min-w-[${Math.max(60, segment.maxLength * 7 + 30)}px]` 
+                        `min-w-[${Math.max(60, segment.maxLength * 7 + 30)}px]`
                       )}
-                      style={{ minWidth: `${Math.max(60, segment.maxLength * 7 + 30)}px`}} 
+                      style={{ minWidth: `${Math.max(60, segment.maxLength * 7 + 30)}px`}}
                       disabled={disabled}
                       aria-label={`Select ${segment.displayName}`}
                     >
@@ -126,11 +126,14 @@ export function AccountCodeBuilder({
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent id={uniquePopoverId} className="p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                  <PopoverContent 
+                    id={uniquePopoverId} 
+                    className="p-0 w-auto min-w-[var(--radix-popover-trigger-width)] max-w-sm"
+                  >
                     <Command
                       filter={(itemValue, search) => {
                         const codeObj = allSegmentCodes[segment.id]?.find(c => c.code === itemValue);
-                        if (!codeObj) return 0; 
+                        if (!codeObj) return 0;
                         const textToSearch = `${codeObj.code} ${codeObj.description}`.toLowerCase();
                         return textToSearch.includes(search.toLowerCase()) ? 1 : 0;
                       }}
@@ -141,8 +144,9 @@ export function AccountCodeBuilder({
                            <CommandEmpty>No {segment.displayName} code found.</CommandEmpty>
                           <CommandGroup>
                             <CommandItem
-                              value="_placeholder_clear_" 
+                              value="_placeholder_clear_"
                               onSelect={() => handleSegmentChange(segment.id, undefined)}
+                              onPointerDown={(e) => e.preventDefault()}
                               className={cn("text-muted-foreground italic", !value[segment.id] && "bg-accent text-accent-foreground")}
                             >
                               <Check className={cn("mr-2 h-4 w-4", !value[segment.id] ? "opacity-100" : "opacity-0")} />
@@ -157,6 +161,7 @@ export function AccountCodeBuilder({
                                   onSelect={(currentValue) => {
                                     handleSegmentChange(segment.id, currentValue);
                                   }}
+                                  onPointerDown={(e) => e.preventDefault()}
                                 >
                                   <Check
                                     className={cn(
@@ -196,5 +201,3 @@ export function AccountCodeBuilder({
     </div>
   );
 }
-
-    
