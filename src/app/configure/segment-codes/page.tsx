@@ -276,6 +276,7 @@ export default function SegmentCodesPage() {
           id: DEFAULT_HIERARCHY_SET_ID,
           name: DEFAULT_HIERARCHY_SET_NAME,
           status: 'Active',
+          description: "Automatically generated and updated based on 'Default Parent Code' in segment code definitions. Managed by the system.",
           segmentHierarchies: [],
           lastModifiedDate: new Date(),
           lastModifiedBy: "System (Excel Upload)"
@@ -476,10 +477,11 @@ export default function SegmentCodesPage() {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !selectedSegment) {
-      if (!selectedSegment) toast({ title: "Error", description: "Please select a segment first to upload codes to.", variant: "destructive" });
-      return;
+    if (!file) {
+        toast({ title: "No File Selected", description: "Please select an Excel file to upload.", variant: "destructive" });
+        return;
     }
+
     setIsUploading(true);
 
     const reader = new FileReader();
@@ -502,16 +504,28 @@ export default function SegmentCodesPage() {
             errorsFound++;
             return;
           }
+          
+          // Ensure targetSegmentId is set if the uploaded sheet matches the currently selected segment or any other segment
+          const targetSegmentIdForSave = targetSegment.id;
+
 
           const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 , raw: false, dateNF: 'yyyy-mm-dd'});
+          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 , raw: false, dateNF: 'yyyy-MM-dd'});
 
-          if (jsonData.length < 1) return; // Skip empty sheets or sheets with only header
+          if (jsonData.length < 2) { // Check if there's at least one data row beyond the header
+             errorMessages.push(`Sheet "${sheetName}" is empty or contains only headers. Skipping.`);
+             return; // Skip empty sheets or sheets with only header
+          }
+
 
           const headers: string[] = jsonData[0].map((h:any) => String(h).trim());
           const rows = jsonData.slice(1);
 
           rows.forEach((rowArray, rowIndex) => {
+            if (rowArray.every(cell => cell === undefined || cell === null || String(cell).trim() === '')) {
+                // Skip entirely empty rows
+                return;
+            }
             codesProcessed++;
             const row: Record<string, any> = {};
             headers.forEach((header, index) => {
@@ -567,7 +581,7 @@ export default function SegmentCodesPage() {
               const validationResult = segmentCodeFormSchema.safeParse({
                   ...parsedData,
                   // Zod expects Date objects for date fields if they are not optional
-                  validFrom: parsedData.validFrom || new Date(0), // Provide default if undefined for required fields
+                  validFrom: parsedData.validFrom || new Date(0,0,0,0,0,0,0), // Provide default if undefined for required fields
               });
 
               if (!validationResult.success) {
@@ -580,12 +594,13 @@ export default function SegmentCodesPage() {
 
               const codeToProcess: SegmentCode = {
                 ...validationResult.data,
-                id: (segmentCodesData[targetSegment.id] || []).find(c => c.code === validationResult.data.code)?.id || `${targetSegment.id}-code-${crypto.randomUUID()}`,
+                id: (segmentCodesData[targetSegmentIdForSave] || []).find(c => c.code === validationResult.data.code)?.id || `${targetSegmentIdForSave}-code-${crypto.randomUUID()}`,
               };
+              
+              const currentCodesForTargetSegment = segmentCodesData[targetSegmentIdForSave] || [];
+              const existingCodeIndex = currentCodesForTargetSegment.findIndex(c => c.code === codeToProcess.code);
 
-              const existingCodeIndex = (segmentCodesData[targetSegment.id] || []).findIndex(c => c.code === codeToProcess.code);
-
-              saveSegmentCodeAndUpdateHierarchy(codeToProcess, targetSegment.id, targetSegment, segmentCodesData[targetSegment.id] || []);
+              saveSegmentCodeAndUpdateHierarchy(codeToProcess, targetSegmentIdForSave, targetSegment, currentCodesForTargetSegment);
 
               if (existingCodeIndex !== -1) codesUpdated++; else codesAdded++;
 
@@ -600,16 +615,24 @@ export default function SegmentCodesPage() {
         if (errorsFound > 0) {
           toast({
             title: "Upload Complete with Errors",
-            description: `${codesAdded} codes added, ${codesUpdated} updated. ${errorsFound} errors occurred. Check console for details. ${errorMessages.slice(0,3).join(' ')}`,
+            description: `${codesAdded} codes added, ${codesUpdated} updated. ${errorsFound} errors occurred. ${errorMessages.slice(0,3).join('; ')} Check console for full details.`,
             variant: "destructive",
             duration: 7000,
           });
-        } else {
+           console.error("Full list of Excel upload errors:", errorMessages);
+        } else if (codesAdded > 0 || codesUpdated > 0) {
           toast({
             title: "Upload Successful",
-            description: `${codesAdded} codes added, ${codesUpdated} updated.`,
+            description: `${codesAdded} codes added, ${codesUpdated} updated across all sheets.`,
           });
+        } else {
+             toast({
+                title: "Upload Processed",
+                description: "No new codes were added or updated. The file might have been empty or contained only existing data without changes.",
+                variant: "default"
+            });
         }
+
 
       } catch (error: any) {
         toast({ title: "Upload Failed", description: `Error reading Excel file: ${error.message}`, variant: "destructive" });
@@ -1115,7 +1138,7 @@ export default function SegmentCodesPage() {
                               </span>
                             </TableCell>
                             <TableCell className="whitespace-normal break-words">{code.description}</TableCell>
-                            <TableCell>{code.defaultParentCode || 'Blank'}</TableCell>
+                            <TableCell>{code.defaultParentCode}</TableCell>
                             <TableCell className="text-center">
                               {code.summaryIndicator ? <CheckCircle className="h-5 w-5 text-green-500 inline" /> : <XCircle className="h-5 w-5 text-muted-foreground inline" />}
                             </TableCell>
