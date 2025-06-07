@@ -72,7 +72,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     workflowRule: undefined,
     approvalPendingWith: undefined,
     lastApprovalActionOn: undefined,
-    useridCreated: 'amohan',
+    useridCreated: 'Neeraj',
     totalDebits: 1500.00,
     totalCredits: 1500.00,
     isPosted: false,
@@ -88,7 +88,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     workflowRule: 'SD_GL_DirectAutoPost',
     approvalPendingWith: undefined,
     lastApprovalActionOn: new Date(Date.UTC(2025, 3, 20, 11, 18)),
-    useridCreated: 'sjain',
+    useridCreated: 'Neeraj',
     totalDebits: 25000.00,
     totalCredits: 25000.00,
     isPosted: true,
@@ -104,7 +104,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     workflowRule: 'AP_WORKFLOW',
     approvalPendingWith: undefined,
     lastApprovalActionOn: undefined,
-    useridCreated: 'apatole',
+    useridCreated: 'Neeraj',
     totalDebits: 780.50,
     totalCredits: 780.50,
     isPosted: false,
@@ -120,7 +120,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     workflowRule: 'AP_WORKFLOW',
     approvalPendingWith: undefined,
     lastApprovalActionOn: new Date(Date.UTC(2025, 0, 14, 14, 42)),
-    useridCreated: 'apatole',
+    useridCreated: 'Neeraj',
     totalDebits: 1200.00,
     totalCredits: 1200.00,
     isPosted: true,
@@ -136,7 +136,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     workflowRule: 'OG_GL_Rule1',
     approvalPendingWith: 'Sanket Deshpande (Approver)',
     lastApprovalActionOn: new Date(Date.UTC(2025, 4, 15, 13, 34)),
-    useridCreated: 'mranade',
+    useridCreated: 'Neeraj',
     totalDebits: 55000.00,
     totalCredits: 55000.00,
     isPosted: false,
@@ -152,7 +152,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     workflowRule: 'AP_WORKFLOW',
     approvalPendingWith: undefined,
     lastApprovalActionOn: undefined,
-    useridCreated: 'apatole',
+    useridCreated: 'Neeraj',
     totalDebits: 345.67,
     totalCredits: 345.67,
     isPosted: false,
@@ -168,7 +168,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     workflowRule: 'AP_WORKFLOW',
     approvalPendingWith: undefined,
     lastApprovalActionOn: new Date(Date.UTC(2025, 0, 14, 10, 0)),
-    useridCreated: 'apatole',
+    useridCreated: 'Neeraj',
     totalDebits: 88.99,
     totalCredits: 88.99,
     isPosted: false,
@@ -182,7 +182,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     source: 'GL',
     status: 'Posted',
     workflowRule: 'YEAR_END_CLOSE',
-    useridCreated: 'system',
+    useridCreated: 'Neeraj', // Was 'system'
     lastApprovalActionOn: new Date(Date.UTC(2024, 11, 31, 23, 59)),
     totalDebits: 100000.00,
     totalCredits: 100000.00,
@@ -199,7 +199,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     workflowRule: 'AR_REVERSAL_WF',
     approvalPendingWith: undefined,
     lastApprovalActionOn: new Date(Date.UTC(2025, 5, 3, 9, 15)),
-    useridCreated: 'kchen',
+    useridCreated: 'Neeraj',
     totalDebits: 560.00,
     totalCredits: 560.00,
     isPosted: false,
@@ -214,7 +214,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
     status: 'Pending Action',
     workflowRule: 'INTERFUND_TRANSFER_WF',
     approvalPendingWith: 'Finance Director',
-    useridCreated: 'amohan',
+    useridCreated: 'Neeraj',
     totalDebits: 75000.00,
     totalCredits: 75000.00,
     isPosted: false,
@@ -224,7 +224,7 @@ export const initialJournalEntriesData: JournalEntry[] = [
 export const fiscalYears = ['2025', '2024', '2023'];
 export const jeSources: JournalEntrySource[] = ['GL', 'AP', 'AR', 'Payroll', 'System'];
 export const jeStatuses: JournalEntryStatus[] = ['Draft', 'Error', 'Pending Action', 'Rejected', 'Approved', 'Posted'];
-export const allUserIds = ['amohan', 'sjain', 'apatole', 'mranade', 'system', 'kchen'];
+export const allUserIds = ['Neeraj', 'amohan', 'sjain', 'apatole', 'mranade', 'system', 'kchen']; // Added Neeraj here for filter consistency
 export const workflowRules = ['SD_GL_DirectAutoPost', 'AP_WORKFLOW', 'OG_GL_Rule1', 'YEAR_END_CLOSE', 'AR_REVERSAL_WF', 'INTERFUND_TRANSFER_WF', 'STANDARD_JE_APPROVAL'];
 export const approvalPendingWithOptions = ['Sanket Deshpande (Approver)', 'Finance Director', 'Controller', 'Mary Jane (Manager)'];
 export const additionalPeriods = ['Period 13', 'Period 14 (Audit)'];
@@ -233,3 +233,5 @@ export const postedOptions: PostedStatusFilter[] = ['Both', 'Yes', 'No'];
 // Values for "None" options in Select components
 export const NONE_ADDITIONAL_PERIOD_VALUE = "_none_additional_period_";
 export const NONE_WORKFLOW_RULE_VALUE = "_none_workflow_rule_";
+
+    
