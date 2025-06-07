@@ -28,6 +28,38 @@ export interface JournalEntry {
   isPosted: boolean;
 }
 
+// --- Added for Create Journal Entry Page with Lines ---
+export interface JournalEntryAccountCode {
+  [segmentId: string]: string | undefined; // e.g., { fund: '101', department: 'DPW', object: '5010' }, value can be undefined if not selected
+}
+
+export interface JournalEntryLine {
+  id: string; // client-side UUID
+  accountCodeSelections: JournalEntryAccountCode;
+  accountCodeDisplay: string; // The concatenated string for display
+  description?: string;
+  debit?: number;
+  credit?: number;
+}
+
+export interface JournalEntryControlsData {
+  fiscalYear: string;
+  journalEntryNumber: string;
+  journalEntryDate: Date;
+  additionalPeriod?: string;
+  source: JournalEntrySource;
+  workflowRule?: string;
+  description: string;
+  comment?: string;
+}
+
+export interface FullJournalEntryFormData {
+  controls: JournalEntryControlsData;
+  lines: JournalEntryLine[];
+}
+// --- End Added ---
+
+
 export const initialJournalEntriesData: JournalEntry[] = [
   {
     id: 'je1',
@@ -198,3 +230,6 @@ export const approvalPendingWithOptions = ['Sanket Deshpande (Approver)', 'Finan
 export const additionalPeriods = ['Period 13', 'Period 14 (Audit)'];
 export const postedOptions: PostedStatusFilter[] = ['Both', 'Yes', 'No'];
 
+// Values for "None" options in Select components
+export const NONE_ADDITIONAL_PERIOD_VALUE = "_none_additional_period_";
+export const NONE_WORKFLOW_RULE_VALUE = "_none_workflow_rule_";
