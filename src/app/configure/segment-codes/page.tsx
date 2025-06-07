@@ -145,6 +145,19 @@ const findNodeBySegmentCodeIdRecursive = (nodes: HierarchyNode[], segmentCodeId:
   return null;
 };
 
+// Helper function to validate characters in a code string
+const validateCodeChars = (code: string | undefined, allowedSpecialChars: string): boolean => {
+  if (!code) return true; // Empty string is valid by this check
+  const alphanumericRegex = /^[a-zA-Z0-9]*$/;
+  for (const char of code) {
+    // Check if character is NOT alphanumeric AND NOT in allowedSpecialChars
+    if (!/^[a-zA-Z0-9]$/.test(char) && !allowedSpecialChars.includes(char)) {
+      return false; 
+    }
+  }
+  return true;
+};
+
 
 export default function SegmentCodesPage() {
   const { segments: allAvailableSegments } = useSegments();
@@ -332,6 +345,43 @@ export default function SegmentCodesPage() {
         toast({ title: "Error", description: "No segment selected.", variant: "destructive" });
         return;
     }
+
+    // Stricter character validation for 'code'
+    if (!validateCodeChars(values.code, selectedSegment.specialCharsAllowed)) {
+        form.setError("code", { 
+            type: "manual", 
+            message: `Code contains invalid characters. Only alphanumeric or: '${selectedSegment.specialCharsAllowed || '(none)'}' are allowed.` 
+        });
+        return;
+    }
+
+    // Stricter character validation for 'defaultParentCode'
+    if (values.defaultParentCode && !validateCodeChars(values.defaultParentCode, selectedSegment.specialCharsAllowed)) {
+        form.setError("defaultParentCode", { 
+            type: "manual", 
+            message: `Default Parent Code contains invalid characters. Only alphanumeric or: '${selectedSegment.specialCharsAllowed || '(none)'}' are allowed.` 
+        });
+        return;
+    }
+    
+    // Validation: Code should not contain its segment's separator
+    if (values.code && selectedSegment.separator && values.code.includes(selectedSegment.separator)) {
+      form.setError("code", {
+        type: "manual",
+        message: `Code cannot contain the segment's separator character ('${selectedSegment.separator}').`,
+      });
+      return;
+    }
+
+    // Validation: defaultParentCode should not contain its segment's separator
+    if (values.defaultParentCode && selectedSegment.separator && values.defaultParentCode.includes(selectedSegment.separator)) {
+      form.setError("defaultParentCode", {
+        type: "manual",
+        message: `Default Parent Code cannot contain the segment's separator character ('${selectedSegment.separator}').`,
+      });
+      return;
+    }
+
 
     const dataToSave: SegmentCode = {
       id: values.id || `${selectedSegmentId}-code-${crypto.randomUUID()}`, 
@@ -545,13 +595,30 @@ export default function SegmentCodesPage() {
                 return ['TRUE', 'YES', '1'].includes(sVal);
               };
 
+              const codeStr = String(row['Code'] || '').trim();
+              const parentCodeStr = String(row['DefaultParentCode'] || '').trim() || undefined;
+
+              if (!validateCodeChars(codeStr, targetSegment.specialCharsAllowed)) {
+                throw new Error(`Code "${codeStr}" contains invalid characters. Only alphanumeric or these special characters are permitted: '${targetSegment.specialCharsAllowed || '(none)'}'.`);
+              }
+              if (parentCodeStr && !validateCodeChars(parentCodeStr, targetSegment.specialCharsAllowed)) {
+                 throw new Error(`DefaultParentCode "${parentCodeStr}" contains invalid characters. Only alphanumeric or these special characters are permitted: '${targetSegment.specialCharsAllowed || '(none)'}'.`);
+              }
+              if (codeStr && targetSegment.separator && codeStr.includes(targetSegment.separator)) {
+                throw new Error(`Code "${codeStr}" cannot contain the segment's separator character ('${targetSegment.separator}').`);
+              }
+              if (parentCodeStr && targetSegment.separator && parentCodeStr.includes(targetSegment.separator)) {
+                throw new Error(`DefaultParentCode "${parentCodeStr}" cannot contain the segment's separator character ('${targetSegment.separator}').`);
+              }
+
+
               const validFromStr = String(row['ValidFrom'] || '').trim();
               const validToStr = String(row['ValidTo'] || '').trim();
 
               const parsedData = {
-                code: String(row['Code'] || '').trim(),
+                code: codeStr,
                 description: String(row['Description'] || '').trim(),
-                defaultParentCode: String(row['DefaultParentCode'] || '').trim() || undefined,
+                defaultParentCode: parentCodeStr,
                 external1: String(row['External1'] || '').trim() || undefined,
                 external2: String(row['External2'] || '').trim() || undefined,
                 external3: String(row['External3'] || '').trim() || undefined,
@@ -671,6 +738,10 @@ export default function SegmentCodesPage() {
                 <p className="text-md text-muted-foreground mt-1">
                   Define and manage codes associated with the selected segment. You can also download a template or upload codes using an Excel file.
                 </p>
+                 <CardDesc className="text-xs text-muted-foreground pt-1">
+                    Allowed special characters for codes in this segment: <strong>'{selectedSegment.specialCharsAllowed || '(none)'}'</strong>.
+                    Separator for this segment is: <strong>'{selectedSegment.separator}'</strong> (cannot be used in codes).
+                </CardDesc>
               </header>
 
               <div className="mb-6 flex flex-col sm:flex-row justify-end gap-2">
@@ -1169,3 +1240,4 @@ export default function SegmentCodesPage() {
     </div>
   );
 }
+

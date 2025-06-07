@@ -89,6 +89,18 @@ const baseSegmentSchema = z.object({
   customFields: z.array(customFieldSchema).optional(),
 });
 
+// Helper function to validate characters in a code string
+const validateCodeChars = (code: string | undefined, allowedSpecialChars: string): boolean => {
+  if (!code) return true; // Empty string is valid (let minLength handle if needed)
+  const alphanumericRegex = /^[a-zA-Z0-9]*$/; // Changed to * to allow empty string through this check
+  for (const char of code) {
+    if (!alphanumericRegex.test(char) && !allowedSpecialChars.includes(char)) {
+      return false; // Character is not alphanumeric and not in allowedSpecialChars
+    }
+  }
+  return true;
+};
+
 export function createSegmentFormSchema(allSegments: Segment[], currentSegmentId?: string) {
   return baseSegmentSchema.superRefine((data, ctx) => {
     const otherSegments = allSegments.filter(segment => segment.id !== currentSegmentId);
@@ -105,6 +117,25 @@ export function createSegmentFormSchema(allSegments: Segment[], currentSegmentId
         path: ['specialCharsAllowed'],
       });
     }
+
+    // Validate Default Code against specialCharsAllowed of the current segment
+    if (data.defaultCode && !validateCodeChars(data.defaultCode, data.specialCharsAllowed)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Default Code contains characters not permitted. Only alphanumeric characters or those specified in 'Special Characters Allowed' (${data.specialCharsAllowed || 'none'}) are allowed.`,
+        path: ['defaultCode'],
+      });
+    }
+    
+    // Validate defaultCode to ensure it doesn't contain the segment's own separator
+    if (data.defaultCode && data.separator && data.defaultCode.includes(data.separator)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Default Code cannot contain the segment's separator character ('${data.separator}').`,
+        path: ['defaultCode'],
+      });
+    }
+
 
     const allOtherSpecialChars = new Set<string>();
     otherSegments.forEach(segment => {
@@ -956,3 +987,4 @@ export default function SegmentsPage() {
     </div>
   );
 }
+
