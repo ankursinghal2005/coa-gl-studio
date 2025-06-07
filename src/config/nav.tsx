@@ -13,11 +13,11 @@ import {
   ClipboardList,
   Users,
   HelpCircle,
-  LayoutGrid, // Added for Segments
-  Code2,      // Added for Segment Codes
-  Network,    // Added for Hierarchies
-  Shuffle,    // Added for Combination Rules
-  ShieldCheck // Added for Account Access Control
+  LayoutGrid, 
+  Code2,      
+  Network,    
+  Shuffle,    
+  ShieldCheck 
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -44,7 +44,6 @@ export const mainNavItems: NavItemConfig[] = [
     children: [
       {
         title: 'COA Configuration',
-        // href: '/', // No longer a direct link, it's a parent
         icon: <ListTree className="h-4 w-4" />,
         children: [
           {
@@ -73,17 +72,17 @@ export const mainNavItems: NavItemConfig[] = [
             icon: <ShieldCheck className="h-4 w-4" />,
           },
           {
-            title: 'Settings', // Matches the homepage block
+            title: 'Settings', 
             href: '/configure/settings',
-            icon: <Settings className="h-4 w-4" />, // Using the already imported Settings icon
+            icon: <Settings className="h-4 w-4" />, 
           },
         ],
       },
       {
         title: 'Journal Entries',
-        href: '/journal-entries',
+        href: '/journal-entries', // Enabled this link
         icon: <FilePenLine className="h-4 w-4" />,
-        disabled: true,
+        disabled: false, // Enabled
       },
       {
         title: 'Reports',
@@ -118,7 +117,7 @@ export const mainNavItems: NavItemConfig[] = [
     disabled: true,
   },
   {
-    title: 'Reports', // Main reports section
+    title: 'Reports', 
     href: '/reports',
     icon: <ClipboardList className="h-4 w-4" />,
     disabled: true,
@@ -135,7 +134,7 @@ export const footerNavItems: NavItemConfig[] = [
   {
     title: 'Settings',
     icon: <Settings className="h-4 w-4" />,
-    href: '/configure/settings', // General settings page
+    href: '/configure/settings', 
   },
   {
     title: 'Help & Support',
