@@ -29,7 +29,7 @@ export function AccountCodeBuilder({
   activeSegments,
   allSegmentCodes,
   disabled,
-  lineId,
+  lineId, 
 }: AccountCodeBuilderProps) {
 
   const handleSegmentChange = (segmentId: string, selectedCodeValue: string | undefined) => {
@@ -44,55 +44,77 @@ export function AccountCodeBuilder({
   ): string => {
     return segments
       .map((segment, index) => {
-        const selectedCode = selections[segment.id] || '';
+        const selectedCode = selections[segment.id] || '_'.repeat(segment.maxLength > 0 ? segment.maxLength : 4); // Use underscores for unselected
         const separator = index < segments.length - 1 ? segment.separator : '';
         return `${selectedCode}${separator}`;
       })
       .join('');
   };
 
-  const currentDisplayString = useMemo(() => buildDisplayString(value, activeSegments), [value, activeSegments]);
+  const currentDisplayString = useMemo(() => {
+     const hasSelection = activeSegments.some(seg => !!value[seg.id]);
+     if (!hasSelection) return '';
+     return buildDisplayString(value, activeSegments)
+  }, [value, activeSegments]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-end gap-x-2 gap-y-3">
+    <div className="space-y-2">
+      <div 
+        className={cn(
+          "flex flex-wrap items-end gap-x-1.5 gap-y-2 border p-3 rounded-lg bg-background shadow-sm",
+          "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
+        )}
+      >
         {activeSegments.map((segment, index) => (
-          <div key={`${lineId}-${segment.id}`} className="flex items-end space-x-1">
-            <div className="flex-grow min-w-[120px]">
-              <Label htmlFor={`${lineId}-${segment.id}-select`} className="text-xs text-muted-foreground">
-                {segment.displayName}
-              </Label>
-              <Select
-                value={value[segment.id] || ''}
-                onValueChange={(val) => handleSegmentChange(segment.id, val === '_placeholder_' ? undefined : val)}
-                disabled={disabled}
-              >
-                <SelectTrigger id={`${lineId}-${segment.id}-select`} className="h-9">
-                  <SelectValue placeholder={`Select ${segment.codePlaceholder || 'Code'}`} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_placeholder_" disabled>Select Code...</SelectItem>
-                  {(allSegmentCodes[segment.id] || [])
-                    .filter(code => code.isActive)
-                    .map((code) => (
-                      <SelectItem key={code.id} value={code.code}>
-                        {code.code} - {code.description}
-                      </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <React.Fragment key={`${lineId}-${segment.id}`}>
+            <div className="flex items-end">
+              <div className="flex flex-col">
+                <Label 
+                  htmlFor={`${lineId}-${segment.id}-select`} 
+                  className="text-xs font-medium text-muted-foreground px-1 mb-0.5"
+                >
+                  {segment.displayName}
+                </Label>
+                <Select
+                  value={value[segment.id] || ''}
+                  onValueChange={(val) => handleSegmentChange(segment.id, val === '_placeholder_' ? undefined : val)}
+                  disabled={disabled}
+                >
+                  <SelectTrigger 
+                    id={`${lineId}-${segment.id}-select`} 
+                    className="h-9 min-w-[100px] sm:min-w-[120px] focus:bg-accent/50"
+                    aria-label={`Select ${segment.displayName}`}
+                  >
+                    <SelectValue placeholder={segment.codePlaceholder || "Code"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_placeholder_" disabled>Select {segment.displayName} Code...</SelectItem>
+                    {(allSegmentCodes[segment.id] || [])
+                      .filter(code => code.isActive) // Add more filters if needed, e.g., based on summaryIndicator
+                      .map((code) => (
+                        <SelectItem key={code.id} value={code.code}>
+                          {code.code} - {code.description}
+                        </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {index < activeSegments.length - 1 && (
+                <span className="px-1.5 pb-[5px] text-muted-foreground font-semibold self-end text-lg"> {/* Adjusted for alignment */}
+                  {segment.separator}
+                </span>
+              )}
             </div>
-            {index < activeSegments.length - 1 && (
-              <span className="pb-2 text-muted-foreground font-semibold">{segment.separator}</span>
-            )}
-          </div>
+          </React.Fragment>
         ))}
       </div>
-      {currentDisplayString && (
-        <div className="mt-1 p-2 border rounded-md bg-muted text-sm text-muted-foreground">
-          Preview: {currentDisplayString}
-        </div>
-      )}
+      <div className="mt-2 p-2.5 border rounded-md bg-muted text-sm text-muted-foreground min-h-[40px] font-mono tracking-wider">
+        {currentDisplayString ? (
+          <span className="text-foreground">{currentDisplayString}</span>
+        ) : (
+          <span className="italic text-gray-500">Select codes above to build the account string</span>
+        )}
+      </div>
     </div>
   );
 }

@@ -42,6 +42,7 @@ const journalEntryControlsSchema = z.object({
 });
 
 const journalEntryLineSchema = z.object({
+  id: z.string().optional(), // Added id here for react-hook-form's useFieldArray
   accountCodeSelections: z.record(z.string().optional()),
   accountCodeDisplay: z.string().min(1, "Account code is required."),
   description: z.string().optional(),
@@ -49,10 +50,10 @@ const journalEntryLineSchema = z.object({
   credit: z.coerce.number().min(0).optional(),
 }).refine(data => (data.debit || 0) > 0 || (data.credit || 0) > 0, {
   message: "Either Debit or Credit must be greater than 0.",
-  path: ["debit"],
+  path: ["debit"], // Pointing to debit, but applies to the pair
 }).refine(data => !( (data.debit || 0) > 0 && (data.credit || 0) > 0), {
   message: "Cannot enter values for both Debit and Credit in a single line.",
-  path: ["credit"],
+  path: ["credit"], // Pointing to credit, but applies to the pair
 });
 
 const journalEntryFormSchema = z.object({
@@ -61,14 +62,15 @@ const journalEntryFormSchema = z.object({
 }).refine(data => {
   const totalDebits = data.lines.reduce((sum, line) => sum + (line.debit || 0), 0);
   const totalCredits = data.lines.reduce((sum, line) => sum + (line.credit || 0), 0);
-  return Math.abs(totalDebits - totalCredits) < 0.001;
+  return Math.abs(totalDebits - totalCredits) < 0.001; // Use a small epsilon for float comparison
 }, {
   message: "Total debits must equal total credits.",
-  path: ["lines"],
+  path: ["lines"], // This error will appear under the lines array
 });
 
 type JournalEntryFormValues = z.infer<typeof journalEntryFormSchema>;
 
+// defaultLineValues does not include id, useFieldArray will provide it
 const defaultLineValues: Omit<JournalEntryLine, 'id'> = {
   accountCodeSelections: {},
   accountCodeDisplay: '',
@@ -86,20 +88,21 @@ export default function CreateJournalEntryPage() {
   const memoizedDefaultValues = useMemo<JournalEntryFormValues>(() => ({
     controls: {
       fiscalYear: fiscalYears.length > 0 ? fiscalYears[0] : '',
-      journalEntryNumber: '0',
+      journalEntryNumber: '0', // Can be made dynamic or system-generated
       journalEntryDate: undefined, // Initialize as undefined for server render
       additionalPeriod: undefined,
-      source: 'GL',
+      source: 'GL', // Default, typically read-only for manual entries
       workflowRule: undefined,
       description: '',
       comment: '',
     },
-    lines: [{ ...defaultLineValues }],
+    lines: [{ ...defaultLineValues }], // Start with one default line object without an id
   }), []);
 
   const form = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntryFormSchema),
     defaultValues: memoizedDefaultValues,
+    mode: "onChange", // More responsive validation for totals
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -134,31 +137,35 @@ export default function CreateJournalEntryPage() {
         form.setError("controls.journalEntryDate", { type: "manual", message: "Journal Entry Date is required." });
         return;
     }
+    // Ensure IDs from useFieldArray are included if needed by backend,
+    // or map to a structure without client-side IDs if backend generates its own.
     const submissionData: FullJournalEntryFormData = {
       controls: {
         ...values.controls,
-        journalEntryDate: values.controls.journalEntryDate, 
+        journalEntryDate: values.controls.journalEntryDate, // Already a Date object or null
         additionalPeriod: values.controls.additionalPeriod === NONE_ADDITIONAL_PERIOD_VALUE ? undefined : values.controls.additionalPeriod,
         workflowRule: values.controls.workflowRule === NONE_WORKFLOW_RULE_VALUE ? undefined : values.controls.workflowRule,
       },
       lines: values.lines.map(line => ({
-        ...(line as JournalEntryLine), 
+        ...(line as Omit<JournalEntryLine, 'id'> & { id?: string }), // Cast to allow optional id
+        id: line.id || crypto.randomUUID(), // Ensure an ID, or adapt if backend generates
         debit: line.debit || 0,
         credit: line.credit || 0,
       })),
     };
     console.log('Journal Entry Submitted:', submissionData);
     alert('Journal Entry saved (see console). Navigation/further steps not yet implemented.');
+    // Example: router.push('/journal-entries'); // Navigate after successful save
   };
 
   const breadcrumbItems = [
-    { label: 'General Ledger', href: '/' },
+    { label: 'General Ledger', href: '/' }, // Assuming GL home is root or a relevant overview page
     { label: 'Work with Journal Entries', href: '/journal-entries' },
     { label: 'Create New Journal Entry' },
   ];
 
   return (
-    <div className="w-full max-w-5xl mx-auto">
+    <div className="w-full max-w-5xl mx-auto"> {/* Adjusted max-width for better viewing on larger screens */}
       <Breadcrumbs items={breadcrumbItems} />
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-primary">
@@ -168,6 +175,7 @@ export default function CreateJournalEntryPage() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          {/* Journal Entry Controls Card */}
           <Card>
             <CardHeader>
               <CardTitle>Journal Entry Controls</CardTitle>
@@ -234,7 +242,7 @@ export default function CreateJournalEntryPage() {
                         name="controls.journalEntryDate"
                         render={({ field: { onChange, value } }) => (
                           <DatePicker
-                            value={value || undefined}
+                            value={value || undefined} // Pass undefined if null for placeholder
                             onValueChange={onChange}
                             placeholder="Select JE Date"
                           />
@@ -255,6 +263,7 @@ export default function CreateJournalEntryPage() {
                       <FormLabel>Additional Period</FormLabel>
                       <Select
                         onValueChange={field.onChange}
+                        // Ensure value is correctly handled if undefined, default to special "none" value
                         value={field.value || NONE_ADDITIONAL_PERIOD_VALUE}
                       >
                         <FormControl>
@@ -319,7 +328,7 @@ export default function CreateJournalEntryPage() {
                            <SelectItem value={NONE_WORKFLOW_RULE_VALUE}>None (or System Default)</SelectItem>
                           {workflowRules.map((rule) => (
                             <SelectItem key={rule} value={rule}>
-                              {rule || 'N/A'}
+                              {rule || 'N/A'} 
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -367,6 +376,7 @@ export default function CreateJournalEntryPage() {
             </CardContent>
           </Card>
 
+          {/* Journal Entry Lines Card */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -376,14 +386,14 @@ export default function CreateJournalEntryPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => append({ ...defaultLineValues })}
+                onClick={() => append({ ...defaultLineValues })} // Append object without pre-defined id
               >
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Line
               </Button>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="max-h-[500px] w-full">
-                <div className="space-y-6 pr-3">
+              <ScrollArea className="max-h-[500px] w-full"> {/* Adjust max-h as needed */}
+                <div className="space-y-6 pr-3"> {/* Added pr-3 for scrollbar space */}
                   {!isClientMounted ? (
                     <div className="flex items-center justify-center py-10 text-muted-foreground">
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -391,14 +401,14 @@ export default function CreateJournalEntryPage() {
                     </div>
                   ) : (
                     fields.map((lineField, index) => (
-                      <Card key={lineField.id} className="p-4 relative shadow-sm bg-muted/30">
+                      <Card key={lineField.id} className="p-4 relative shadow-sm bg-muted/30"> {/* Use lineField.id as key */}
                          <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             className="absolute top-2 right-2 h-7 w-7 text-destructive hover:text-destructive/80"
                             onClick={() => remove(index)}
-                            disabled={fields.length <= 1}
+                            disabled={fields.length <= 1} // Prevent removing the last line
                           >
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Remove line</span>
@@ -418,8 +428,9 @@ export default function CreateJournalEntryPage() {
                                   }}
                                   activeSegments={activeSegments}
                                   allSegmentCodes={mockSegmentCodesData}
-                                  lineId={lineField.id} 
+                                  lineId={lineField.id} // Pass the stable ID from useFieldArray
                                 />
+                                {/* Display validation message for accountCodeDisplay which is set by AccountCodeBuilder */}
                                 <FormMessage>{form.formState.errors.lines?.[index]?.accountCodeDisplay?.message}</FormMessage>
                               </FormItem>
                             )}
@@ -446,8 +457,9 @@ export default function CreateJournalEntryPage() {
                                   <FormLabel>Debit</FormLabel>
                                   <FormControl>
                                     <Input type="number" {...field} placeholder="0.00" step="0.01"
+                                     // Ensure onChange converts to number or undefined
                                      onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                                     value={field.value ?? ''}
+                                     value={field.value ?? ''} // Handle undefined for controlled input
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -477,6 +489,7 @@ export default function CreateJournalEntryPage() {
                   )}
                 </div>
               </ScrollArea>
+              {/* Display array-level error (e.g., "Total debits must equal total credits") */}
               {form.formState.errors.lines && typeof form.formState.errors.lines.message === 'string' && (
                 <p className="text-sm font-medium text-destructive mt-2">{form.formState.errors.lines.message}</p>
               )}
