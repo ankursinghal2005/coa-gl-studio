@@ -6,6 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // Added useRouter
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,6 +83,7 @@ const statusMap: Record<JournalEntryStatus, { variant: "default" | "secondary" |
 
 
 export default function JournalEntriesPage() {
+  const router = useRouter(); // Initialized useRouter
   const [activeTab, setActiveTab] = useState<JournalEntryStatus | 'All'>('All');
   const [allEntries] = useState<JournalEntry[]>(initialJournalEntriesData);
   const [displayedEntries, setDisplayedEntries] = useState<JournalEntry[]>(allEntries);
@@ -188,8 +190,6 @@ export default function JournalEntriesPage() {
   };
   
   const handleFind = () => {
-    // This function is technically not needed as useEffect handles filtering.
-    // Kept for explicit "Find" button action if desired in future.
     console.log("Filtering with current form values.");
   };
 
@@ -199,8 +199,7 @@ export default function JournalEntriesPage() {
   ];
 
   const handleCreateNewJE = () => {
-    console.log("Create New JE clicked");
-    alert("Create New Journal Entry functionality to be implemented.");
+    router.push('/journal-entries/create'); // Navigate to create page
   };
 
   const handleRowAction = (action: string, jeId: string) => {
@@ -220,7 +219,7 @@ export default function JournalEntriesPage() {
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as JournalEntryStatus | 'All')}>
         <TabsList className="mb-4 overflow-x-auto whitespace-nowrap justify-start sm:justify-center">
           <TabsTrigger value="All">All Journal Entries</TabsTrigger>
-          {jeStatuses.map(sVal => ( // Renamed status to sVal to avoid conflict
+          {jeStatuses.map(sVal => ( 
             <TabsTrigger key={sVal} value={sVal}>{sVal}</TabsTrigger>
           ))}
         </TabsList>
