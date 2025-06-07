@@ -24,6 +24,9 @@ import { fiscalYears, additionalPeriods, workflowRules, jeSources, type JournalE
 import { Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+const NONE_ADDITIONAL_PERIOD_VALUE = "_none_additional_period_";
+const NONE_WORKFLOW_RULE_VALUE = "_none_workflow_rule_";
+
 const journalEntryControlsSchema = z.object({
   fiscalYear: z.string().min(1, { message: 'Fiscal Year is required.' }),
   journalEntryNumber: z.string().min(1, {message: "Journal Entry Number is required."}),
@@ -46,20 +49,22 @@ export default function CreateJournalEntryPage() {
       fiscalYear: fiscalYears.length > 0 ? fiscalYears[0] : '',
       journalEntryNumber: '0',
       journalEntryDate: new Date(),
-      additionalPeriod: '',
+      additionalPeriod: undefined, // Initialize as undefined for placeholder to show
       source: 'GL',
-      workflowRule: '',
+      workflowRule: undefined, // Initialize as undefined for placeholder to show
       description: '',
       comment: '',
     },
   });
 
   const onSubmit = (values: JournalEntryControlsFormValues) => {
-    console.log('Journal Entry Controls Submitted:', values);
-    // For now, just log. Later, this would save to context/backend and navigate
-    // to the next step (e.g., adding lines to the JE)
+    const submissionValues = {
+        ...values,
+        additionalPeriod: values.additionalPeriod === NONE_ADDITIONAL_PERIOD_VALUE ? undefined : values.additionalPeriod,
+        workflowRule: values.workflowRule === NONE_WORKFLOW_RULE_VALUE ? undefined : values.workflowRule,
+    };
+    console.log('Journal Entry Controls Submitted:', submissionValues);
     alert('Journal Entry Controls saved (see console). Next step not yet implemented.');
-    // router.push(`/journal-entries/create/${newJeId}/lines`); // Example next step
   };
 
   const breadcrumbItems = [
@@ -158,14 +163,17 @@ export default function CreateJournalEntryPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Additional Period</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || ""} // Pass empty string if undefined for Select's value prop
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select Additional Period" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value={NONE_ADDITIONAL_PERIOD_VALUE}>None</SelectItem>
                           {additionalPeriods.map((period) => (
                             <SelectItem key={period} value={period}>
                               {period}
@@ -208,14 +216,17 @@ export default function CreateJournalEntryPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Workflow Rule</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || ""} // Pass empty string if undefined
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select Workflow Rule" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                           <SelectItem value="">None (or System Default)</SelectItem>
+                           <SelectItem value={NONE_WORKFLOW_RULE_VALUE}>None (or System Default)</SelectItem>
                           {workflowRules.map((rule) => (
                             <SelectItem key={rule} value={rule}>
                               {rule || 'N/A'}
