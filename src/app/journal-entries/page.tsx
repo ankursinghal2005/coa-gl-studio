@@ -90,7 +90,7 @@ export default function JournalEntriesPage() {
   const form = useForm<FilterFormValues>({
     resolver: zodResolver(filterSchema),
     defaultValues: {
-      fiscalYear: fiscalYears[0],
+      fiscalYear: undefined, // Changed from fiscalYears[0]
       posted: 'Both',
       source: 'All',
       useridCreated: 'All',
@@ -152,7 +152,7 @@ export default function JournalEntriesPage() {
 
   const handleResetFilters = () => {
     reset({
-      fiscalYear: fiscalYears[0],
+      fiscalYear: undefined, // Changed from fiscalYears[0]
       jeNumber: '',
       jeDate: undefined,
       description: '',
@@ -221,7 +221,7 @@ export default function JournalEntriesPage() {
               render={({ field }) => (
                 <div>
                   <label htmlFor="fiscalYear" className="block text-sm font-medium text-muted-foreground mb-1">Fiscal Year</label>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || ''}> {/* Ensure value is not undefined for Select */}
                     <SelectTrigger id="fiscalYear"><SelectValue placeholder="Select Year" /></SelectTrigger>
                     <SelectContent>
                       {fiscalYears.map(year => <SelectItem key={year} value={year}>{year}</SelectItem>)}
@@ -485,3 +485,4 @@ export default function JournalEntriesPage() {
     </div>
   );
 }
+
