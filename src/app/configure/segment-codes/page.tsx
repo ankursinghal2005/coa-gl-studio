@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, parse as parseDateFns } from "date-fns";
-import { useSearchParams } from 'next/navigation'; 
+import { useSearchParams } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import {
   Table,
@@ -68,10 +68,10 @@ import { useToast } from "@/hooks/use-toast"
 
 
 const submoduleOptions = [
-  'General Ledger', 
-  'Accounts Payable', 
-  'Accounts Receivables', 
-  'Cash Receipts', 
+  'General Ledger',
+  'Accounts Payable',
+  'Accounts Receivables',
+  'Cash Receipts',
   'Payroll'
 ] as const;
 
@@ -119,7 +119,7 @@ const defaultCodeFormValues: SegmentCodeFormValues = {
   validTo: undefined,
   availableForTransactionCoding: false,
   availableForBudgeting: false,
-  allowedSubmodules: [...submoduleOptions], 
+  allowedSubmodules: [...submoduleOptions],
   customFieldValues: {},
   defaultParentCode: '',
 };
@@ -152,7 +152,7 @@ export default function SegmentCodesPage() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const querySegmentIdParam = searchParams.get('segmentId');
-  
+
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -178,7 +178,7 @@ export default function SegmentCodesPage() {
     resolver: zodResolver(segmentCodeFormSchema),
     defaultValues: defaultCodeFormValues,
   });
-  
+
 
   useEffect(() => {
     setSelectedSegmentId(currentSelectedId => {
@@ -234,12 +234,12 @@ export default function SegmentCodesPage() {
 
 
   const saveSegmentCodeAndUpdateHierarchy = (
-    codeToSave: SegmentCode, 
-    targetSegmentId: string, 
+    codeToSave: SegmentCode,
+    targetSegmentId: string,
     targetSegment: Segment,
     currentCodesForSegment: SegmentCode[]
   ): { savedCode: SegmentCode | null, hierarchyMessage?: string } => {
-    
+
     let existingCodeIndex = currentCodesForSegment.findIndex(c => c.id === codeToSave.id || c.code === codeToSave.code);
     let savedCode: SegmentCode;
     let operation: 'added' | 'updated' = 'added';
@@ -259,7 +259,7 @@ export default function SegmentCodesPage() {
             [targetSegmentId]: [...(prev[targetSegmentId] || []), savedCode],
         }));
     }
-    
+
     setCurrentEditingCode(savedCode); // Ensure currentEditingCode is updated if in dialog mode
 
     let hierarchyMessage: string | undefined;
@@ -268,18 +268,17 @@ export default function SegmentCodesPage() {
     if (savedCode.defaultParentCode) {
       const DEFAULT_HIERARCHY_SET_ID = 'hset-system-default-code-hierarchy';
       const DEFAULT_HIERARCHY_SET_NAME = "Default Code Structures (System)";
-      
+
       let hierarchySet = getHierarchySetById(DEFAULT_HIERARCHY_SET_ID);
 
       if (!hierarchySet) {
-        hierarchySet = { 
-          id: DEFAULT_HIERARCHY_SET_ID, 
-          name: DEFAULT_HIERARCHY_SET_NAME, 
-          status: 'Active', 
-          validFrom: new Date(Date.UTC(2023, 0, 1)), 
-          segmentHierarchies: [], 
-          lastModifiedDate: new Date(), 
-          lastModifiedBy: "System (Excel Upload)" 
+        hierarchySet = {
+          id: DEFAULT_HIERARCHY_SET_ID,
+          name: DEFAULT_HIERARCHY_SET_NAME,
+          status: 'Active',
+          segmentHierarchies: [],
+          lastModifiedDate: new Date(),
+          lastModifiedBy: "System (Excel Upload)"
         };
         addHierarchySet(hierarchySet);
         hierarchySet = getHierarchySetById(DEFAULT_HIERARCHY_SET_ID); // Re-fetch
@@ -287,7 +286,7 @@ export default function SegmentCodesPage() {
             return { savedCode, hierarchyMessage: `Failed to create/retrieve default hierarchy set for ${savedCode.code}.` };
          }
       }
-      
+
       let hierarchySetToUpdate = JSON.parse(JSON.stringify(hierarchySet)) as HierarchySet;
       const allCodesForCurrentSegment = segmentCodesData[targetSegmentId] || [savedCode]; // Use updated list
 
@@ -355,7 +354,7 @@ export default function SegmentCodesPage() {
       customFieldValues: values.customFieldValues || {},
       defaultParentCode: values.defaultParentCode?.trim() || undefined,
     };
-    
+
     // Check for duplicate code string before adding/updating (if code string can change)
     const isAdding = dialogMode === 'add';
     const codeExists = (segmentCodesData[selectedSegmentId] || []).some(
@@ -367,15 +366,15 @@ export default function SegmentCodesPage() {
         toast({ title: "Validation Error", description: "This code already exists for this segment.", variant: "destructive" });
         return;
     }
-    
+
     const { savedCode, hierarchyMessage } = saveSegmentCodeAndUpdateHierarchy(dataToSave, selectedSegmentId, selectedSegment, currentSegmentCodes);
 
     if (savedCode) {
         toast({ title: "Success", description: hierarchyMessage || `Code "${savedCode.code}" processed.` });
         if (dialogMode === 'edit') {
-            setDialogMode('view'); 
+            setDialogMode('view');
         } else {
-            setIsCodeFormOpen(false); 
+            setIsCodeFormOpen(false);
         }
     } else {
         toast({ title: "Error", description: "Failed to save code.", variant: "destructive" });
@@ -395,7 +394,7 @@ export default function SegmentCodesPage() {
 
   const handleOpenAddCodeDialog = () => {
     setDialogMode('add');
-    setCurrentEditingCode(null); 
+    setCurrentEditingCode(null);
     setIsCodeFormOpen(true);
   };
 
@@ -405,7 +404,7 @@ export default function SegmentCodesPage() {
     setIsCodeFormOpen(true);
   };
 
-  const handleEditCodeFromDialog = () => { 
+  const handleEditCodeFromDialog = () => {
     if (currentEditingCode) {
       setDialogMode('edit');
     }
@@ -413,7 +412,7 @@ export default function SegmentCodesPage() {
 
    const handleDialogClose = (isOpen: boolean) => {
     if (!isOpen) {
-      setIsCodeFormOpen(false); 
+      setIsCodeFormOpen(false);
     } else {
       setIsCodeFormOpen(true);
     }
@@ -433,9 +432,9 @@ export default function SegmentCodesPage() {
 
     allAvailableSegments.forEach(segment => {
       const headers = [
-        'Code*', 'Description*', 'DefaultParentCode', 
+        'Code*', 'Description*', 'DefaultParentCode',
         'External1', 'External2', 'External3', 'External4', 'External5',
-        'SummaryIndicator (TRUE/FALSE)*', 'IsActive (TRUE/FALSE)*', 
+        'SummaryIndicator (TRUE/FALSE)*', 'IsActive (TRUE/FALSE)*',
         'ValidFrom (YYYY-MM-DD)*', 'ValidTo (YYYY-MM-DD)',
         'AvailableForTransactionCoding (TRUE/FALSE)*', 'AvailableForBudgeting (TRUE/FALSE)*',
         'AllowedSubmodules (comma-separated)'
@@ -506,7 +505,7 @@ export default function SegmentCodesPage() {
 
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 , raw: false, dateNF: 'yyyy-mm-dd'});
-          
+
           if (jsonData.length < 1) return; // Skip empty sheets or sheets with only header
 
           const headers: string[] = jsonData[0].map((h:any) => String(h).trim());
@@ -535,13 +534,13 @@ export default function SegmentCodesPage() {
                     throw new Error(`Custom field "${cf.label}" is required.`);
                 }
               });
-              
+
               const parseBoolean = (val: any) => {
                 if (val === undefined || val === null || String(val).trim() === '') return undefined; // Treat empty as undefined
                 const sVal = String(val).toUpperCase();
                 return ['TRUE', 'YES', '1'].includes(sVal);
               };
-              
+
               const validFromStr = String(row['ValidFrom'] || '').trim();
               const validToStr = String(row['ValidTo'] || '').trim();
 
@@ -585,7 +584,7 @@ export default function SegmentCodesPage() {
               };
 
               const existingCodeIndex = (segmentCodesData[targetSegment.id] || []).findIndex(c => c.code === codeToProcess.code);
-              
+
               saveSegmentCodeAndUpdateHierarchy(codeToProcess, targetSegment.id, targetSegment, segmentCodesData[targetSegment.id] || []);
 
               if (existingCodeIndex !== -1) codesUpdated++; else codesAdded++;
@@ -625,11 +624,11 @@ export default function SegmentCodesPage() {
 
 
   return (
-    <div className="flex flex-col h-full"> 
-      <div className="p-0 md:px-0 lg:px-0"> 
+    <div className="flex flex-col h-full">
+      <div className="p-0 md:px-0 lg:px-0">
          <Breadcrumbs items={breadcrumbItems} />
       </div>
-      <div className="flex flex-1 overflow-hidden"> 
+      <div className="flex flex-1 overflow-hidden">
         <aside className="w-1/4 min-w-[200px] max-w-[300px] border-r bg-card p-4 space-y-2 overflow-y-auto">
           <h2 className="text-lg font-semibold mb-3 text-primary flex items-center">
             <ListFilter className="mr-2 h-5 w-5" /> Segments
@@ -838,7 +837,7 @@ export default function SegmentCodesPage() {
                                           field.onChange(currentSelection.filter((item) => item !== option));
                                         }
                                       }}
-                                      onSelect={(e) => e.preventDefault()} 
+                                      onSelect={(e) => e.preventDefault()}
                                       disabled={isFieldDisabled}
                                     >
                                       {option}
@@ -889,7 +888,7 @@ export default function SegmentCodesPage() {
                             )}
                           />
                         </div>
-                        
+
                         {selectedSegment && selectedSegment.customFields && selectedSegment.customFields.length > 0 && (
                           <Card className="my-4">
                             <CardHeader>
@@ -1116,7 +1115,7 @@ export default function SegmentCodesPage() {
                               </span>
                             </TableCell>
                             <TableCell className="whitespace-normal break-words">{code.description}</TableCell>
-                            <TableCell>{code.defaultParentCode || 'N/A'}</TableCell>
+                            <TableCell>{code.defaultParentCode || 'Blank'}</TableCell>
                             <TableCell className="text-center">
                               {code.summaryIndicator ? <CheckCircle className="h-5 w-5 text-green-500 inline" /> : <XCircle className="h-5 w-5 text-muted-foreground inline" />}
                             </TableCell>
