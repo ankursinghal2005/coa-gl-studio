@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea'; // Added this import
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils';
 const journalEntryControlsSchema = z.object({
   fiscalYear: z.string().min(1, { message: 'Fiscal Year is required.' }),
   journalEntryNumber: z.string().min(1, {message: "Journal Entry Number is required."}),
-  journalEntryDate: z.date({ required_error: 'Journal Entry Date is required.' }),
+  journalEntryDate: z.date({ required_error: 'Journal Entry Date is required.' }).optional().nullable(), // Allow undefined/null for initial state
   additionalPeriod: z.string().optional(),
   source: z.enum(jeSources as [JournalEntrySource, ...JournalEntrySource[]]),
   workflowRule: z.string().optional(),
@@ -42,7 +42,6 @@ const journalEntryControlsSchema = z.object({
 });
 
 const journalEntryLineSchema = z.object({
-  // id is managed by useFieldArray, no need to validate here unless specific format is required
   accountCodeSelections: z.record(z.string().optional()),
   accountCodeDisplay: z.string().min(1, "Account code is required."),
   description: z.string().optional(),
@@ -62,7 +61,6 @@ const journalEntryFormSchema = z.object({
 }).refine(data => {
   const totalDebits = data.lines.reduce((sum, line) => sum + (line.debit || 0), 0);
   const totalCredits = data.lines.reduce((sum, line) => sum + (line.credit || 0), 0);
-  // Use a small epsilon for float comparison
   return Math.abs(totalDebits - totalCredits) < 0.001;
 }, {
   message: "Total debits must equal total credits.",
@@ -71,7 +69,6 @@ const journalEntryFormSchema = z.object({
 
 type JournalEntryFormValues = z.infer<typeof journalEntryFormSchema>;
 
-// Default values for a single line, ID will be assigned by useFieldArray
 const defaultLineValues: Omit<JournalEntryLine, 'id'> = {
   accountCodeSelections: {},
   accountCodeDisplay: '',
@@ -85,21 +82,23 @@ export default function CreateJournalEntryPage() {
   const { segments } = useSegments();
   const activeSegments = useMemo(() => segments.filter(s => s.isActive).sort((a,b) => segments.indexOf(a) - segments.indexOf(b)), [segments]);
 
+  const memoizedDefaultValues = useMemo<JournalEntryFormValues>(() => ({
+    controls: {
+      fiscalYear: fiscalYears.length > 0 ? fiscalYears[0] : '',
+      journalEntryNumber: '0',
+      journalEntryDate: undefined, // Initialize as undefined
+      additionalPeriod: undefined,
+      source: 'GL',
+      workflowRule: undefined,
+      description: '',
+      comment: '',
+    },
+    lines: [{ ...defaultLineValues }],
+  }), []);
+
   const form = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntryFormSchema),
-    defaultValues: {
-      controls: {
-        fiscalYear: fiscalYears.length > 0 ? fiscalYears[0] : '',
-        journalEntryNumber: '0',
-        journalEntryDate: new Date(),
-        additionalPeriod: undefined,
-        source: 'GL',
-        workflowRule: undefined,
-        description: '',
-        comment: '',
-      },
-      lines: [{ ...defaultLineValues }],
-    },
+    defaultValues: memoizedDefaultValues,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -108,6 +107,15 @@ export default function CreateJournalEntryPage() {
   });
 
   const watchedLines = useWatch({ control: form.control, name: "lines" });
+
+  // Set JE Date to today only on client-side after mount
+  useEffect(() => {
+    if (!form.getValues('controls.journalEntryDate')) {
+      form.setValue('controls.journalEntryDate', new Date(), { shouldValidate: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
+
 
   const totals = useMemo(() => {
     let debits = 0;
@@ -121,14 +129,19 @@ export default function CreateJournalEntryPage() {
 
 
   const onSubmit = (values: JournalEntryFormValues) => {
+    if (!values.controls.journalEntryDate) {
+        form.setError("controls.journalEntryDate", { type: "manual", message: "Journal Entry Date is required." });
+        return;
+    }
     const submissionData: FullJournalEntryFormData = {
       controls: {
         ...values.controls,
+        journalEntryDate: values.controls.journalEntryDate, // Already a Date object
         additionalPeriod: values.controls.additionalPeriod === NONE_ADDITIONAL_PERIOD_VALUE ? undefined : values.controls.additionalPeriod,
         workflowRule: values.controls.workflowRule === NONE_WORKFLOW_RULE_VALUE ? undefined : values.controls.workflowRule,
       },
       lines: values.lines.map(line => ({
-        ...(line as JournalEntryLine), // Cast to include id
+        ...(line as Omit<JournalEntryLine, 'id'> & { id: string }), // Ensure id is present
         debit: line.debit || 0,
         credit: line.credit || 0,
       })),
@@ -220,7 +233,7 @@ export default function CreateJournalEntryPage() {
                         name="controls.journalEntryDate"
                         render={({ field: { onChange, value } }) => (
                           <DatePicker
-                            value={value}
+                            value={value || undefined} // Ensure value is Date or undefined
                             onValueChange={onChange}
                             placeholder="Select JE Date"
                           />
@@ -398,7 +411,7 @@ export default function CreateJournalEntryPage() {
                                 }}
                                 activeSegments={activeSegments}
                                 allSegmentCodes={mockSegmentCodesData}
-                                lineId={lineField.id}
+                                lineId={lineField.id} // Use stable id from useFieldArray
                               />
                               <FormMessage>{form.formState.errors.lines?.[index]?.accountCodeDisplay?.message}</FormMessage>
                             </FormItem>
