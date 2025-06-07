@@ -62,20 +62,21 @@ const customFieldSchema = z.object({
   ).optional(),
 }).refine(data => {
   if (data.type === 'Dropdown') {
-    return Array.isArray(data.dropdownOptions) && data.dropdownOptions.length > 0;
+    return Array.isArray(data.dropdownOptions) && data.dropdownOptions.length > 0 && data.dropdownOptions.every(opt => opt.trim() !== '');
   }
   return true;
 }, {
-  message: "At least one dropdown option is required when type is 'Dropdown'.",
+  message: "At least one non-empty dropdown option is required when type is 'Dropdown'.",
   path: ["dropdownOptions"],
 });
 
-const segmentFormSchema = z.object({
+
+const baseSegmentSchema = z.object({
   displayName: z.string().min(1, { message: 'Display Name is required.' }),
   segmentType: z.string().optional(),
   dataType: z.enum(['Alphanumeric', 'Numeric', 'Text'], { required_error: "Data Type is required." }),
   maxLength: z.coerce.number({ required_error: "Max Length is required.", invalid_type_error: "Max Length must be a number." }).int().positive({ message: "Max Length must be a positive number." }),
-  specialCharsAllowed: z.string({required_error: "Special Characters Allowed is required."}).refine(value => value !== null, { message: "Special Characters Allowed cannot be null." }),
+  specialCharsAllowed: z.string(), // No longer required error here, allow empty for no special chars. Refine handles null if that's possible.
   defaultCode: z.string().optional(),
   separator: z.enum(['-', '|', ',', '.'], { required_error: "Separator is required." }),
   isMandatoryForCoding: z.boolean().default(false),
@@ -96,7 +97,69 @@ const segmentFormSchema = z.object({
   path: ["validTo"],
 });
 
-type SegmentFormValues = z.infer<typeof segmentFormSchema>;
+export function createSegmentFormSchema(allSegments: Segment[], currentSegmentId?: string) {
+  return baseSegmentSchema.superRefine((data, ctx) => {
+    const otherSegments = allSegments.filter(segment => segment.id !== currentSegmentId);
+
+    // Rule 1: Current segment's separator cannot be in its own specialCharsAllowed
+    if (data.specialCharsAllowed && data.separator && data.specialCharsAllowed.includes(data.separator)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `The separator character '${data.separator}' cannot also be listed in 'Special Characters Allowed' for this segment.`,
+        path: ['separator'],
+      });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `The character '${data.separator}' is this segment's separator and cannot be included here.`,
+        path: ['specialCharsAllowed'],
+      });
+    }
+
+    // Collect all special chars and separators from OTHER segments
+    const allOtherSpecialChars = new Set<string>();
+    otherSegments.forEach(segment => {
+      if (segment.specialCharsAllowed) {
+        for (const char of segment.specialCharsAllowed) {
+          allOtherSpecialChars.add(char);
+        }
+      }
+    });
+
+    const allOtherSeparators = new Set<string>();
+    otherSegments.forEach(segment => {
+      if (segment.separator) {
+        allOtherSeparators.add(segment.separator);
+      }
+    });
+
+    // Rule 2: Current segment's specialCharsAllowed should not contain any separator from other segments
+    if (data.specialCharsAllowed) {
+      for (const char of data.specialCharsAllowed) {
+        if (allOtherSeparators.has(char)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `The character '${char}' is used as a separator in another segment and cannot be an allowed special character.`,
+            path: ['specialCharsAllowed'],
+          });
+        }
+      }
+    }
+
+    // Rule 3: Current segment's separator should not be in any other segment's specialCharsAllowed
+    if (data.separator) {
+      if (allOtherSpecialChars.has(data.separator)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `The separator '${data.separator}' is listed as an allowed special character in another segment. Please choose a different separator or remove it from the other segment's special characters.`,
+          path: ['separator'],
+        });
+      }
+    }
+  });
+}
+
+
+type SegmentFormValues = z.infer<typeof baseSegmentSchema>; // Use base for type, factory for validation
 
 const defaultFormValues: Omit<SegmentFormValues, 'id' | 'segmentType' | 'isCore'> = {
   displayName: '',
@@ -127,15 +190,24 @@ export default function SegmentsPage() {
     setIsClientMounted(true);
   }, []);
 
+  const dynamicSegmentFormSchema = useMemo(() => {
+    return createSegmentFormSchema(segments, currentSegmentData?.id);
+  }, [segments, currentSegmentData?.id]);
 
   const form = useForm<SegmentFormValues>({
-    resolver: zodResolver(segmentFormSchema),
+    resolver: zodResolver(dynamicSegmentFormSchema),
     defaultValues: {
       ...defaultFormValues,
       isCore: false, 
       customFields: [],
     },
   });
+  
+  // Effect to update resolver if schema changes while dialog is open
+  useEffect(() => {
+    form.reset(undefined, { keepValues: true }); // This re-evaluates with new resolver
+  }, [dynamicSegmentFormSchema, form]);
+
 
   const { fields: customFormFields, append: appendCustomField, remove: removeCustomField } = useFieldArray({
     control: form.control,
@@ -512,7 +584,7 @@ export default function SegmentsPage() {
                   name="specialCharsAllowed"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Special Characters Allowed *</FormLabel>
+                      <FormLabel>Special Characters Allowed</FormLabel>
                       <FormControl>
                         <Input {...field} value={field.value ?? ''} placeholder="e.g., -_ (empty for none)" disabled={isFieldDisabled(currentSegmentData?.isCore, 'specialCharsAllowed')} />
                       </FormControl>
