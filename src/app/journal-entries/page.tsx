@@ -5,7 +5,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -38,12 +37,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MoreHorizontal, PlusCircle, Settings2, FileDown, Copy, Trash2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Settings2, FileDown } from 'lucide-react';
+import { FormattedDateTime } from '@/components/ui/FormattedDateTime';
 import {
   initialJournalEntriesData,
   type JournalEntry,
   type JournalEntryStatus,
-  type JournalEntrySource,
   type PostedStatusFilter,
   fiscalYears,
   jeSources,
@@ -87,22 +86,39 @@ export default function JournalEntriesPage() {
   const [allEntries] = useState<JournalEntry[]>(initialJournalEntriesData);
   const [displayedEntries, setDisplayedEntries] = useState<JournalEntry[]>(allEntries);
 
+  const memoizedDefaultValues = useMemo(() => ({
+    fiscalYear: undefined,
+    jeNumber: '',
+    jeDate: undefined,
+    description: '',
+    source: 'All',
+    useridCreated: 'All',
+    additionalPeriod: 'All',
+    status: 'All',
+    workflowRule: 'All',
+    approvalPendingWith: 'All',
+    posted: 'Both',
+  }), []);
+
   const form = useForm<FilterFormValues>({
     resolver: zodResolver(filterSchema),
-    defaultValues: {
-      fiscalYear: undefined, // Changed from fiscalYears[0]
-      posted: 'Both',
-      source: 'All',
-      useridCreated: 'All',
-      status: 'All',
-      workflowRule: 'All',
-      approvalPendingWith: 'All',
-      additionalPeriod: 'All',
-    },
+    defaultValues: memoizedDefaultValues,
   });
 
   const { watch, reset, control } = form;
-  const filters = watch();
+
+  const fiscalYear = watch('fiscalYear');
+  const jeNumber = watch('jeNumber');
+  const jeDate = watch('jeDate');
+  const description = watch('description');
+  const source = watch('source');
+  const useridCreated = watch('useridCreated');
+  const additionalPeriod = watch('additionalPeriod');
+  const status = watch('status');
+  const workflowRule = watch('workflowRule');
+  const approvalPendingWith = watch('approvalPendingWith');
+  const posted = watch('posted');
+
 
   useEffect(() => {
     let filtered = [...allEntries];
@@ -111,77 +127,78 @@ export default function JournalEntriesPage() {
       filtered = filtered.filter(entry => entry.status === activeTab);
     }
 
-    if (filters.fiscalYear && filters.fiscalYear !== 'All') {
-      filtered = filtered.filter(entry => entry.fiscalYear === filters.fiscalYear);
+    if (fiscalYear && fiscalYear !== 'All') {
+      filtered = filtered.filter(entry => entry.fiscalYear === fiscalYear);
     }
-    if (filters.jeNumber) {
-      filtered = filtered.filter(entry => entry.jeNumber.includes(filters.jeNumber!));
+    if (jeNumber) {
+      filtered = filtered.filter(entry => entry.jeNumber.includes(jeNumber));
     }
-    if (filters.jeDate) {
-      const filterDate = filters.jeDate.toDateString();
-      filtered = filtered.filter(entry => entry.jeDate.toDateString() === filterDate);
+    if (jeDate) {
+      const filterDateOnly = new Date(jeDate.getFullYear(), jeDate.getMonth(), jeDate.getDate());
+      filtered = filtered.filter(entry => {
+        const entryDateOnly = new Date(entry.jeDate.getFullYear(), entry.jeDate.getMonth(), entry.jeDate.getDate());
+        return entryDateOnly.getTime() === filterDateOnly.getTime();
+      });
     }
-    if (filters.description) {
-      filtered = filtered.filter(entry => entry.description.toLowerCase().includes(filters.description!.toLowerCase()));
+    if (description) {
+      filtered = filtered.filter(entry => entry.description.toLowerCase().includes(description.toLowerCase()));
     }
-    if (filters.source && filters.source !== 'All') {
-      filtered = filtered.filter(entry => entry.source === filters.source);
+    if (source && source !== 'All') {
+      filtered = filtered.filter(entry => entry.source === source);
     }
-    if (filters.useridCreated && filters.useridCreated !== 'All') {
-      filtered = filtered.filter(entry => entry.useridCreated === filters.useridCreated);
+    if (useridCreated && useridCreated !== 'All') {
+      filtered = filtered.filter(entry => entry.useridCreated === useridCreated);
     }
-    if (filters.status && filters.status !== 'All') {
-      filtered = filtered.filter(entry => entry.status === filters.status);
+    if (status && status !== 'All') {
+      filtered = filtered.filter(entry => entry.status === status);
     }
-    if (filters.workflowRule && filters.workflowRule !== 'All') {
-      filtered = filtered.filter(entry => entry.workflowRule === filters.workflowRule);
+    if (workflowRule && workflowRule !== 'All') {
+      filtered = filtered.filter(entry => entry.workflowRule === workflowRule);
     }
-    if (filters.approvalPendingWith && filters.approvalPendingWith !== 'All') {
-      filtered = filtered.filter(entry => entry.approvalPendingWith === filters.approvalPendingWith);
+    if (approvalPendingWith && approvalPendingWith !== 'All') {
+      filtered = filtered.filter(entry => entry.approvalPendingWith === approvalPendingWith);
     }
-    if (filters.additionalPeriod && filters.additionalPeriod !== 'All') {
-        filtered = filtered.filter(entry => entry.additionalPeriod === filters.additionalPeriod);
+    if (additionalPeriod && additionalPeriod !== 'All') {
+        filtered = filtered.filter(entry => entry.additionalPeriod === additionalPeriod);
     }
-    if (filters.posted && filters.posted !== 'Both') {
-        const isPostedFilter = filters.posted === 'Yes';
+    if (posted && posted !== 'Both') {
+        const isPostedFilter = posted === 'Yes';
         filtered = filtered.filter(entry => entry.isPosted === isPostedFilter);
     }
     
     setDisplayedEntries(filtered);
-  }, [filters, activeTab, allEntries]);
+  }, [
+    activeTab, 
+    allEntries, 
+    fiscalYear, 
+    jeNumber, 
+    jeDate, 
+    description, 
+    source, 
+    useridCreated, 
+    additionalPeriod, 
+    status, 
+    workflowRule, 
+    approvalPendingWith, 
+    posted
+  ]);
 
   const handleResetFilters = () => {
-    reset({
-      fiscalYear: undefined, // Changed from fiscalYears[0]
-      jeNumber: '',
-      jeDate: undefined,
-      description: '',
-      source: 'All',
-      useridCreated: 'All',
-      additionalPeriod: 'All',
-      status: 'All',
-      workflowRule: 'All',
-      approvalPendingWith: 'All',
-      posted: 'Both',
-    });
-    // Resetting activeTab also if desired, or keep it as is
-    // setActiveTab('All'); 
+    reset(memoizedDefaultValues);
   };
   
   const handleFind = () => {
-    // Trigger re-evaluation of useEffect by updating a watched value, though it happens naturally.
-    // Could add specific 'find' logic here if useEffect wasn't sufficient.
-    // For now, the useEffect handles filtering automatically on filter change.
-    console.log("Filtering with:", filters);
+    // This function is technically not needed as useEffect handles filtering.
+    // Kept for explicit "Find" button action if desired in future.
+    console.log("Filtering with current form values.");
   };
 
   const breadcrumbItems = [
-    { label: 'General Ledger', href: '/' }, // Assuming GL dashboard is at root for now
+    { label: 'General Ledger', href: '/' }, 
     { label: 'Work with Journal Entries' },
   ];
 
   const handleCreateNewJE = () => {
-    // TODO: Navigate to a create JE page or open a modal/sheet
     console.log("Create New JE clicked");
     alert("Create New Journal Entry functionality to be implemented.");
   };
@@ -203,8 +220,8 @@ export default function JournalEntriesPage() {
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as JournalEntryStatus | 'All')}>
         <TabsList className="mb-4 overflow-x-auto whitespace-nowrap justify-start sm:justify-center">
           <TabsTrigger value="All">All Journal Entries</TabsTrigger>
-          {jeStatuses.map(status => (
-            <TabsTrigger key={status} value={status}>{status}</TabsTrigger>
+          {jeStatuses.map(sVal => ( // Renamed status to sVal to avoid conflict
+            <TabsTrigger key={sVal} value={sVal}>{sVal}</TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
@@ -221,7 +238,7 @@ export default function JournalEntriesPage() {
               render={({ field }) => (
                 <div>
                   <label htmlFor="fiscalYear" className="block text-sm font-medium text-muted-foreground mb-1">Fiscal Year</label>
-                  <Select onValueChange={field.onChange} value={field.value || ''}> {/* Ensure value is not undefined for Select */}
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <SelectTrigger id="fiscalYear"><SelectValue placeholder="Select Year" /></SelectTrigger>
                     <SelectContent>
                       {fiscalYears.map(year => <SelectItem key={year} value={year}>{year}</SelectItem>)}
@@ -236,7 +253,7 @@ export default function JournalEntriesPage() {
               render={({ field }) => (
                 <div>
                   <label htmlFor="jeNumber" className="block text-sm font-medium text-muted-foreground mb-1">JE Number</label>
-                  <Input id="jeNumber" placeholder="JE Number" {...field} />
+                  <Input id="jeNumber" placeholder="JE Number" {...field} value={field.value || ''} />
                 </div>
               )}
             />
@@ -260,7 +277,7 @@ export default function JournalEntriesPage() {
               render={({ field }) => (
                 <div>
                   <label htmlFor="description" className="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-                  <Input id="description" placeholder="Description" {...field} />
+                  <Input id="description" placeholder="Description" {...field} value={field.value || ''} />
                 </div>
               )}
             />
@@ -322,7 +339,7 @@ export default function JournalEntriesPage() {
                     <SelectTrigger id="status"><SelectValue placeholder="Select Status" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="All">All</SelectItem>
-                      {jeStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      {jeStatuses.map(sVal => <SelectItem key={sVal} value={sVal}>{sVal}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -435,7 +452,9 @@ export default function JournalEntriesPage() {
                         </Link>
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{entry.description}</TableCell>
-                      <TableCell>{format(entry.jeDate, 'MM/dd/yyyy')}</TableCell>
+                      <TableCell>
+                        <FormattedDateTime date={entry.jeDate} formatString="MM/dd/yyyy" />
+                      </TableCell>
                       <TableCell>{entry.source}</TableCell>
                       <TableCell>
                         <Badge variant={statusMap[entry.status].variant} className={cn(statusMap[entry.status].className)}>
@@ -445,9 +464,9 @@ export default function JournalEntriesPage() {
                       <TableCell>{entry.workflowRule || '-'}</TableCell>
                       <TableCell>{entry.approvalPendingWith || '-'}</TableCell>
                       <TableCell>
-                        {entry.lastApprovalActionOn
-                          ? format(entry.lastApprovalActionOn, 'MM/dd/yyyy hh:mm a')
-                          : '-'}
+                        {entry.lastApprovalActionOn ? (
+                          <FormattedDateTime date={entry.lastApprovalActionOn} formatString="MM/dd/yyyy hh:mm a" />
+                        ) : '-'}
                       </TableCell>
                       <TableCell>{entry.useridCreated}</TableCell>
                       <TableCell className="text-center">
@@ -485,4 +504,3 @@ export default function JournalEntriesPage() {
     </div>
   );
 }
-
