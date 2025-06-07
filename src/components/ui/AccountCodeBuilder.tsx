@@ -29,7 +29,7 @@ interface AccountCodeBuilderProps {
   activeSegments: Segment[];
   allSegmentCodes: Record<string, SegmentCode[]>;
   disabled?: boolean;
-  lineId: string;
+  lineId: string; // Unique ID for the current journal entry line, crucial for accessibility
 }
 
 export function AccountCodeBuilder({
@@ -52,7 +52,6 @@ export function AccountCodeBuilder({
     const displayString = buildDisplayString(newSelections);
     onChange(newSelections, displayString);
     
-    // Close the popover after selection is processed
     requestAnimationFrame(() => {
       setPopoverState(segmentId, false);
     });
