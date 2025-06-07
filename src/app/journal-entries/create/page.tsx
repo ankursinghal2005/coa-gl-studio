@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react'; // Added useState
 import { useForm, Controller, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,14 +26,14 @@ import { mockSegmentCodesData } from '@/lib/segment-types';
 import { useSegments } from '@/contexts/SegmentsContext';
 import { AccountCodeBuilder } from '@/components/ui/AccountCodeBuilder';
 import { FormattedCurrency } from '@/components/ui/FormattedCurrency';
-import { Info, PlusCircle, Trash2 } from 'lucide-react';
+import { Info, PlusCircle, Trash2, Loader2 } from 'lucide-react'; // Added Loader2
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 const journalEntryControlsSchema = z.object({
   fiscalYear: z.string().min(1, { message: 'Fiscal Year is required.' }),
   journalEntryNumber: z.string().min(1, {message: "Journal Entry Number is required."}),
-  journalEntryDate: z.date({ required_error: 'Journal Entry Date is required.' }).optional().nullable(), // Allow undefined/null for initial state
+  journalEntryDate: z.date({ required_error: 'Journal Entry Date is required.' }).optional().nullable(),
   additionalPeriod: z.string().optional(),
   source: z.enum(jeSources as [JournalEntrySource, ...JournalEntrySource[]]),
   workflowRule: z.string().optional(),
@@ -81,12 +81,13 @@ export default function CreateJournalEntryPage() {
   const router = useRouter();
   const { segments } = useSegments();
   const activeSegments = useMemo(() => segments.filter(s => s.isActive).sort((a,b) => segments.indexOf(a) - segments.indexOf(b)), [segments]);
+  const [isClientMounted, setIsClientMounted] = useState(false);
 
   const memoizedDefaultValues = useMemo<JournalEntryFormValues>(() => ({
     controls: {
       fiscalYear: fiscalYears.length > 0 ? fiscalYears[0] : '',
       journalEntryNumber: '0',
-      journalEntryDate: undefined, // Initialize as undefined
+      journalEntryDate: undefined, // Initialize as undefined for server render
       additionalPeriod: undefined,
       source: 'GL',
       workflowRule: undefined,
@@ -108,14 +109,14 @@ export default function CreateJournalEntryPage() {
 
   const watchedLines = useWatch({ control: form.control, name: "lines" });
 
-  // Set JE Date to today only on client-side after mount
   useEffect(() => {
+    setIsClientMounted(true);
+    // Set JE Date to today only on client-side after mount, if not already set
     if (!form.getValues('controls.journalEntryDate')) {
       form.setValue('controls.journalEntryDate', new Date(), { shouldValidate: true });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
-
+  }, []); // Empty dependency array ensures this runs once on mount
 
   const totals = useMemo(() => {
     let debits = 0;
@@ -136,12 +137,12 @@ export default function CreateJournalEntryPage() {
     const submissionData: FullJournalEntryFormData = {
       controls: {
         ...values.controls,
-        journalEntryDate: values.controls.journalEntryDate, // Already a Date object
+        journalEntryDate: values.controls.journalEntryDate, 
         additionalPeriod: values.controls.additionalPeriod === NONE_ADDITIONAL_PERIOD_VALUE ? undefined : values.controls.additionalPeriod,
         workflowRule: values.controls.workflowRule === NONE_WORKFLOW_RULE_VALUE ? undefined : values.controls.workflowRule,
       },
       lines: values.lines.map(line => ({
-        ...(line as Omit<JournalEntryLine, 'id'> & { id: string }), // Ensure id is present
+        ...(line as JournalEntryLine), 
         debit: line.debit || 0,
         credit: line.credit || 0,
       })),
@@ -233,7 +234,7 @@ export default function CreateJournalEntryPage() {
                         name="controls.journalEntryDate"
                         render={({ field: { onChange, value } }) => (
                           <DatePicker
-                            value={value || undefined} // Ensure value is Date or undefined
+                            value={value || undefined}
                             onValueChange={onChange}
                             placeholder="Select JE Date"
                           />
@@ -254,7 +255,7 @@ export default function CreateJournalEntryPage() {
                       <FormLabel>Additional Period</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value || ""}
+                        value={field.value || NONE_ADDITIONAL_PERIOD_VALUE}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -307,7 +308,7 @@ export default function CreateJournalEntryPage() {
                       <FormLabel>Workflow Rule</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value || ""}
+                        value={field.value || NONE_WORKFLOW_RULE_VALUE}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -383,90 +384,97 @@ export default function CreateJournalEntryPage() {
             <CardContent>
               <ScrollArea className="max-h-[500px] w-full">
                 <div className="space-y-6 pr-3">
-                  {fields.map((lineField, index) => (
-                    <Card key={lineField.id} className="p-4 relative shadow-sm bg-muted/30">
-                       <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-2 right-2 h-7 w-7 text-destructive hover:text-destructive/80"
-                          onClick={() => remove(index)}
-                          disabled={fields.length <= 1}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Remove line</span>
-                        </Button>
-                      <div className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name={`lines.${index}.accountCodeSelections`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Account Code *</FormLabel>
-                              <AccountCodeBuilder
-                                value={field.value}
-                                onChange={(newSelections, displayString) => {
-                                  field.onChange(newSelections);
-                                  form.setValue(`lines.${index}.accountCodeDisplay`, displayString, { shouldValidate: true });
-                                }}
-                                activeSegments={activeSegments}
-                                allSegmentCodes={mockSegmentCodesData}
-                                lineId={lineField.id} // Use stable id from useFieldArray
-                              />
-                              <FormMessage>{form.formState.errors.lines?.[index]?.accountCodeDisplay?.message}</FormMessage>
-                            </FormItem>
-                          )}
-                        />
-                         <FormField
+                  {!isClientMounted ? (
+                    <div className="flex items-center justify-center py-10 text-muted-foreground">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Loading lines...
+                    </div>
+                  ) : (
+                    fields.map((lineField, index) => (
+                      <Card key={lineField.id} className="p-4 relative shadow-sm bg-muted/30">
+                         <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 text-destructive hover:text-destructive/80"
+                            onClick={() => remove(index)}
+                            disabled={fields.length <= 1}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Remove line</span>
+                          </Button>
+                        <div className="space-y-4">
+                          <FormField
                             control={form.control}
-                            name={`lines.${index}.description`}
+                            name={`lines.${index}.accountCodeSelections`}
                             render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Account Code *</FormLabel>
+                                <AccountCodeBuilder
+                                  value={field.value}
+                                  onChange={(newSelections, displayString) => {
+                                    field.onChange(newSelections);
+                                    form.setValue(`lines.${index}.accountCodeDisplay`, displayString, { shouldValidate: true });
+                                  }}
+                                  activeSegments={activeSegments}
+                                  allSegmentCodes={mockSegmentCodesData}
+                                  lineId={lineField.id} 
+                                />
+                                <FormMessage>{form.formState.errors.lines?.[index]?.accountCodeDisplay?.message}</FormMessage>
+                              </FormItem>
+                            )}
+                          />
+                           <FormField
+                              control={form.control}
+                              name={`lines.${index}.description`}
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Line Description</FormLabel>
+                                  <FormControl>
+                                      <Input {...field} placeholder="Optional line item description" value={field.value ?? ''}/>
+                                  </FormControl>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                           />
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name={`lines.${index}.debit`}
+                              render={({ field }) => (
                                 <FormItem>
-                                <FormLabel>Line Description</FormLabel>
-                                <FormControl>
-                                    <Input {...field} placeholder="Optional line item description" value={field.value ?? ''}/>
-                                </FormControl>
-                                <FormMessage />
+                                  <FormLabel>Debit</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" {...field} placeholder="0.00" step="0.01"
+                                     onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                     value={field.value ?? ''}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
                                 </FormItem>
-                            )}
-                         />
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name={`lines.${index}.debit`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Debit</FormLabel>
-                                <FormControl>
-                                  <Input type="number" {...field} placeholder="0.00" step="0.01"
-                                   onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                                   value={field.value ?? ''}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name={`lines.${index}.credit`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Credit</FormLabel>
-                                <FormControl>
-                                  <Input type="number" {...field} placeholder="0.00" step="0.01"
-                                   onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                                   value={field.value ?? ''}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`lines.${index}.credit`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Credit</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" {...field} placeholder="0.00" step="0.01"
+                                     onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                     value={field.value ?? ''}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    ))
+                  )}
                 </div>
               </ScrollArea>
               {form.formState.errors.lines && typeof form.formState.errors.lines.message === 'string' && (
@@ -502,3 +510,4 @@ export default function CreateJournalEntryPage() {
     </div>
   );
 }
+
