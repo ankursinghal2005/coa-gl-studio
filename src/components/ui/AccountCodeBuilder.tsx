@@ -42,10 +42,6 @@ export function AccountCodeBuilder({
 }: AccountCodeBuilderProps) {
   const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({});
 
-  const togglePopover = (segmentId: string) => {
-    setOpenPopovers(prev => ({ ...prev, [segmentId]: !prev[segmentId] }));
-  };
-
   const setPopoverState = (segmentId: string, isOpen: boolean) => {
     setOpenPopovers(prev => ({ ...prev, [segmentId]: isOpen }));
   };
@@ -54,7 +50,10 @@ export function AccountCodeBuilder({
     const newSelections = { ...value, [segmentId]: selectedCodeValue };
     const displayString = buildDisplayString(newSelections);
     onChange(newSelections, displayString);
-    setPopoverState(segmentId, false); 
+    // Defer closing the popover to allow cmdk selection to fully process
+    requestAnimationFrame(() => {
+      setPopoverState(segmentId, false);
+    });
   };
 
   const buildDisplayString = (selections: JournalEntryAccountCode): string => {
@@ -69,7 +68,8 @@ export function AccountCodeBuilder({
 
   const currentDisplayString = useMemo(() => {
     return buildDisplayString(value);
-  }, [value, activeSegments]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, activeSegments]); // buildDisplayString is stable
 
   const isPreviewPlaceholder = useMemo(() => {
     return !activeSegments.some(seg => !!value[seg.id]);
@@ -92,12 +92,14 @@ export function AccountCodeBuilder({
           const triggerButtonText = selectedCodeObject
             ? selectedCodeObject.code
             : '_'.repeat(segment.maxLength > 0 ? Math.max(1, segment.maxLength) : 4);
+          
+          const uniquePopoverId = `${lineId}-${segment.id}-popover-content`;
 
           return (
             <React.Fragment key={`${lineId}-${segment.id}`}>
               <div className="flex flex-col">
                 <Label
-                  htmlFor={`${lineId}-${segment.id}-combobox`}
+                  htmlFor={`${lineId}-${segment.id}-combobox-trigger`}
                   className="text-xs font-medium text-muted-foreground px-1 mb-0.5"
                 >
                   {segment.displayName}
@@ -108,12 +110,13 @@ export function AccountCodeBuilder({
                       variant="outline"
                       role="combobox"
                       aria-expanded={openPopovers[segment.id] || false}
-                      id={`${lineId}-${segment.id}-combobox`}
+                      aria-controls={openPopovers[segment.id] ? uniquePopoverId : undefined}
+                      id={`${lineId}-${segment.id}-combobox-trigger`}
                       className={cn(
                         "h-9 justify-between focus:bg-accent/50 font-mono",
-                        `min-w-[${Math.max(60, segment.maxLength * 8 + 20)}px]` // Dynamic min-width based on maxLength
+                        `min-w-[${Math.max(60, segment.maxLength * 7 + 30)}px]` 
                       )}
-                      style={{ minWidth: `${Math.max(60, segment.maxLength * 7 + 30)}px`}} // Ensure enough space
+                      style={{ minWidth: `${Math.max(60, segment.maxLength * 7 + 30)}px`}} 
                       disabled={disabled}
                       aria-label={`Select ${segment.displayName}`}
                     >
@@ -123,11 +126,11 @@ export function AccountCodeBuilder({
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                  <PopoverContent id={uniquePopoverId} className="p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
                     <Command
                       filter={(itemValue, search) => {
                         const codeObj = allSegmentCodes[segment.id]?.find(c => c.code === itemValue);
-                        if (!codeObj) return 0;
+                        if (!codeObj) return 0; 
                         const textToSearch = `${codeObj.code} ${codeObj.description}`.toLowerCase();
                         return textToSearch.includes(search.toLowerCase()) ? 1 : 0;
                       }}
@@ -181,7 +184,7 @@ export function AccountCodeBuilder({
         })}
       </div>
       <Label className="text-xs text-muted-foreground">Full Account Code Preview:</Label>
-      <div className="mt-1 p-2.5 border rounded-md bg-muted text-sm text-muted-foreground min-h-[40px] font-mono tracking-wider">
+      <div className="mt-1 p-2.5 border rounded-md bg-muted text-sm min-h-[40px] font-mono tracking-wider">
         {currentDisplayString ? (
           <span className={cn(isPreviewPlaceholder && "italic text-gray-400")}>
              {currentDisplayString}
@@ -194,3 +197,4 @@ export function AccountCodeBuilder({
   );
 }
 
+    
