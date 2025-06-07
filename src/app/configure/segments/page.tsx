@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
+// import { DatePicker } from "@/components/ui/date-picker"; // Removed DatePicker
 import { Checkbox } from '@/components/ui/checkbox';
 import { PlusCircle, GripVertical, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescriptionComponent } from '@/components/ui/card';
@@ -76,26 +76,19 @@ const baseSegmentSchema = z.object({
   segmentType: z.string().optional(),
   dataType: z.enum(['Alphanumeric', 'Numeric', 'Text'], { required_error: "Data Type is required." }),
   maxLength: z.coerce.number({ required_error: "Max Length is required.", invalid_type_error: "Max Length must be a number." }).int().positive({ message: "Max Length must be a positive number." }),
-  specialCharsAllowed: z.string(), // No longer required error here, allow empty for no special chars. Refine handles null if that's possible.
+  specialCharsAllowed: z.string(), 
   defaultCode: z.string().optional(),
   separator: z.enum(['-', '|', ',', '.'], { required_error: "Separator is required." }),
   isMandatoryForCoding: z.boolean().default(false),
   isActive: z.boolean().default(true),
-  validFrom: z.date({ required_error: "Valid From date is required." }),
-  validTo: z.date().optional(),
+  // validFrom: z.date({ required_error: "Valid From date is required." }), // Removed
+  // validTo: z.date().optional(), // Removed
   isCustom: z.boolean().default(true),
   isCore: z.boolean().default(false),
   id: z.string().optional(),
   customFields: z.array(customFieldSchema).optional(),
-}).refine(data => {
-  if (data.validFrom && data.validTo) {
-    return data.validTo >= data.validFrom;
-  }
-  return true;
-}, {
-  message: "Valid To date must be after or the same as Valid From date.",
-  path: ["validTo"],
 });
+// Removed refine for validFrom/validTo
 
 export function createSegmentFormSchema(allSegments: Segment[], currentSegmentId?: string) {
   return baseSegmentSchema.superRefine((data, ctx) => {
@@ -159,7 +152,7 @@ export function createSegmentFormSchema(allSegments: Segment[], currentSegmentId
 }
 
 
-type SegmentFormValues = z.infer<typeof baseSegmentSchema>; // Use base for type, factory for validation
+type SegmentFormValues = z.infer<typeof baseSegmentSchema>; 
 
 const defaultFormValues: Omit<SegmentFormValues, 'id' | 'segmentType' | 'isCore'> = {
   displayName: '',
@@ -170,8 +163,8 @@ const defaultFormValues: Omit<SegmentFormValues, 'id' | 'segmentType' | 'isCore'
   separator: '-',
   isMandatoryForCoding: false,
   isActive: true,
-  validFrom: new Date(),
-  validTo: undefined,
+  // validFrom: new Date(), // Removed
+  // validTo: undefined, // Removed
   isCustom: true,
   customFields: [],
 };
@@ -203,9 +196,8 @@ export default function SegmentsPage() {
     },
   });
   
-  // Effect to update resolver if schema changes while dialog is open
   useEffect(() => {
-    form.reset(undefined, { keepValues: true }); // This re-evaluates with new resolver
+    form.reset(undefined, { keepValues: true }); 
   }, [dynamicSegmentFormSchema, form]);
 
 
@@ -229,8 +221,8 @@ export default function SegmentsPage() {
       } else if ((dialogMode === 'view' || dialogMode === 'edit') && currentSegmentData) {
         form.reset({
           ...currentSegmentData,
-          validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(),
-          validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
+          // validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(), // Removed
+          // validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined, // Removed
           customFields: currentSegmentData.customFields?.map(cf => ({
             ...cf,
             dropdownOptions: cf.dropdownOptions || (cf.type === 'Dropdown' ? [''] : [])
@@ -304,8 +296,8 @@ export default function SegmentsPage() {
         separator: dataToSave.separator,
         isMandatoryForCoding: dataToSave.isMandatoryForCoding,
         isActive: dataToSave.isActive,
-        validFrom: dataToSave.validFrom,
-        validTo: dataToSave.validTo,
+        // validFrom: dataToSave.validFrom, // Removed
+        // validTo: dataToSave.validTo, // Removed
         customFields: dataToSave.customFields,
       };
       addSegment(newSegment);
@@ -321,8 +313,8 @@ export default function SegmentsPage() {
         separator: dataToSave.separator,
         isMandatoryForCoding: dataToSave.isMandatoryForCoding,
         isActive: dataToSave.isActive,
-        validFrom: dataToSave.validFrom,
-        validTo: dataToSave.validTo,
+        // validFrom: dataToSave.validFrom, // Removed
+        // validTo: dataToSave.validTo, // Removed
         customFields: dataToSave.customFields,
       };
       updateSegment(updatedSegment);
@@ -424,7 +416,6 @@ export default function SegmentsPage() {
 
 
   return (
-    // Removed p-4/py-8, min-h-screen, bg-background. Added w-full, max-w-4xl, mx-auto.
     <div className="w-full max-w-4xl mx-auto">
         <Breadcrumbs items={breadcrumbItems} />
         <header className="mb-8">
@@ -607,45 +598,6 @@ export default function SegmentsPage() {
                   )}
                 />
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="validFrom"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Valid From *</FormLabel>
-                        <DatePicker
-                          value={field.value}
-                          onValueChange={field.onChange}
-                          placeholder="Select start date"
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, 'validFrom')}
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="validTo"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Valid To</FormLabel>
-                         <DatePicker
-                          value={field.value}
-                          onValueChange={field.onChange}
-                          placeholder="Select end date"
-                          disabled={isFieldDisabled(currentSegmentData?.isCore, 'validTo')}
-                          disableDates={(date) => {
-                            const validFrom = form.getValues("validFrom");
-                            return validFrom instanceof Date ? date < validFrom : false;
-                          }}
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
                  <FormField
                     control={form.control}
                     name="separator"
@@ -874,7 +826,7 @@ export default function SegmentsPage() {
                               </Button>
                                <FormField
                                   control={form.control}
-                                  name={dropdownOptionsPath} // This will show array-level errors like "min 1 item"
+                                  name={dropdownOptionsPath} 
                                   render={() => <FormMessage />} 
                                 />
                               <CardDescriptionComponent className="text-xs mt-1">
@@ -916,8 +868,8 @@ export default function SegmentsPage() {
                           if(currentSegmentData) {
                             form.reset({ 
                                 ...currentSegmentData,
-                                validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(),
-                                validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined,
+                                // validFrom: currentSegmentData.validFrom ? new Date(currentSegmentData.validFrom) : new Date(), // Removed
+                                // validTo: currentSegmentData.validTo ? new Date(currentSegmentData.validTo) : undefined, // Removed
                                 customFields: currentSegmentData.customFields?.map(cf => ({
                                   ...cf,
                                   dropdownOptions: cf.dropdownOptions || (cf.type === 'Dropdown' ? [''] : [])
