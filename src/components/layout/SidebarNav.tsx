@@ -1,7 +1,7 @@
 
 'use client';
 
-import * as React from 'react';
+import * as React from 'react'; // Ensure React is imported for useId
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -49,18 +49,21 @@ export function SidebarNav({ className }: SidebarNavProps) {
   const { state: sidebarState, toggleSidebar, isMobile } = useSidebar();
   const pathname = usePathname();
 
-  const AppLogo = () => (
-    <svg width="37" height="32" viewBox="0 0 50 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-      <g clipPath="url(#clip0_177_45916_sidebar)">
-        <path d="M47.9493 0H2.05186C-0.0434997 0 -0.786992 2.78377 1.02768 3.83506L22.9519 16.5363V41.9413C22.9519 44.0439 25.7261 44.7899 26.7738 42.969L49.7228 3.08246C50.5113 1.71218 49.5257 0 47.9493 0Z" fill="#4B3FFF"/>
-      </g>
-      <defs>
-        <clipPath id="clip0_177_45916_sidebar">
-          <rect width="50" height="44" fill="white"/>
-        </clipPath>
-      </defs>
-    </svg>
-  );
+  const AppLogo = () => {
+    const uniqueClipId = React.useId(); // Generate a unique ID
+    return (
+      <svg width="37" height="32" viewBox="0 0 50 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+        <g clipPath={`url(#${uniqueClipId})`}>
+          <path d="M47.9493 0H2.05186C-0.0434997 0 -0.786992 2.78377 1.02768 3.83506L22.9519 16.5363V41.9413C22.9519 44.0439 25.7261 44.7899 26.7738 42.969L49.7228 3.08246C50.5113 1.71218 49.5257 0 47.9493 0Z" fill="#4B3FFF"/>
+        </g>
+        <defs>
+          <clipPath id={uniqueClipId}>
+            <rect width="50" height="44" fill="white"/>
+          </clipPath>
+        </defs>
+      </svg>
+    );
+  };
 
   const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false): React.ReactNode[] => {
     return items.map((item, index) => {
@@ -301,4 +304,3 @@ export function SidebarNav({ className }: SidebarNavProps) {
     </Sidebar>
   );
 }
-
