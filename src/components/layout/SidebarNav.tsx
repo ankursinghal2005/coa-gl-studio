@@ -233,7 +233,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
               <Link href="/" className="flex items-center gap-2">
                   <AppLogo />
                   <div>
-                      <span className="font-semibold text-lg text-primary">Financial</span>
+                      <span className="font-semibold text-lg text-primary">Financials</span>
                       <span className="text-xs block text-muted-foreground">by OpenGov</span>
                   </div>
               </Link>
@@ -279,7 +279,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
         >
           <AppLogo />
           <div className="group-data-[collapsible=icon]:hidden text-left">
-            <span className="font-semibold text-lg text-primary">Financial</span>
+            <span className="font-semibold text-lg text-primary">Financials</span>
             <span className="text-xs block text-muted-foreground">by OpenGov</span>
           </div>
         </Button>
