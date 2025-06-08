@@ -49,6 +49,19 @@ export function SidebarNav({ className }: SidebarNavProps) {
   const { state: sidebarState, toggleSidebar, isMobile } = useSidebar();
   const pathname = usePathname();
 
+  const AppLogo = () => (
+    <svg width="37" height="32" viewBox="0 0 50 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+      <g clipPath="url(#clip0_177_45916_sidebar)">
+        <path d="M47.9493 0H2.05186C-0.0434997 0 -0.786992 2.78377 1.02768 3.83506L22.9519 16.5363V41.9413C22.9519 44.0439 25.7261 44.7899 26.7738 42.969L49.7228 3.08246C50.5113 1.71218 49.5257 0 47.9493 0Z" fill="#4B3FFF"/>
+      </g>
+      <defs>
+        <clipPath id="clip0_177_45916_sidebar">
+          <rect width="50" height="44" fill="white"/>
+        </clipPath>
+      </defs>
+    </svg>
+  );
+
   const renderNavItems = (items: NavItemConfig[], isSubmenu: boolean = false): React.ReactNode[] => {
     return items.map((item, index) => {
       const iconSpan = !isSubmenu && item.icon ? <span className="flex items-center justify-center shrink-0">{item.icon}</span> : null;
@@ -218,7 +231,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
         <SidebarHeader className="p-2 border-b border-sidebar-border">
            <div className="flex items-center gap-2 px-2 py-2">
               <Link href="/" className="flex items-center gap-2">
-                  <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded">F</span>
+                  <AppLogo />
                   <div>
                       <span className="font-semibold text-lg text-primary">Financial</span>
                       <span className="text-xs block text-muted-foreground">by OpenGov</span>
@@ -264,9 +277,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
           aria-label={sidebarState === 'collapsed' ? "Expand sidebar" : "Collapse sidebar"}
           title={sidebarState === 'collapsed' ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <span className="text-xl font-bold bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded shrink-0">
-            F
-          </span>
+          <AppLogo />
           <div className="group-data-[collapsible=icon]:hidden text-left">
             <span className="font-semibold text-lg text-primary">Financial</span>
             <span className="text-xs block text-muted-foreground">by OpenGov</span>
