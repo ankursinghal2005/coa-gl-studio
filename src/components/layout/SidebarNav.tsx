@@ -4,6 +4,7 @@
 import * as React from 'react'; // Ensure React is imported for useId
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react'; // Added useState and useEffect
 
 import { mainNavItems, footerNavItems, type NavItemConfig } from '@/config/nav.tsx';
 import { cn } from '@/lib/utils';
@@ -15,11 +16,10 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  sidebarMenuButtonVariants, 
+  sidebarMenuButtonVariants,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  // SidebarTrigger, // No longer used directly here, ui/sidebar.tsx handles its own trigger
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSub as RadixDropdownMenuSub, 
+  DropdownMenuSub as RadixDropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
@@ -48,6 +48,11 @@ interface SidebarNavProps {
 export function SidebarNav({ className }: SidebarNavProps) {
   const { state: sidebarState, toggleSidebar, isMobile } = useSidebar();
   const pathname = usePathname();
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const AppLogo = () => {
     const uniqueClipId = React.useId(); // Generate a unique ID
@@ -70,7 +75,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
       const iconSpan = !isSubmenu && item.icon ? <span className="flex items-center justify-center shrink-0">{item.icon}</span> : null;
 
       if (!item.href && !item.children) {
-        if (isSubmenu && sidebarState === 'collapsed' && !isMobile) { 
+        if (isSubmenu && sidebarState === 'collapsed' && !isMobile) {
           return <DropdownMenuItem key={`${item.title}-${index}-label`} disabled className="font-semibold opacity-100 cursor-default">{item.title}</DropdownMenuItem>;
         }
         return (
@@ -85,7 +90,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
         if (sidebarState === 'collapsed' && !isMobile) {
           const hasGrandChildren = item.children.some(child => child.children && child.children.length > 0);
 
-          if (hasGrandChildren && !isSubmenu) { 
+          if (hasGrandChildren && !isSubmenu) {
              return (
               <SidebarMenuItem key={`${item.title}-${index}-main-dd-sub`}>
                 <DropdownMenu>
@@ -195,7 +200,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   disabled={item.disabled}
                   aria-disabled={item.disabled}
                   tabIndex={item.disabled ? -1 : undefined}
-                  className="block w-full" 
+                  className="block w-full"
                   asChild
                 >
                   <Link href={item.href || '#'} className="block w-full">
@@ -226,9 +231,11 @@ export function SidebarNav({ className }: SidebarNavProps) {
     });
   };
 
+  if (!hasMounted) {
+    return null; // Return null on server and initial client render
+  }
+
   if (isMobile) {
-    // ui/sidebar.tsx now handles SheetTitle for mobile.
-    // This component just provides the content FOR the sheet.
     return (
       <>
         <SidebarHeader className="p-2 border-b border-sidebar-border">
@@ -274,7 +281,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
           className={cn(
             "flex items-center gap-2 w-full h-auto py-2 px-2",
             sidebarState === 'collapsed' ? "justify-center" : "justify-start",
-            "hover:bg-sidebar-accent" 
+            "hover:bg-sidebar-accent"
           )}
           onClick={toggleSidebar}
           aria-label={sidebarState === 'collapsed' ? "Expand sidebar" : "Collapse sidebar"}
