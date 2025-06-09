@@ -401,7 +401,7 @@ export default function CreateJournalEntryPage() {
                     </div>
                   ) : (
                     fields.map((lineField, index) => (
-                      <Card key={lineField.id} className="p-4 relative shadow-sm bg-muted/30"> {/* Use lineField.id as key */}
+                      <Card key={lineField.id} className="p-3 relative shadow-sm bg-muted/30"> {/* Use lineField.id as key, changed p-4 to p-3 */}
                          <Button
                             type="button"
                             variant="ghost"
@@ -448,7 +448,7 @@ export default function CreateJournalEntryPage() {
                                   </FormItem>
                               )}
                            />
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 gap-2"> {/* Changed gap-4 to gap-2 */}
                             <FormField
                               control={form.control}
                               name={`lines.${index}.debit`}
