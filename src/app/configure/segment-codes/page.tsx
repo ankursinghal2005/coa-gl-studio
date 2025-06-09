@@ -760,422 +760,422 @@ export default function SegmentCodesPage() {
                   {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
                   Upload Codes
                 </Button>
-                <Sheet open={isCodeFormSheetOpen} onOpenChange={handleSheetOpenChange}>
-                  <SheetTrigger asChild>
-                    <Button onClick={handleOpenAddCodeSheet} disabled={isUploading}>
-                      <PlusCircle className="mr-2 h-5 w-5" />
-                      Add Code Manually
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent className="sm:max-w-2xl w-full flex flex-col">
-                    <SheetHeader>
-                      <SheetTitle>
-                        {formMode === 'add' && `Add New Code for ${selectedSegment.displayName}`}
-                        {formMode === 'view' && `View Code: ${currentEditingCode?.code} for ${selectedSegment.displayName}`}
-                        {formMode === 'edit' && `Edit Code: ${currentEditingCode?.code} for ${selectedSegment.displayName}`}
-                      </SheetTitle>
-                      <SheetDescription>
-                        {formMode === 'add' && "Fill in the details for the new segment code."}
-                        {formMode === 'view' && "Viewing details for the selected segment code."}
-                        {formMode === 'edit' && "Modify the details of the segment code."}
-                      </SheetDescription>
-                    </SheetHeader>
-                    <ScrollArea className="flex-1 min-h-0">
-                      <div className="p-4">
-                        <Form {...form}>
-                          <form onSubmit={form.handleSubmit(handleSaveCodeSubmit)} className="space-y-4">
-                            <FormField
-                              control={form.control}
-                              name="code"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Segment Code *</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} disabled={isFieldDisabled || (formMode === 'edit' && !!currentEditingCode?.id)} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="description"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Description *</FormLabel>
-                                  <FormControl>
-                                    <Textarea {...field} disabled={isFieldDisabled} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="defaultParentCode"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Default Parent Code (for Hierarchy)</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} placeholder="Enter code of parent (optional)" value={field.value ?? ''} disabled={isFieldDisabled} />
-                                  </FormControl>
-                                  <CardDesc className="text-xs text-muted-foreground pt-1">If provided, this code will be added under the specified parent in a system-generated default hierarchy. Parent must be a summary code within this segment.</CardDesc>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <FormField
-                                control={form.control}
-                                name="external1"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>External 1</FormLabel>
-                                    <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="external2"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>External 2</FormLabel>
-                                    <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="external3"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>External 3</FormLabel>
-                                    <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="external4"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>External 4</FormLabel>
-                                    <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="external5"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>External 5</FormLabel>
-                                    <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-
-                            <FormField
-                              control={form.control}
-                              name="allowedSubmodules"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Allowed Submodules</FormLabel>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild disabled={isFieldDisabled}>
-                                      <Button
-                                        variant="outline"
-                                        className="w-full justify-between"
-                                        disabled={isFieldDisabled}
-                                      >
-                                        <span>
-                                          {field.value && field.value.length > 0
-                                            ? `${field.value.length} selected`
-                                            : "Select submodules"}
-                                        </span>
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                                      <DropdownMenuLabel>Allowed Submodules</DropdownMenuLabel>
-                                      <DropdownMenuSeparator />
-                                      {submoduleOptions.map((option) => (
-                                        <DropdownMenuCheckboxItem
-                                          key={option}
-                                          checked={field.value?.includes(option) ?? false}
-                                          onCheckedChange={(checked) => {
-                                            const currentSelection = field.value || [];
-                                            if (checked) {
-                                              field.onChange([...currentSelection, option]);
-                                            } else {
-                                              field.onChange(currentSelection.filter((item) => item !== option));
-                                            }
-                                          }}
-                                          onSelect={(e) => e.preventDefault()}
-                                          disabled={isFieldDisabled}
-                                        >
-                                          {option}
-                                        </DropdownMenuCheckboxItem>
-                                      ))}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <FormField
-                                control={form.control}
-                                name="validFrom"
-                                render={({ field }) => (
-                                  <FormItem className="flex flex-col">
-                                    <FormLabel>Valid From *</FormLabel>
-                                    <DatePicker
-                                      value={field.value}
-                                      onValueChange={field.onChange}
-                                      placeholder="Select valid from date"
-                                      disabled={isFieldDisabled}
-                                    />
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="validTo"
-                                render={({ field }) => (
-                                  <FormItem className="flex flex-col">
-                                    <FormLabel>Valid To</FormLabel>
-                                    <DatePicker
-                                      value={field.value}
-                                      onValueChange={field.onChange}
-                                      placeholder="Select valid to date"
-                                      disabled={isFieldDisabled}
-                                      disableDates={(date) => {
-                                        const validFrom = form.getValues("validFrom");
-                                        return validFrom instanceof Date ? date < validFrom : false;
-                                      }}
-                                    />
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-
-                            {selectedSegment && selectedSegment.customFields && selectedSegment.customFields.length > 0 && (
-                              <Card className="my-4">
-                                <CardHeader>
-                                  <CardTitle className="text-lg">Custom Fields for {selectedSegment.displayName}</CardTitle>
-                                  <CardDesc>Provide values for segment-specific custom fields.</CardDesc>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                  {selectedSegment.customFields.map((customFieldDef) => (
-                                    <FormField
-                                      key={customFieldDef.id}
-                                      control={form.control}
-                                      name={`customFieldValues.${customFieldDef.id}`}
-                                      rules={{ required: customFieldDef.required ? `${customFieldDef.label} is required.` : false }}
-                                      render={({ field }) => {
-                                        const getInputComponent = () => {
-                                          switch (customFieldDef.type) {
-                                            case 'Text':
-                                              return <Input type="text" {...field} value={field.value ?? ''} disabled={isFieldDisabled} />;
-                                            case 'Number':
-                                              return (
-                                                <Input
-                                                  type="number"
-                                                  {...field}
-                                                  value={field.value ?? ''}
-                                                  onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                                                  disabled={isFieldDisabled}
-                                                />
-                                              );
-                                            case 'Date':
-                                              return (
-                                                <DatePicker
-                                                  value={field.value ? new Date(field.value) : undefined}
-                                                  onValueChange={field.onChange}
-                                                  disabled={isFieldDisabled}
-                                                  placeholder={`Select ${customFieldDef.label}`}
-                                                />
-                                              );
-                                            case 'Boolean':
-                                              const switchId = `custom-field-switch-${customFieldDef.id}-${field.name}`;
-                                              return (
-                                                <div className="flex items-center space-x-2 pt-2">
-                                                  <Switch
-                                                    {...field}
-                                                    checked={field.value ?? false}
-                                                    onCheckedChange={field.onChange}
-                                                    disabled={isFieldDisabled}
-                                                    id={switchId}
-                                                  />
-                                                  <label htmlFor={switchId} className="text-sm cursor-pointer">
-                                                    {field.value ? 'Yes' : 'No'}
-                                                  </label>
-                                                </div>
-                                              );
-                                            case 'Dropdown':
-                                              return (
-                                                <Select
-                                                  onValueChange={field.onChange}
-                                                  value={field.value ?? ''}
-                                                  disabled={isFieldDisabled}
-                                                >
-                                                  <SelectTrigger>
-                                                    <SelectValue placeholder={`Select ${customFieldDef.label}`} />
-                                                  </SelectTrigger>
-                                                  <SelectContent>
-                                                    {(customFieldDef.dropdownOptions || []).map(option => (
-                                                      <SelectItem key={option} value={option}>
-                                                        {option}
-                                                      </SelectItem>
-                                                    ))}
-                                                  </SelectContent>
-                                                </Select>
-                                              );
-                                            default:
-                                              return null;
-                                          }
-                                        };
-
-                                        return (
-                                          <FormItem>
-                                            <FormLabel>{customFieldDef.label}{customFieldDef.required ? ' *' : ''}</FormLabel>
-                                            <FormControl>
-                                              {getInputComponent()}
-                                            </FormControl>
-                                            <FormMessage />
-                                          </FormItem>
-                                        );
-                                      }}
-                                    />
-                                  ))}
-                                </CardContent>
-                              </Card>
-                            )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                              <FormField
-                                control={form.control}
-                                name="availableForTransactionCoding"
-                                render={({ field }) => (
-                                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                                    <FormLabel>Available for Transaction Coding</FormLabel>
-                                    <FormControl>
-                                      <Switch
-                                        checked={field.value}
-                                        onCheckedChange={field.onChange}
-                                        disabled={isFieldDisabled}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="availableForBudgeting"
-                                render={({ field }) => (
-                                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                                    <FormLabel>Available for Budgeting</FormLabel>
-                                    <FormControl>
-                                      <Switch
-                                        checked={field.value}
-                                        onCheckedChange={field.onChange}
-                                        disabled={isFieldDisabled}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                              <FormField
-                                control={form.control}
-                                name="summaryIndicator"
-                                render={({ field }) => (
-                                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                                    <FormLabel>Summary Indicator</FormLabel>
-                                    <FormControl>
-                                      <Switch
-                                        checked={field.value}
-                                        onCheckedChange={field.onChange}
-                                        disabled={isFieldDisabled}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="isActive"
-                                render={({ field }) => (
-                                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                                    <FormLabel>Active</FormLabel>
-                                    <FormControl>
-                                      <Switch
-                                        checked={field.value}
-                                        onCheckedChange={field.onChange}
-                                        disabled={isFieldDisabled}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                          </form>
-                        </Form>
-                      </div>
-                    </ScrollArea>
-                    <SheetFooter className="pt-4 mt-auto">
-                      {formMode === 'add' && (
-                        <>
-                          <SheetClose asChild>
-                            <Button type="button" variant="outline">Cancel</Button>
-                          </SheetClose>
-                          <Button type="submit" onClick={form.handleSubmit(handleSaveCodeSubmit)}>Save Code</Button>
-                        </>
-                      )}
-                      {formMode === 'view' && currentEditingCode && (
-                        <>
-                          <SheetClose asChild>
-                            <Button type="button" variant="outline">Close</Button>
-                          </SheetClose>
-                          <Button type="button" onClick={handleEditCodeFromSheet}>Edit</Button>
-                        </>
-                      )}
-                      {formMode === 'edit' && currentEditingCode && (
-                        <>
-                          <Button type="button" variant="outline" onClick={() => {
-                            setFormMode('view');
-                            if(currentEditingCode) form.reset({
-                              ...currentEditingCode,
-                              validFrom: currentEditingCode.validFrom ? new Date(currentEditingCode.validFrom) : new Date(),
-                              validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
-                              allowedSubmodules: currentEditingCode.allowedSubmodules || [],
-                              customFieldValues: currentEditingCode.customFieldValues || {},
-                              defaultParentCode: currentEditingCode.defaultParentCode || '',
-                            });
-                          }}>Cancel</Button>
-                          <Button type="submit" onClick={form.handleSubmit(handleSaveCodeSubmit)}>Save Changes</Button>
-                        </>
-                      )}
-                    </SheetFooter>
-                  </SheetContent>
-                </Sheet>
               </div>
 
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Codes for {selectedSegment.displayName}</CardTitle>
+                  <Sheet open={isCodeFormSheetOpen} onOpenChange={handleSheetOpenChange}>
+                    <SheetTrigger asChild>
+                      <Button onClick={handleOpenAddCodeSheet} disabled={isUploading}>
+                        <PlusCircle className="mr-2 h-5 w-5" />
+                        Add Code Manually
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent className="sm:max-w-2xl w-full flex flex-col">
+                      <SheetHeader>
+                        <SheetTitle>
+                          {formMode === 'add' && `Add New Code for ${selectedSegment.displayName}`}
+                          {formMode === 'view' && `View Code: ${currentEditingCode?.code} for ${selectedSegment.displayName}`}
+                          {formMode === 'edit' && `Edit Code: ${currentEditingCode?.code} for ${selectedSegment.displayName}`}
+                        </SheetTitle>
+                        <SheetDescription>
+                          {formMode === 'add' && "Fill in the details for the new segment code."}
+                          {formMode === 'view' && "Viewing details for the selected segment code."}
+                          {formMode === 'edit' && "Modify the details of the segment code."}
+                        </SheetDescription>
+                      </SheetHeader>
+                      <ScrollArea className="flex-1 min-h-0">
+                        <div className="p-4">
+                          <Form {...form}>
+                            <form onSubmit={form.handleSubmit(handleSaveCodeSubmit)} className="space-y-4">
+                              <FormField
+                                control={form.control}
+                                name="code"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Segment Code *</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} disabled={isFieldDisabled || (formMode === 'edit' && !!currentEditingCode?.id)} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="description"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Description *</FormLabel>
+                                    <FormControl>
+                                      <Textarea {...field} disabled={isFieldDisabled} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="defaultParentCode"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Default Parent Code (for Hierarchy)</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} placeholder="Enter code of parent (optional)" value={field.value ?? ''} disabled={isFieldDisabled} />
+                                    </FormControl>
+                                    <CardDesc className="text-xs text-muted-foreground pt-1">If provided, this code will be added under the specified parent in a system-generated default hierarchy. Parent must be a summary code within this segment.</CardDesc>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name="external1"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>External 1</FormLabel>
+                                      <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="external2"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>External 2</FormLabel>
+                                      <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="external3"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>External 3</FormLabel>
+                                      <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="external4"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>External 4</FormLabel>
+                                      <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="external5"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>External 5</FormLabel>
+                                      <FormControl><Input {...field} value={field.value ?? ''} disabled={isFieldDisabled} /></FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+
+                              <FormField
+                                control={form.control}
+                                name="allowedSubmodules"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Allowed Submodules</FormLabel>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild disabled={isFieldDisabled}>
+                                        <Button
+                                          variant="outline"
+                                          className="w-full justify-between"
+                                          disabled={isFieldDisabled}
+                                        >
+                                          <span>
+                                            {field.value && field.value.length > 0
+                                              ? `${field.value.length} selected`
+                                              : "Select submodules"}
+                                          </span>
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                                        <DropdownMenuLabel>Allowed Submodules</DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        {submoduleOptions.map((option) => (
+                                          <DropdownMenuCheckboxItem
+                                            key={option}
+                                            checked={field.value?.includes(option) ?? false}
+                                            onCheckedChange={(checked) => {
+                                              const currentSelection = field.value || [];
+                                              if (checked) {
+                                                field.onChange([...currentSelection, option]);
+                                              } else {
+                                                field.onChange(currentSelection.filter((item) => item !== option));
+                                              }
+                                            }}
+                                            onSelect={(e) => e.preventDefault()}
+                                            disabled={isFieldDisabled}
+                                          >
+                                            {option}
+                                          </DropdownMenuCheckboxItem>
+                                        ))}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name="validFrom"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-col">
+                                      <FormLabel>Valid From *</FormLabel>
+                                      <DatePicker
+                                        value={field.value}
+                                        onValueChange={field.onChange}
+                                        placeholder="Select valid from date"
+                                        disabled={isFieldDisabled}
+                                      />
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="validTo"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-col">
+                                      <FormLabel>Valid To</FormLabel>
+                                      <DatePicker
+                                        value={field.value}
+                                        onValueChange={field.onChange}
+                                        placeholder="Select valid to date"
+                                        disabled={isFieldDisabled}
+                                        disableDates={(date) => {
+                                          const validFrom = form.getValues("validFrom");
+                                          return validFrom instanceof Date ? date < validFrom : false;
+                                        }}
+                                      />
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+
+                              {selectedSegment && selectedSegment.customFields && selectedSegment.customFields.length > 0 && (
+                                <Card className="my-4">
+                                  <CardHeader>
+                                    <CardTitle className="text-lg">Custom Fields for {selectedSegment.displayName}</CardTitle>
+                                    <CardDesc>Provide values for segment-specific custom fields.</CardDesc>
+                                  </CardHeader>
+                                  <CardContent className="space-y-4">
+                                    {selectedSegment.customFields.map((customFieldDef) => (
+                                      <FormField
+                                        key={customFieldDef.id}
+                                        control={form.control}
+                                        name={`customFieldValues.${customFieldDef.id}`}
+                                        rules={{ required: customFieldDef.required ? `${customFieldDef.label} is required.` : false }}
+                                        render={({ field }) => {
+                                          const getInputComponent = () => {
+                                            switch (customFieldDef.type) {
+                                              case 'Text':
+                                                return <Input type="text" {...field} value={field.value ?? ''} disabled={isFieldDisabled} />;
+                                              case 'Number':
+                                                return (
+                                                  <Input
+                                                    type="number"
+                                                    {...field}
+                                                    value={field.value ?? ''}
+                                                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                                    disabled={isFieldDisabled}
+                                                  />
+                                                );
+                                              case 'Date':
+                                                return (
+                                                  <DatePicker
+                                                    value={field.value ? new Date(field.value) : undefined}
+                                                    onValueChange={field.onChange}
+                                                    disabled={isFieldDisabled}
+                                                    placeholder={`Select ${customFieldDef.label}`}
+                                                  />
+                                                );
+                                              case 'Boolean':
+                                                const switchId = `custom-field-switch-${customFieldDef.id}-${field.name}`;
+                                                return (
+                                                  <div className="flex items-center space-x-2 pt-2">
+                                                    <Switch
+                                                      {...field}
+                                                      checked={field.value ?? false}
+                                                      onCheckedChange={field.onChange}
+                                                      disabled={isFieldDisabled}
+                                                      id={switchId}
+                                                    />
+                                                    <label htmlFor={switchId} className="text-sm cursor-pointer">
+                                                      {field.value ? 'Yes' : 'No'}
+                                                    </label>
+                                                  </div>
+                                                );
+                                              case 'Dropdown':
+                                                return (
+                                                  <Select
+                                                    onValueChange={field.onChange}
+                                                    value={field.value ?? ''}
+                                                    disabled={isFieldDisabled}
+                                                  >
+                                                    <SelectTrigger>
+                                                      <SelectValue placeholder={`Select ${customFieldDef.label}`} />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      {(customFieldDef.dropdownOptions || []).map(option => (
+                                                        <SelectItem key={option} value={option}>
+                                                          {option}
+                                                        </SelectItem>
+                                                      ))}
+                                                    </SelectContent>
+                                                  </Select>
+                                                );
+                                              default:
+                                                return null;
+                                            }
+                                          };
+
+                                          return (
+                                            <FormItem>
+                                              <FormLabel>{customFieldDef.label}{customFieldDef.required ? ' *' : ''}</FormLabel>
+                                              <FormControl>
+                                                {getInputComponent()}
+                                              </FormControl>
+                                              <FormMessage />
+                                            </FormItem>
+                                          );
+                                        }}
+                                      />
+                                    ))}
+                                  </CardContent>
+                                </Card>
+                              )}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                <FormField
+                                  control={form.control}
+                                  name="availableForTransactionCoding"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                      <FormLabel>Available for Transaction Coding</FormLabel>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                          disabled={isFieldDisabled}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="availableForBudgeting"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                      <FormLabel>Available for Budgeting</FormLabel>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                          disabled={isFieldDisabled}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                <FormField
+                                  control={form.control}
+                                  name="summaryIndicator"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                      <FormLabel>Summary Indicator</FormLabel>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                          disabled={isFieldDisabled}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="isActive"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                      <FormLabel>Active</FormLabel>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                          disabled={isFieldDisabled}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            </form>
+                          </Form>
+                        </div>
+                      </ScrollArea>
+                      <SheetFooter className="pt-4 mt-auto">
+                        {formMode === 'add' && (
+                          <>
+                            <SheetClose asChild>
+                              <Button type="button" variant="outline">Cancel</Button>
+                            </SheetClose>
+                            <Button type="submit" onClick={form.handleSubmit(handleSaveCodeSubmit)}>Save Code</Button>
+                          </>
+                        )}
+                        {formMode === 'view' && currentEditingCode && (
+                          <>
+                            <SheetClose asChild>
+                              <Button type="button" variant="outline">Close</Button>
+                            </SheetClose>
+                            <Button type="button" onClick={handleEditCodeFromSheet}>Edit</Button>
+                          </>
+                        )}
+                        {formMode === 'edit' && currentEditingCode && (
+                          <>
+                            <Button type="button" variant="outline" onClick={() => {
+                              setFormMode('view');
+                              if(currentEditingCode) form.reset({
+                                ...currentEditingCode,
+                                validFrom: currentEditingCode.validFrom ? new Date(currentEditingCode.validFrom) : new Date(),
+                                validTo: currentEditingCode.validTo ? new Date(currentEditingCode.validTo) : undefined,
+                                allowedSubmodules: currentEditingCode.allowedSubmodules || [],
+                                customFieldValues: currentEditingCode.customFieldValues || {},
+                                defaultParentCode: currentEditingCode.defaultParentCode || '',
+                              });
+                            }}>Cancel</Button>
+                            <Button type="submit" onClick={form.handleSubmit(handleSaveCodeSubmit)}>Save Changes</Button>
+                          </>
+                        )}
+                      </SheetFooter>
+                    </SheetContent>
+                  </Sheet>
                 </CardHeader>
                 <CardContent>
                   {currentSegmentCodes.length > 0 ? (
