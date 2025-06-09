@@ -4,7 +4,7 @@ import {
   LayoutDashboard,
   BookOpen,
   ListTree,
-  // FilePenLine, // Removed for Journal Entries
+  FilePenLine, // Added FilePenLine
   BarChart3,
   CreditCard,
   Target,
@@ -13,11 +13,11 @@ import {
   ClipboardList,
   Users,
   HelpCircle,
-  LayoutGrid, 
-  Code2,      
-  Network,    
-  Shuffle,    
-  ShieldCheck 
+  LayoutGrid,
+  Code2,
+  Network,
+  Shuffle,
+  ShieldCheck
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -72,18 +72,18 @@ export const mainNavItems: NavItemConfig[] = [
             icon: <ShieldCheck className="h-4 w-4" />,
           },
           {
-            title: 'Settings', 
+            title: 'Settings',
             href: '/configure/settings',
-            icon: <Settings className="h-4 w-4" />, 
+            icon: <Settings className="h-4 w-4" />,
           },
         ],
       },
-      // { // Journal Entries section was here, now removed
-      //   title: 'Journal Entries',
-      //   href: '/journal-entries', 
-      //   icon: <FilePenLine className="h-4 w-4" />,
-      //   disabled: false, 
-      // },
+      {
+        title: 'Journal Entries',
+        href: '/journal-entries',
+        icon: <FilePenLine className="h-4 w-4" />,
+        disabled: false,
+      },
       {
         title: 'Reports',
         href: '/gl-reports',
@@ -117,7 +117,7 @@ export const mainNavItems: NavItemConfig[] = [
     disabled: true,
   },
   {
-    title: 'Reports', 
+    title: 'Reports',
     href: '/reports',
     icon: <ClipboardList className="h-4 w-4" />,
     disabled: true,
@@ -134,7 +134,7 @@ export const footerNavItems: NavItemConfig[] = [
   {
     title: 'Settings',
     icon: <Settings className="h-4 w-4" />,
-    href: '/configure/settings', 
+    href: '/configure/settings',
   },
   {
     title: 'Help & Support',
@@ -143,4 +143,3 @@ export const footerNavItems: NavItemConfig[] = [
     disabled: true,
   },
 ];
-
