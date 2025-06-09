@@ -738,10 +738,6 @@ export default function SegmentCodesPage() {
                 <p className="text-md text-muted-foreground mt-1">
                   Define and manage codes associated with the selected segment. You can also download a template or upload codes using an Excel file.
                 </p>
-                 <CardDesc className="text-xs text-muted-foreground pt-1">
-                    Allowed special characters for codes in this segment: <strong>'{selectedSegment.specialCharsAllowed || '(none)'}'</strong>.
-                    Separator for this segment is: <strong>'{selectedSegment.separator}'</strong> (cannot be used in codes).
-                </CardDesc>
               </header>
 
               <div className="mb-6 flex flex-col sm:flex-row justify-end gap-2">
