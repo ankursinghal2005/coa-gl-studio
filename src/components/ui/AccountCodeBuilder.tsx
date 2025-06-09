@@ -32,6 +32,8 @@ interface AccountCodeBuilderProps {
   lineId: string; // For generating unique IDs
 }
 
+const STANDARD_PLACEHOLDER_LENGTH = 8;
+
 export function AccountCodeBuilder({
   value,
   onChange,
@@ -53,7 +55,7 @@ export function AccountCodeBuilder({
   const buildDisplayString = (selections: JournalEntryAccountCode): string => {
     return activeSegments
       .map((segment, index) => {
-        const selectedCode = selections[segment.id] || '_'.repeat(segment.maxLength > 0 ? Math.max(1, segment.maxLength) : 4);
+        const selectedCode = selections[segment.id] || '_'.repeat(STANDARD_PLACEHOLDER_LENGTH);
         const separator = index < activeSegments.length - 1 ? segment.separator : '';
         return `${selectedCode}${separator}`;
       })
@@ -66,7 +68,6 @@ export function AccountCodeBuilder({
     const displayString = buildDisplayString(newSelections);
     onChange(newSelections, displayString);
     
-    // Defer closing the popover to ensure selection processing is complete
     requestAnimationFrame(() => {
       setPopoverState(segmentId, false);
     });
@@ -96,7 +97,7 @@ export function AccountCodeBuilder({
 
           const triggerButtonText = selectedCodeObject
             ? selectedCodeObject.code
-            : '_'.repeat(segment.maxLength > 0 ? Math.max(1, segment.maxLength) : 4);
+            : '_'.repeat(STANDARD_PLACEHOLDER_LENGTH);
           
           const triggerButtonId = `${lineId}-${segment.id}-combobox-trigger`;
           const uniquePopoverId = `${lineId}-${segment.id}-popover-content`;
@@ -130,10 +131,9 @@ export function AccountCodeBuilder({
                       aria-controls={openPopovers[segment.id] ? uniquePopoverId : undefined}
                       id={triggerButtonId}
                       className={cn(
-                        "h-9 justify-between focus:bg-accent/50 font-mono max-w-[200px]",
+                        "h-9 justify-between focus:bg-accent/50 font-mono w-auto min-w-[90px] max-w-[200px]",
                         !selectedCodeObject && "text-muted-foreground/70"
                       )}
-                      style={{ minWidth: `${Math.max(60, (segment.maxLength > 0 ? segment.maxLength : 4) * 10 + 28)}px` }}
                       disabled={disabled}
                       aria-label={`Select ${segment.displayName}`}
                     >
@@ -147,9 +147,6 @@ export function AccountCodeBuilder({
                     id={uniquePopoverId} 
                     className="p-0 w-auto min-w-[var(--radix-popover-trigger-width)] max-w-sm"
                     onPointerDownOutside={(event) => {
-                      // If the click target is a CommandItem, prevent the Popover from closing.
-                      // This allows CMDK's onSelect to fire and handle the logic,
-                      // including programmatically closing the popover via handleSegmentChange.
                       if ((event.target as HTMLElement)?.closest('[data-cmdk-item="true"]')) {
                         event.preventDefault();
                       }
@@ -238,4 +235,6 @@ export function AccountCodeBuilder({
     </div>
   );
 }
+    
+
     
