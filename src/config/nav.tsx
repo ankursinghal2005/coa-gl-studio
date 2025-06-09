@@ -4,7 +4,7 @@ import {
   LayoutDashboard,
   BookOpen,
   ListTree,
-  FilePenLine,
+  // FilePenLine, // Removed for Journal Entries
   BarChart3,
   CreditCard,
   Target,
@@ -78,12 +78,12 @@ export const mainNavItems: NavItemConfig[] = [
           },
         ],
       },
-      {
-        title: 'Journal Entries',
-        href: '/journal-entries', // Enabled this link
-        icon: <FilePenLine className="h-4 w-4" />,
-        disabled: false, // Enabled
-      },
+      // { // Journal Entries section was here, now removed
+      //   title: 'Journal Entries',
+      //   href: '/journal-entries', 
+      //   icon: <FilePenLine className="h-4 w-4" />,
+      //   disabled: false, 
+      // },
       {
         title: 'Reports',
         href: '/gl-reports',
@@ -143,3 +143,4 @@ export const footerNavItems: NavItemConfig[] = [
     disabled: true,
   },
 ];
+
