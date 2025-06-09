@@ -29,7 +29,7 @@ interface AccountCodeBuilderProps {
   activeSegments: Segment[];
   allSegmentCodes: Record<string, SegmentCode[]>;
   disabled?: boolean;
-  lineId: string;
+  lineId: string; // For generating unique IDs
 }
 
 export function AccountCodeBuilder({
@@ -46,7 +46,6 @@ export function AccountCodeBuilder({
   const setPopoverState = (segmentId: string, isOpen: boolean) => {
     setOpenPopovers(prev => ({ ...prev, [segmentId]: isOpen }));
     if (!isOpen) {
-      // Clear search term for this segment when popover closes
       setSearchTermCache(prev => ({...prev, [segmentId]: ''}));
     }
   };
@@ -67,12 +66,11 @@ export function AccountCodeBuilder({
     const displayString = buildDisplayString(newSelections);
     onChange(newSelections, displayString);
     
-    // Defer closing popover to allow cmdk selection to fully process
-    setTimeout(() => {
-        setPopoverState(segmentId, false);
-    }, 0); 
+    // Defer closing the popover to ensure selection processing is complete
+    requestAnimationFrame(() => {
+      setPopoverState(segmentId, false);
+    });
   };
-
 
   const currentDisplayString = useMemo(() => {
     return buildDisplayString(value);
@@ -82,7 +80,6 @@ export function AccountCodeBuilder({
   const isPreviewPlaceholder = useMemo(() => {
     return !activeSegments.some(seg => !!value[seg.id]);
   }, [value, activeSegments]);
-
 
   return (
     <div className="space-y-3">
@@ -101,9 +98,9 @@ export function AccountCodeBuilder({
             ? selectedCodeObject.code
             : '_'.repeat(segment.maxLength > 0 ? Math.max(1, segment.maxLength) : 4);
           
+          const triggerButtonId = `${lineId}-${segment.id}-combobox-trigger`;
           const uniquePopoverId = `${lineId}-${segment.id}-popover-content`;
           const commandInputId = `${lineId}-${segment.id}-combobox-input`;
-          const triggerButtonId = `${lineId}-${segment.id}-combobox-trigger`;
 
           return (
             <React.Fragment key={`${lineId}-${segment.id}`}>
@@ -119,7 +116,7 @@ export function AccountCodeBuilder({
                   onOpenChange={(isOpen) => {
                     setPopoverState(segment.id, isOpen);
                     if (isOpen) {
-                      setTimeout(() => { // Auto-focus CommandInput
+                      setTimeout(() => {
                         document.getElementById(commandInputId)?.focus();
                       }, 0);
                     }
@@ -133,10 +130,10 @@ export function AccountCodeBuilder({
                       aria-controls={openPopovers[segment.id] ? uniquePopoverId : undefined}
                       id={triggerButtonId}
                       className={cn(
-                        "h-9 justify-between focus:bg-accent/50 font-mono max-w-[200px]", // Added max-width
+                        "h-9 justify-between focus:bg-accent/50 font-mono max-w-[200px]",
                         !selectedCodeObject && "text-muted-foreground/70"
                       )}
-                      style={{ minWidth: `${Math.max(60, (segment.maxLength > 0 ? segment.maxLength : 4) * 9 + 28)}px` }} // Adjusted min-width calc
+                      style={{ minWidth: `${Math.max(60, (segment.maxLength > 0 ? segment.maxLength : 4) * 10 + 28)}px` }}
                       disabled={disabled}
                       aria-label={`Select ${segment.displayName}`}
                     >
@@ -150,8 +147,10 @@ export function AccountCodeBuilder({
                     id={uniquePopoverId} 
                     className="p-0 w-auto min-w-[var(--radix-popover-trigger-width)] max-w-sm"
                     onPointerDownOutside={(event) => {
-                      // Prevent Popover from closing if click is on a CommandItem or within the list
-                      if ((event.target as HTMLElement)?.closest('[data-cmdk-item="true"], [data-cmdk-list="true"]')) {
+                      // If the click target is a CommandItem, prevent the Popover from closing.
+                      // This allows CMDK's onSelect to fire and handle the logic,
+                      // including programmatically closing the popover via handleSegmentChange.
+                      if ((event.target as HTMLElement)?.closest('[data-cmdk-item="true"]')) {
                         event.preventDefault();
                       }
                     }}
@@ -164,7 +163,7 @@ export function AccountCodeBuilder({
                         const textToSearch = `${codeObj.code} ${codeObj.description}`.toLowerCase();
                         return textToSearch.includes(search.toLowerCase()) ? 1 : 0;
                       }}
-                      value={searchTermCache[segment.id] || ''} // Control search term from state
+                      value={searchTermCache[segment.id] || ''}
                       onValueChange={(currentSearchTerm) => {
                         setSearchTermCache(prev => ({...prev, [segment.id]: currentSearchTerm}));
                       }}
