@@ -29,6 +29,12 @@ import {
   SheetClose,
 } from '@/components/ui/sheet';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Form,
   FormControl,
   FormField,
@@ -44,7 +50,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from '@/components/ui/checkbox';
-import { PlusCircle, GripVertical, Trash2 } from 'lucide-react';
+import { PlusCircle, GripVertical, Trash2, MoreHorizontal } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescriptionComponent } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { Label } from '@/components/ui/label';
@@ -52,6 +58,7 @@ import { useSegments } from '@/contexts/SegmentsContext';
 import type { Segment, CustomFieldDefinition } from '@/lib/segment-types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 
 const customFieldSchema = z.object({
@@ -434,7 +441,7 @@ export default function SegmentsPage() {
 
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-full xl:max-w-7xl mx-auto">
         <Breadcrumbs items={breadcrumbItems} />
         <header className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-primary">Manage Segments</h1>
@@ -491,7 +498,12 @@ export default function SegmentsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Configured Segments</CardTitle>
+            <div>
+              <CardTitle>Configured Segments</CardTitle>
+              <CardDescriptionComponent className="mt-1">
+                 Manage your chart of accounts segments. Click a segment name to view details, or use actions to access segment codes.
+              </CardDescriptionComponent>
+            </div>
             <Sheet open={isSheetOpen} onOpenChange={(isOpen) => {
               setIsSheetOpen(isOpen);
               if (!isOpen) {
@@ -910,70 +922,107 @@ export default function SegmentsPage() {
               </SheetContent>
             </Sheet>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px] text-center">Order</TableHead>
-                  <TableHead className="w-[250px] sm:w-[300px]">Display Name</TableHead>
-                  <TableHead>Segment Type</TableHead>
-                  <TableHead className="text-right w-[150px] sm:w-[180px]">Status</TableHead>
-                  <TableHead className="text-center w-[150px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {segments.map((segment) => (
-                  <TableRow 
-                    key={segment.id}
-                    draggable={true} 
-                    onDragStart={(e) => handleDragStart(e, segment.id)}
-                    onDragEnd={handleDragEnd} 
-                    onDragOver={(e) => handleDragOver(e, segment.id)} 
-                    onDrop={(e) => handleDrop(e, segment.id)}
-                    className={cn(
-                      "cursor-grab active:cursor-grabbing transition-all duration-150 ease-in-out",
-                      draggedSegmentId === segment.id && "opacity-50 shadow-2xl ring-2 ring-primary z-10 relative",
-                      dropTargetId === segment.id && draggedSegmentId !== segment.id && "outline outline-2 outline-accent outline-offset-[-2px]"
-                    )}
-                  >
-                    <TableCell className="text-center">
-                        <GripVertical className="inline-block h-5 w-5 text-muted-foreground" />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <button
-                        className="text-primary hover:underline cursor-pointer bg-transparent border-none p-0"
-                        onClick={() => handleViewSegmentClick(segment)}
-                      >
-                        {segment.displayName}
-                      </button>
-                       {segment.isCore && <span className="ml-2 text-xs text-muted-foreground">(Core)</span>}
-                    </TableCell>
-                    <TableCell>{segment.segmentType}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <span className={`text-sm ${segment.isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {segment.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                        <Switch
-                          id={`status-toggle-${segment.id}`}
-                          checked={segment.isActive}
-                          onCheckedChange={() => handleToggleChange(segment.id)}
-                          disabled={segment.isCore && sheetMode === 'edit'}
-                          aria-label={`Toggle status for ${segment.displayName}`}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Link href={`/configure/segment-codes?segmentId=${segment.id}`} passHref>
-                        <Button variant="outline" size="sm">
-                          View Codes
-                        </Button>
-                      </Link>
-                    </TableCell>
+          <CardContent className="p-0">
+            <ScrollArea className="w-full whitespace-nowrap">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[70px] text-center px-2">Order</TableHead>
+                    <TableHead className="min-w-[180px]">Display Name</TableHead>
+                    <TableHead className="min-w-[150px]">Segment Type</TableHead>
+                    <TableHead className="min-w-[120px]">Data Type</TableHead>
+                    <TableHead className="w-[100px] text-center">Max Len</TableHead>
+                    <TableHead className="w-[120px] text-center">Mandatory</TableHead>
+                    <TableHead className="min-w-[180px] text-center">Status</TableHead>
+                    <TableHead className="w-[80px] text-center">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {segments.map((segment, index) => (
+                    <TableRow 
+                      key={segment.id}
+                      draggable={true} 
+                      onDragStart={(e) => handleDragStart(e, segment.id)}
+                      onDragEnd={handleDragEnd} 
+                      onDragOver={(e) => handleDragOver(e, segment.id)} 
+                      onDrop={(e) => handleDrop(e, segment.id)}
+                      className={cn(
+                        "cursor-grab active:cursor-grabbing transition-all duration-150 ease-in-out",
+                        draggedSegmentId === segment.id && "opacity-50 shadow-2xl ring-2 ring-primary z-10 relative",
+                        dropTargetId === segment.id && draggedSegmentId !== segment.id && "outline outline-2 outline-accent outline-offset-[-2px]"
+                      )}
+                    >
+                      <TableCell className="text-center px-2">
+                        <div className="flex items-center justify-center">
+                          <GripVertical className="h-5 w-5 text-muted-foreground mr-1" />
+                          <span className="inline-block bg-muted text-muted-foreground px-2 py-0.5 rounded-sm text-xs">
+                            {index + 1}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold">
+                          {segment.displayName}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <span>{segment.segmentType}</span>
+                          {segment.isCore && <Badge variant="secondary" className="ml-2 text-xs">Core</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell>{segment.dataType}</TableCell>
+                      <TableCell className="text-center">{segment.maxLength}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={segment.isMandatoryForCoding ? "default" : "outline"} 
+                               className={cn(segment.isMandatoryForCoding ? "bg-primary/10 text-primary border-primary/30" : "text-muted-foreground")}>
+                          {segment.isMandatoryForCoding ? 'Required' : 'Optional'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center space-x-2">
+                          <Switch
+                            id={`status-toggle-${segment.id}`}
+                            checked={segment.isActive}
+                            onCheckedChange={() => handleToggleChange(segment.id)}
+                            disabled={segment.isCore}
+                            aria-label={`Toggle status for ${segment.displayName}`}
+                          />
+                          <Badge 
+                            variant={segment.isActive ? "default" : "destructive"}
+                            className={cn(
+                                "text-xs px-2 py-0.5",
+                                segment.isActive ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-100/90" 
+                                                : "bg-red-100 text-red-700 border-red-200 hover:bg-red-100/90"
+                            )}
+                          >
+                            {segment.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewSegmentClick(segment)}>
+                              View/Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/configure/segment-codes?segmentId=${segment.id}`}>
+                                Manage Codes
+                              </Link>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
              {segments.length === 0 && (
               <p className="py-8 text-center text-muted-foreground">
                 No segments configured. Click "Add Custom Segment" to get started.
