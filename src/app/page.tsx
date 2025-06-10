@@ -30,7 +30,7 @@ const configItems = [
   },
   {
     id: 'combination-rules',
-    title: 'Combination Rules',
+    title: 'Segment Code Combinations',
     icon: Shuffle,
     description: 'Set up rules for valid account combinations.',
     dataAiHint: 'rules logic',
