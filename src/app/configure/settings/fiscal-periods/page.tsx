@@ -120,7 +120,7 @@ const generateCalendarData = (
 
         periods.push({
           id: `${fiscalYearLabel}-P${m + 1}`,
-          name: `${format(periodStart, 'MMM').toUpperCase()}${fiscalYearLabel}`,
+          name: `${format(periodStart, 'MMM').toUpperCase()}-${fiscalYearLabel}`,
           startDate: periodStart,
           endDate: periodEnd,
           status: status,
@@ -129,37 +129,63 @@ const generateCalendarData = (
     } else { 
       let currentPeriodStartDate = new Date(fyStartDate);
       
-      // For 4-4-5, the FY typically lasts 13 periods (52 weeks + 1 week for some schemes, or 13 4-week periods).
-      // Here, we are modeling it as: 3 quarters of 3 "months" each, and 1 quarter of 4 "months", totaling 13 "months".
-      // The exact end date depends on this.
-      let calculatedFyEndDate = fyStartDate; // Start with FY start
-      for(let q=0; q<3; q++) calculatedFyEndDate = addMonths(calculatedFyEndDate, 3); // Q1, Q2, Q3
-      calculatedFyEndDate = addMonths(calculatedFyEndDate, 4); // Q4
-      calculatedFyEndDate = endOfMonth(subDays(calculatedFyEndDate,1)); // End of the 13th month
-
-      fiscalYearLabel = `FY${getYear(calculatedFyEndDate)}`;
+      let calculatedFyEndYear = currentFYStartCalendarYear;
+      if (startMonthIndex > 0) { // If FY starts in Feb or later, it ends in the next calendar year for a 12-month or 13-month cycle
+        calculatedFyEndYear +=1;
+      }
       
-      let periodNumber = 1;
-      for (let q = 0; q < 4; q++) { // 4 Quarters
-        let quarterStartDate = new Date(currentPeriodStartDate);
-        let quarterEndDate: Date;
-        let numMonthsInQuarter = (q < 3) ? 3 : 4; // Q1,Q2,Q3 are 3 months, Q4 is 4 months
+      // For a 13 "period" 4-4-5 year, the fiscal year often ends 1 year from its start date plus one week if 53-week years are handled,
+      // or it just covers 13 nominal 4-week "months". Here, we'll model it as 3 quarters of 3 * 4-week "months"
+      // and 1 quarter of 4 * 4-week "months", roughly mapping to a 13 "month" concept where each "month" is ~4 weeks.
+      // More simply, the fiscal year label should be consistent with the year it primarily falls in or ends in.
+      // If it starts Jan 2025, 13 "months" will end in Jan 2026. So the label would be FY2026.
+      // If it starts July 2025, 13 "months" will end in July 2026. Label FY2026.
+      // The logic below approximates this.
+      
+      // Determine the calendar year the fiscal year predominantly ends in.
+      // A 13-period structure from Jan 2025 would end in Jan 2026.
+      // A 13-period structure from Jul 2025 would end in Jul 2026.
+      let tempEndDateForLabel = addMonths(fyStartDate, 12); // Approximate end for labeling
+      fiscalYearLabel = `FY${getYear(tempEndDateForLabel)}`;
 
-        quarterEndDate = endOfMonth(addMonths(currentPeriodStartDate, numMonthsInQuarter - 1));
-        currentPeriodStartDate = addDays(quarterEndDate, 1);
+
+      let cumulativeEndDate = fyStartDate;
+      const quarterDurationsInPeriods = [3, 3, 3, 4]; // Q1, Q2, Q3 have 3 "periods", Q4 has 4 "periods" (total 13)
+
+      for (let q = 0; q < 4; q++) { // 4 Quarters
+        const numPeriodsInQuarter = quarterDurationsInPeriods[q];
+        const quarterStartDate = new Date(cumulativeEndDate);
         
+        // Simulate periods within quarter. For 4-4-5, these aren't standard calendar months.
+        // We'll just use the quarter start/end.
+        // Each "period" in 4-4-5 is typically 4 or 5 weeks.
+        // A quarter is 13 weeks. (4+4+5 or other combination).
+        // The actual end date for 4-4-5 is often 364 days (52 weeks) or 371 days (53 weeks).
+        // For simplicity, we'll base quarter end dates by adding nominal months.
+        // Q1: 3 nominal months, Q2: 3 nominal months, Q3: 3 nominal months, Q4: 4 nominal months.
+        
+        let quarterEndDateCalc = new Date(quarterStartDate);
+        if (q === 0 || q === 1) { // First two quarters are 3 "periods" (approx 3 months)
+            quarterEndDateCalc = endOfMonth(addMonths(quarterStartDate, 2)); // 3 full "months"
+        } else if (q === 2) { // Third quarter is 3 "periods"
+             quarterEndDateCalc = endOfMonth(addMonths(quarterStartDate, 2)); 
+        } else { // Fourth quarter is 4 "periods"
+            quarterEndDateCalc = endOfMonth(addMonths(quarterStartDate, 3));
+        }
+        
+        cumulativeEndDate = addDays(quarterEndDateCalc, 1); // Start of next quarter
+
         let status: DisplayPeriod['status'] = 'Open';
-        if (today > quarterEndDate) status = "Closed";
+        if (today > quarterEndDateCalc) status = "Closed";
         else if (today < quarterStartDate) status = "Future";
         
         periods.push({
           id: `${fiscalYearLabel}-Q${q + 1}`,
-          name: `Q${q + 1}${fiscalYearLabel}`,
+          name: `Q${q + 1}-${fiscalYearLabel}`,
           startDate: quarterStartDate,
-          endDate: quarterEndDate,
+          endDate: quarterEndDateCalc,
           status: status,
         });
-        periodNumber++;
       }
       fyEndDate = periods[periods.length - 1].endDate;
     }
@@ -224,7 +250,6 @@ export default function FiscalPeriodsPage() {
     if (mode === 'edit' && configuredCalendar) {
       form.reset(configuredCalendar);
     } else {
-      // If creating, or if configuredCalendar is somehow null, use default (which is the example)
       form.reset(defaultFormValues);
     }
     setIsConfigureDialogOpen(true);
@@ -232,7 +257,6 @@ export default function FiscalPeriodsPage() {
 
   const handlePeriodClick = (periodName: string, type: 'Fiscal Year' | 'Period') => {
     console.log(`Clicked on ${type}: ${periodName}`);
-    // Placeholder for future actions, e.g., opening/closing periods, viewing details
   };
 
   const breadcrumbItems = [
@@ -375,7 +399,6 @@ export default function FiscalPeriodsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {/* Adjust title based on whether editing existing or creating new from example */}
               {configuredCalendar && !form.formState.isDirty && form.getValues().startMonth === configuredCalendar.startMonth && form.getValues().startYear === configuredCalendar.startYear && form.getValues().periodFrequency === configuredCalendar.periodFrequency
                 ? 'View/Edit Accounting Calendar' 
                 : (configuredCalendar ? 'Edit Accounting Calendar' : 'Configure Accounting Calendar')
@@ -460,4 +483,3 @@ export default function FiscalPeriodsPage() {
     </div>
   );
 }
-
