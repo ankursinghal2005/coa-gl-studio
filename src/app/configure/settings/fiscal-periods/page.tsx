@@ -547,12 +547,14 @@ export default function FiscalPeriodsPage() {
             updatedSubledgerStatuses['Accounts Payable'] = 'Open';
             apChanged = true;
         } else if (originalStatus === 'Closed' && updatedSubledgerStatuses['Accounts Payable'] === 'Closed') {
+            // No change if AP was already closed and GL is reopened from closed
         }
 
         if(originalStatus === 'Future' && updatedSubledgerStatuses['Accounts Receivable'] === 'Future') {
             updatedSubledgerStatuses['Accounts Receivable'] = 'Open';
             arChanged = true;
         } else if (originalStatus === 'Closed' && updatedSubledgerStatuses['Accounts Receivable'] === 'Closed') {
+           // No change if AR was already closed and GL is reopened from closed
         }
 
         if (apChanged || arChanged) {
@@ -593,8 +595,12 @@ export default function FiscalPeriodsPage() {
           return prevYears; 
       }
       
-      const periodToUpdate = { ...targetFiscalYear.periods[targetPeriodIndex] };
-      periodToUpdate.subledgerStatuses = { ...periodToUpdate.subledgerStatuses };
+      // Create a new period object with new subledgerStatuses for immutability
+      const originalPeriod = targetFiscalYear.periods[targetPeriodIndex];
+      const periodToUpdate: DisplayPeriod = {
+        ...originalPeriod,
+        subledgerStatuses: { ...originalPeriod.subledgerStatuses },
+      };
 
 
       let mainActionResult: { success: boolean; message?: string; newStatus?: PeriodStatus } = { success: false, message: "Action not processed." };
@@ -643,7 +649,16 @@ export default function FiscalPeriodsPage() {
           console.log(`ACTION_SUCCESS: Final Toast: "${finalToastMessage}"`);
           setActionFeedback({ title: "Success", description: finalToastMessage || `Action "${action}" on "${periodName}" successful.`, type: 'success' });
           
-          updatedYears[targetFiscalYearIndex].periods[targetPeriodIndex] = periodToUpdate;
+          // Ensure immutability for the updated period
+          const updatedPeriods = [...targetFiscalYear.periods];
+          updatedPeriods[targetPeriodIndex] = periodToUpdate;
+          
+          const updatedTargetFiscalYear = {
+            ...targetFiscalYear,
+            periods: updatedPeriods,
+          };
+
+          updatedYears[targetFiscalYearIndex] = updatedTargetFiscalYear;
           
           return updatedYears;
       } else {
@@ -779,6 +794,7 @@ export default function FiscalPeriodsPage() {
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="pt-0 pb-3 px-3">
+                                      {!period.isAdhoc ? (
                                         <div className="space-y-1.5 pl-3 border-l-2 border-border ml-1 pt-1">
                                         {subledgerNames.map(subledger => {
                                             const subStatus = period.subledgerStatuses[subledger];
@@ -800,6 +816,11 @@ export default function FiscalPeriodsPage() {
                                             );
                                         })}
                                         </div>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground pl-3 pt-1 ml-1">
+                                          This is an adjustment period. Its status reflects overall General Ledger activity for year-end adjustments.
+                                        </p>
+                                      )}
                                     </AccordionContent>
                                 </AccordionItem>
                                 )
