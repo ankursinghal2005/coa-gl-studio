@@ -33,7 +33,8 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card';
-import { CalendarCog } from 'lucide-react'; // Using CalendarCog for a more specific icon
+import { CalendarCog } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
 
 const fiscalCalendarSchema = z.object({
   startMonth: z.string().min(1, "Start month is required."),
@@ -42,7 +43,7 @@ const fiscalCalendarSchema = z.object({
     .int()
     .min(1900, "Year must be 1900 or later.")
     .max(2100, "Year must be 2100 or earlier."),
-  periodFrequency: z.enum(['Monthly', '4-4-5'] as [string, ...string[]], { // Ensure enum has at least one value for TS
+  periodFrequency: z.enum(['Monthly', '4-4-5'] as [string, ...string[]], {
     required_error: "Period frequency is required.",
   }),
 });
@@ -54,23 +55,39 @@ const months = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+const defaultFormValues: FiscalCalendarFormValues = {
+  startMonth: '',
+  startYear: new Date().getFullYear(),
+  periodFrequency: 'Monthly' as 'Monthly' | '4-4-5', // Provide a default valid enum value
+};
+
+
 export default function FiscalPeriodsPage() {
   const [isConfigureDialogOpen, setIsConfigureDialogOpen] = useState(false);
+  const [configuredCalendar, setConfiguredCalendar] = useState<FiscalCalendarFormValues | null>(null);
+  const { toast } = useToast();
 
   const form = useForm<FiscalCalendarFormValues>({
     resolver: zodResolver(fiscalCalendarSchema),
-    defaultValues: {
-      startMonth: '',
-      startYear: new Date().getFullYear(),
-      periodFrequency: undefined, // Let placeholder show
-    },
+    defaultValues: defaultFormValues,
   });
 
   const onSubmit = (values: FiscalCalendarFormValues) => {
-    console.log("Fiscal Calendar Configuration:", values);
-    alert(`Calendar configured: Start: ${values.startMonth} ${values.startYear}, Frequency: ${values.periodFrequency}. Actual generation TBD.`);
+    setConfiguredCalendar(values);
+    toast({
+      title: "Configuration Saved",
+      description: `Calendar configured: Start ${values.startMonth} ${values.startYear}, Frequency: ${values.periodFrequency}.`,
+    });
     setIsConfigureDialogOpen(false);
-    form.reset();
+  };
+
+  const handleOpenDialog = (mode: 'create' | 'edit') => {
+    if (mode === 'edit' && configuredCalendar) {
+      form.reset(configuredCalendar);
+    } else {
+      form.reset(defaultFormValues);
+    }
+    setIsConfigureDialogOpen(true);
   };
 
   const breadcrumbItems = [
@@ -96,18 +113,35 @@ export default function FiscalPeriodsPage() {
         <CardHeader>
           <CardTitle>Accounting Calendar Definition</CardTitle>
           <CardDesc>
-            Configure the start date and period frequency for your primary accounting calendar.
-            This will be used to generate fiscal periods.
+            {configuredCalendar
+              ? 'View or edit your current accounting calendar configuration.'
+              : 'Configure the start date and period frequency for your primary accounting calendar.'}
           </CardDesc>
         </CardHeader>
         <CardContent className="flex flex-col items-start space-y-4">
-           <p className="text-sm text-muted-foreground">
-            Currently, no accounting calendar is defined. Click below to set it up.
-            {/* Later, this section will show current calendar details if configured */}
-          </p>
-          <Button onClick={() => setIsConfigureDialogOpen(true)}>
-            Configure Accounting Calendar
-          </Button>
+          {configuredCalendar ? (
+            <div className="space-y-3 p-4 border rounded-md bg-muted/50 w-full">
+              <h3 className="text-lg font-semibold text-primary">Current Configuration:</h3>
+              <p className="text-sm">
+                <span className="font-medium text-muted-foreground">Start Date:</span> {configuredCalendar.startMonth} 1, {configuredCalendar.startYear}
+              </p>
+              <p className="text-sm">
+                <span className="font-medium text-muted-foreground">Period Frequency:</span> {configuredCalendar.periodFrequency}
+              </p>
+              <Button onClick={() => handleOpenDialog('edit')} className="mt-2">
+                Edit Configuration
+              </Button>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Currently, no accounting calendar is defined. Click below to set it up.
+              </p>
+              <Button onClick={() => handleOpenDialog('create')}>
+                Configure Accounting Calendar
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -116,7 +150,9 @@ export default function FiscalPeriodsPage() {
       <Dialog open={isConfigureDialogOpen} onOpenChange={setIsConfigureDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Configure Accounting Calendar</DialogTitle>
+            <DialogTitle>
+              {configuredCalendar ? 'Edit Accounting Calendar' : 'Configure Accounting Calendar'}
+            </DialogTitle>
             <DialogDescription>
               Set the start date and period frequency. The start day is always the 1st of the month.
             </DialogDescription>
@@ -129,14 +165,14 @@ export default function FiscalPeriodsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Start Month *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select start month" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {months.map((month, index) => (
+                        {months.map((month) => (
                           <SelectItem key={month} value={month}>
                             {month}
                           </SelectItem>
