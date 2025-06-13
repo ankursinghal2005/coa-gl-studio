@@ -35,7 +35,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { CalendarCog, CalendarDays, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { CalendarCog, CalendarDays, CheckCircle2, XCircle, Clock, AlertTriangle, Lock } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { FormattedDateTime } from '@/components/ui/FormattedDateTime';
@@ -47,7 +47,7 @@ const fiscalCalendarSchema = z.object({
     .int()
     .min(1900, "Year must be 1900 or later.")
     .max(2100, "Year must be 2100 or earlier."),
-  periodFrequency: z.enum(['Monthly', '4-4-5'] as [string, ...string[]], { // Internal value '4-4-5' for Quarterly
+  periodFrequency: z.enum(['Monthly', '4-4-5'] as [string, ...string[]], {
     required_error: "Period frequency is required.",
   }),
 });
@@ -67,21 +67,35 @@ const exampleCalendarConfig: FiscalCalendarFormValues = {
 
 const defaultFormValues: FiscalCalendarFormValues = exampleCalendarConfig;
 
+export type PeriodStatus = 'Open' | 'Closed' | 'Future' | 'Adjustment' | 'Hard Closed';
+export type PeriodAction = 'Open' | 'Close' | 'Hard Close' | 'Reopen';
+
+
 interface DisplayPeriod {
   id: string;
   name: string;
-  startDate?: Date; // Optional for ADJ period
-  endDate?: Date;   // Optional for ADJ period
-  status: 'Open' | 'Closed' | 'Future' | 'Adjustment'; // Added 'Adjustment' status
+  startDate?: Date;
+  endDate?: Date;
+  status: PeriodStatus;
+  isAdhoc?: boolean; // True for ADJ periods
 }
 
 interface DisplayFiscalYear {
-  id: string;
+  id: string; // e.g., FY2025
   name: string;
   startDate: Date;
   endDate: Date;
-  status: 'Open' | 'Closed' | 'Future';
+  status: PeriodStatus; // Status of the fiscal year itself
   periods: DisplayPeriod[];
+}
+
+interface ActionDialogState {
+  isOpen: boolean;
+  periodId: string | null;
+  periodName: string | null;
+  currentStatus: PeriodStatus | null;
+  fiscalYearId: string | null;
+  availableActions: PeriodAction[];
 }
 
 const generateCalendarData = (
@@ -100,21 +114,21 @@ const generateCalendarData = (
 
   for (let i = 0; i < 3; i++) { // Generate for 3 fiscal years
     const currentFYStartCalendarYear = config.startYear + i;
-    const fyStartDate = new Date(currentFYStartCalendarYear, startMonthIndex, 1);
+    let fyStartDate = new Date(currentFYStartCalendarYear, startMonthIndex, 1);
     fyStartDate.setHours(0,0,0,0);
 
     const periods: DisplayPeriod[] = [];
-    let fyEndDate: Date;
+    let fyActualEndDate: Date; // Actual end date of regular periods for FY status
     let fiscalYearLabel: string;
 
     if (config.periodFrequency === 'Monthly') {
-      fyEndDate = endOfMonth(addMonths(fyStartDate, 11)); 
-      fiscalYearLabel = `FY${getYear(fyEndDate)}`;
+      fyActualEndDate = endOfMonth(addMonths(fyStartDate, 11));
+      fiscalYearLabel = `FY${getYear(fyActualEndDate)}`;
 
       for (let m = 0; m < 12; m++) {
         const periodStart = startOfMonth(addMonths(fyStartDate, m));
         const periodEnd = endOfMonth(periodStart);
-        let status: DisplayPeriod['status'] = 'Open';
+        let status: PeriodStatus = 'Open';
         if (today > periodEnd) status = "Closed";
         else if (today < periodStart) status = "Future";
 
@@ -124,18 +138,19 @@ const generateCalendarData = (
           startDate: periodStart,
           endDate: periodEnd,
           status: status,
+          isAdhoc: false,
         });
       }
-    } else if (config.periodFrequency === '4-4-5') { // Logic for "Quarterly"
-      fyEndDate = endOfMonth(addMonths(fyStartDate, 11)); // Standard 12-month fiscal year for quarterly
-      fiscalYearLabel = `FY${getYear(fyEndDate)}`; // Name by end year
+    } else if (config.periodFrequency === '4-4-5') { // Now "Quarterly"
+      fyActualEndDate = endOfMonth(addMonths(fyStartDate, 11)); // Standard 12-month fiscal year
+      fiscalYearLabel = `FY${getYear(fyActualEndDate)}`;
 
       for (let q = 0; q < 4; q++) { // 4 Quarters
         const quarterStartMonthOffset = q * 3;
         const periodStart = startOfMonth(addMonths(fyStartDate, quarterStartMonthOffset));
         const periodEnd = endOfMonth(addMonths(periodStart, 2)); // Each quarter is 3 months
 
-        let status: DisplayPeriod['status'] = 'Open';
+        let status: PeriodStatus = 'Open';
         if (today > periodEnd) status = "Closed";
         else if (today < periodStart) status = "Future";
 
@@ -145,39 +160,34 @@ const generateCalendarData = (
           startDate: periodStart,
           endDate: periodEnd,
           status: status,
+          isAdhoc: false,
         });
       }
-    } else { // Should not happen with enum validation
+    } else {
         console.error("Unknown period frequency:", config.periodFrequency);
-        fyEndDate = endOfMonth(addMonths(fyStartDate, 11)); // Default to monthly if error
-        fiscalYearLabel = `FY${getYear(fyEndDate)}`;
+        fyActualEndDate = endOfMonth(addMonths(fyStartDate, 11));
+        fiscalYearLabel = `FY${getYear(fyActualEndDate)}`;
     }
     
-    // Add ADJ period
     const adjPeriod: DisplayPeriod = {
       id: `${fiscalYearLabel}-ADJ`,
       name: `ADJ-${fiscalYearLabel}`,
       startDate: undefined, 
       endDate: undefined,   
-      status: 'Adjustment', 
+      status: 'Future', // Default ADJ status to Future
+      isAdhoc: true,
     };
     periods.push(adjPeriod);
 
-
-    let fyStatus: DisplayPeriod['status'] = 'Open';
-    // Calculate FY status based on its actual end date (excluding ADJ for this calculation)
-    const actualFyEndDateForStatus = config.periodFrequency === 'Monthly' || config.periodFrequency === '4-4-5'
-      ? endOfMonth(addMonths(fyStartDate, 11))
-      : fyEndDate; // Fallback, should be one of the two
-
-    if (today > actualFyEndDateForStatus) fyStatus = "Closed";
+    let fyStatus: PeriodStatus = 'Open';
+    if (today > fyActualEndDate) fyStatus = "Closed";
     else if (today < fyStartDate) fyStatus = "Future";
 
     yearsData.push({
       id: fiscalYearLabel, 
       name: fiscalYearLabel,
       startDate: fyStartDate,
-      endDate: actualFyEndDateForStatus, // Use actual end date for FY display
+      endDate: fyActualEndDate,
       status: fyStatus,
       periods: periods,
     });
@@ -188,20 +198,29 @@ const generateCalendarData = (
 
 export default function FiscalPeriodsPage() {
   const [isConfigureDialogOpen, setIsConfigureDialogOpen] = useState(false);
-  const [configuredCalendar, setConfiguredCalendar] = useState<FiscalCalendarFormValues | null>(exampleCalendarConfig);
+  const [configuredCalendar, setConfiguredCalendar] = useState<FiscalCalendarFormValues>(exampleCalendarConfig);
   const [generatedFiscalYears, setGeneratedFiscalYears] = useState<DisplayFiscalYear[]>([]);
   const { toast } = useToast();
+
+  const [actionDialogState, setActionDialogState] = useState<ActionDialogState>({
+    isOpen: false,
+    periodId: null,
+    periodName: null,
+    currentStatus: null,
+    fiscalYearId: null,
+    availableActions: [],
+  });
 
   const form = useForm<FiscalCalendarFormValues>({
     resolver: zodResolver(fiscalCalendarSchema),
     defaultValues: defaultFormValues,
   });
 
-  const onSubmit = (values: FiscalCalendarFormValues) => {
+  const onSubmitConfig = (values: FiscalCalendarFormValues) => {
     setConfiguredCalendar(values);
     toast({
       title: "Configuration Saved",
-      description: `Calendar configured: Start ${values.startMonth} ${values.startYear}, Frequency: ${values.periodFrequency === '4-4-5' ? 'Quarterly' : values.periodFrequency}.`,
+      description: `Calendar configured: Start ${values.startMonth} ${values.startYear}, Frequency: ${values.periodFrequency === '4-4-5' ? 'Quarterly (4 periods per FY)' : values.periodFrequency}.`,
     });
     setIsConfigureDialogOpen(false);
   };
@@ -225,7 +244,7 @@ export default function FiscalPeriodsPage() {
     }
   }, [configuredCalendar, toast]); 
 
-  const handleOpenDialog = (mode: 'create' | 'edit') => {
+  const handleOpenConfigDialog = (mode: 'create' | 'edit') => {
     if (mode === 'edit' && configuredCalendar) {
       form.reset(configuredCalendar);
     } else {
@@ -234,31 +253,126 @@ export default function FiscalPeriodsPage() {
     setIsConfigureDialogOpen(true);
   };
 
-  const handlePeriodClick = (periodName: string, type: 'Fiscal Year' | 'Period') => {
-    console.log(`Clicked on ${type}: ${periodName}`);
+  const getStatusIconAndColor = (status: PeriodStatus): { Icon: LucideIcon, colorClass: string, title: string } => {
+    switch (status) {
+      case 'Open': return { Icon: CheckCircle2, colorClass: 'text-green-600', title: 'Open' };
+      case 'Closed': return { Icon: XCircle, colorClass: 'text-red-600', title: 'Closed' };
+      case 'Future': return { Icon: Clock, colorClass: 'text-yellow-500', title: 'Future' };
+      case 'Adjustment': return { Icon: CalendarCog, colorClass: 'text-blue-500', title: 'Adjustment Period' };
+      case 'Hard Closed': return { Icon: Lock, colorClass: 'text-destructive', title: 'Hard Closed' };
+      default: return { Icon: AlertTriangle, colorClass: 'text-muted-foreground', title: 'Unknown' }; 
+    }
   };
+
+  const handlePeriodClick = (period: DisplayPeriod, fiscalYearId: string) => {
+    if (period.status === 'Hard Closed') {
+      toast({ title: "Action Denied", description: `Period "${period.name}" is Hard Closed and cannot be modified.`, variant: "destructive" });
+      return;
+    }
+
+    let actions: PeriodAction[] = [];
+    if (period.isAdhoc) { // ADJ Period
+      if (period.status === 'Future' || period.status === 'Closed') {
+        // Check if all other regular periods in its FY are closed or hard-closed
+        const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
+        const allRegularClosed = fy?.periods.filter(p => !p.isAdhoc).every(p => p.status === 'Closed' || p.status === 'Hard Closed');
+        if (allRegularClosed) actions.push('Open');
+      } else if (period.status === 'Open') {
+        actions.push('Close');
+        actions.push('Hard Close');
+      }
+    } else { // Regular Period
+      switch (period.status) {
+        case 'Open':
+          actions = ['Close', 'Hard Close'];
+          break;
+        case 'Closed':
+          actions = ['Reopen', 'Hard Close'];
+          break;
+        case 'Future':
+          actions = ['Open']; // Assuming future periods can be opened directly
+          break;
+      }
+    }
+    
+    setActionDialogState({
+      isOpen: true,
+      periodId: period.id,
+      periodName: period.name,
+      currentStatus: period.status,
+      fiscalYearId: fiscalYearId,
+      availableActions: actions,
+    });
+  };
+
+  const handlePerformAction = (action: PeriodAction) => {
+    const { periodId, periodName, fiscalYearId } = actionDialogState;
+    if (!periodId || !fiscalYearId) return;
+
+    const targetFiscalYear = generatedFiscalYears.find(fy => fy.id === fiscalYearId);
+    if (!targetFiscalYear) return;
+
+    const targetPeriodIndex = targetFiscalYear.periods.findIndex(p => p.id === periodId);
+    if (targetPeriodIndex === -1) return;
+    
+    const targetPeriod = targetFiscalYear.periods[targetPeriodIndex];
+
+    // Rule: "Close" action requires previous period to be Closed or Hard Closed
+    if (action === 'Close' && !targetPeriod.isAdhoc) {
+      if (targetPeriodIndex > 0) {
+        const previousPeriod = targetFiscalYear.periods[targetPeriodIndex - 1];
+        if (previousPeriod.status !== 'Closed' && previousPeriod.status !== 'Hard Closed') {
+          toast({ title: "Action Denied", description: `Cannot close "${periodName}". Previous period "${previousPeriod.name}" must be Closed or Hard Closed first.`, variant: "destructive" });
+          return;
+        }
+      }
+    }
+
+    // Rule: "Open" ADJ period requires all other regular periods in its FY to be Closed or Hard Closed
+    if (action === 'Open' && targetPeriod.isAdhoc) {
+        const allRegularClosed = targetFiscalYear.periods.filter(p => !p.isAdhoc).every(p => p.status === 'Closed' || p.status === 'Hard Closed');
+        if (!allRegularClosed) {
+            toast({ title: "Action Denied", description: `Cannot open ADJ period "${periodName}". All regular periods in ${targetFiscalYear.name} must be Closed or Hard Closed first.`, variant: "destructive" });
+            return;
+        }
+    }
+
+
+    if (window.confirm(`Are you sure you want to ${action.toLowerCase()} period "${periodName}"?`)) {
+      setGeneratedFiscalYears(prevYears =>
+        prevYears.map(fy => {
+          if (fy.id === fiscalYearId) {
+            return {
+              ...fy,
+              periods: fy.periods.map(p => {
+                if (p.id === periodId) {
+                  let newStatus: PeriodStatus = p.status;
+                  switch (action) {
+                    case 'Open': newStatus = 'Open'; break;
+                    case 'Close': newStatus = 'Closed'; break;
+                    case 'Hard Close': newStatus = 'Hard Closed'; break;
+                    case 'Reopen': newStatus = 'Open'; break;
+                  }
+                  return { ...p, status: newStatus };
+                }
+                return p;
+              }),
+            };
+          }
+          return fy;
+        })
+      );
+      toast({ title: "Success", description: `Period "${periodName}" status changed to ${action === 'Reopen' ? 'Open' : action}.` });
+      setActionDialogState({ isOpen: false, periodId: null, periodName: null, currentStatus: null, fiscalYearId: null, availableActions: [] });
+    }
+  };
+
 
   const breadcrumbItems = [
     { label: 'COA Configuration', href: '/' },
     { label: 'Settings', href: '/configure/settings' },
     { label: 'Fiscal Period Management' },
   ];
-
-  const getStatusIconAndColor = (status: DisplayPeriod['status']): { Icon: LucideIcon, colorClass: string, title: string } => {
-    switch (status) {
-      case 'Open':
-        return { Icon: CheckCircle2, colorClass: 'text-green-600', title: 'Open' };
-      case 'Closed':
-        return { Icon: XCircle, colorClass: 'text-red-600', title: 'Closed' };
-      case 'Future':
-        return { Icon: Clock, colorClass: 'text-yellow-500', title: 'Future' };
-      case 'Adjustment':
-        return { Icon: CalendarCog, colorClass: 'text-blue-500', title: 'Adjustment Period' }; // Or a different icon like Settings2, Edit3
-      default:
-        return { Icon: Clock, colorClass: 'text-muted-foreground', title: 'Unknown' }; 
-    }
-  };
-
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -290,9 +404,9 @@ export default function FiscalPeriodsPage() {
                 <span className="font-medium text-muted-foreground">Start Date:</span> {configuredCalendar.startMonth} 1, {configuredCalendar.startYear}
               </p>
               <p className="text-sm">
-                <span className="font-medium text-muted-foreground">Period Frequency:</span> {configuredCalendar.periodFrequency === '4-4-5' ? 'Quarterly' : configuredCalendar.periodFrequency}
+                <span className="font-medium text-muted-foreground">Period Frequency:</span> {configuredCalendar.periodFrequency === '4-4-5' ? 'Quarterly (4 periods per FY)' : configuredCalendar.periodFrequency}
               </p>
-              <Button onClick={() => handleOpenDialog('edit')} className="mt-2">
+              <Button onClick={() => handleOpenConfigDialog('edit')} className="mt-2">
                 Edit Configuration
               </Button>
             </div>
@@ -301,7 +415,7 @@ export default function FiscalPeriodsPage() {
               <p className="text-sm text-muted-foreground">
                 Currently, no accounting calendar is defined. Click below to set it up.
               </p>
-              <Button onClick={() => handleOpenDialog('create')}>
+              <Button onClick={() => handleOpenConfigDialog('create')}>
                 Configure Accounting Calendar
               </Button>
             </>
@@ -317,7 +431,7 @@ export default function FiscalPeriodsPage() {
               Generated Fiscal Calendar (Next 3 Years)
             </CardTitle>
             <CardDesc>
-              Based on your configuration. Click on a fiscal year to expand its periods. Includes an Adjustment (ADJ) period for each year.
+              Based on your configuration. Click on a fiscal year to expand its periods. Includes an Adjustment (ADJ) period for each year. Click a period name to manage its status.
             </CardDesc>
           </CardHeader>
           <CardContent>
@@ -348,8 +462,9 @@ export default function FiscalPeriodsPage() {
                             <div key={period.id} className="flex justify-between items-center p-2 border-b border-dashed last:border-b-0">
                                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
                                  <button
-                                    onClick={() => handlePeriodClick(period.name, 'Period')}
-                                    className="text-sm text-primary/90 hover:underline text-left"
+                                    onClick={() => handlePeriodClick(period, fy.id)}
+                                    className="text-sm text-primary/90 hover:underline text-left disabled:text-muted-foreground disabled:no-underline disabled:cursor-not-allowed"
+                                    disabled={period.status === 'Hard Closed'}
                                   >
                                     {period.name}
                                   </button>
@@ -384,7 +499,7 @@ export default function FiscalPeriodsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {configuredCalendar && !form.formState.isDirty && form.getValues().startMonth === configuredCalendar.startMonth && form.getValues().startYear === configuredCalendar.startYear && form.getValues().periodFrequency === configuredCalendar.periodFrequency
+              {configuredCalendar && !form.formState.isDirty && configuredCalendar.startMonth === form.getValues().startMonth && configuredCalendar.startYear === form.getValues().startYear && configuredCalendar.periodFrequency === form.getValues().periodFrequency
                 ? 'View/Edit Accounting Calendar' 
                 : (configuredCalendar ? 'Edit Accounting Calendar' : 'Configure Accounting Calendar')
               }
@@ -394,7 +509,7 @@ export default function FiscalPeriodsPage() {
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-2">
+            <form onSubmit={form.handleSubmit(onSubmitConfig)} className="space-y-6 py-2">
               <FormField
                 control={form.control}
                 name="startMonth"
@@ -465,6 +580,39 @@ export default function FiscalPeriodsPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Period Action Dialog */}
+      <Dialog open={actionDialogState.isOpen} onOpenChange={(isOpen) => setActionDialogState(prev => ({ ...prev, isOpen }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage Period: {actionDialogState.periodName}</DialogTitle>
+            <DialogDescription>
+              Current Status: <span className="font-semibold">{actionDialogState.currentStatus}</span>. Select an action.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            {actionDialogState.availableActions.map(action => (
+              <Button
+                key={action}
+                onClick={() => handlePerformAction(action)}
+                className="w-full"
+                variant={action === 'Hard Close' || action === 'Close' ? 'destructive' : (action === 'Reopen' ? 'outline' : 'default')}
+              >
+                {action} Period
+              </Button>
+            ))}
+            {actionDialogState.availableActions.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center">No actions available for this period in its current state or due to other period statuses.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Cancel</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
