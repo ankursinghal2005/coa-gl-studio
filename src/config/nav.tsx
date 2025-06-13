@@ -73,12 +73,12 @@ export const mainNavItems: NavItemConfig[] = [
             icon: <ShieldCheck className="h-4 w-4" />,
           },
           {
-            title: 'Settings',
-            href: '/configure/settings', // This is the main settings page for COA
+            title: 'Settings', // This is the "COA Configuration" > "Settings" item
+            href: '/configure/settings', 
             icon: <Settings className="h-4 w-4" />,
-            // Children of COA Settings used to include Fiscal Period Management
             children: [
-              // "Fiscal Period Management" removed from here
+              // This children array is intentionally empty for this specific "Settings" item.
+              // "Fiscal Period Management" is NOT a child here.
             ],
           },
         ],
@@ -97,13 +97,11 @@ export const mainNavItems: NavItemConfig[] = [
       },
       {
         title: 'Settings', // Settings item under General Ledger
-        href: '/configure/settings', // Links to the same settings page as COA settings main link
+        href: '/configure/settings', 
         icon: <Settings className="h-4 w-4" />,
-        // This "Settings" under "General Ledger" can have its own sub-menu if needed in future
-        // For now, it's a direct link. If it were to have children, it would be:
         children: [
            {
-            title: 'Fiscal Period Management',
+            title: 'Fiscal Period Management', // Fiscal Period Management IS a child here
             href: '/configure/settings/fiscal-periods',
             icon: <CalendarDays className="h-4 w-4" />,
           }
