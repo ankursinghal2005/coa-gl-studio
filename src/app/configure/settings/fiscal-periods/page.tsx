@@ -93,7 +93,7 @@ const generateCalendarData = (
   const startMonthIndex = monthNames.indexOf(config.startMonth);
   if (startMonthIndex === -1) {
     console.error("Invalid start month in configuration:", config.startMonth);
-    return []; // Should not happen if form validation is correct
+    return [];
   }
 
   for (let i = 0; i < 3; i++) { // Generate for 3 fiscal years
@@ -124,10 +124,10 @@ const generateCalendarData = (
           status: status,
         });
       }
-    } else { // 4-4-5 logic (13-month fiscal year implied by "last quarter having one additional period month")
-      const quarterMonths = [3, 3, 3, 4]; // Q1, Q2, Q3 are 3 months, Q4 is 4 months
+    } else { 
+      const quarterMonths = [3, 3, 3, 4]; 
       let currentMonthOffset = 0;
-      let lastPeriodEndDateForFY: Date = fyStartDate; // Initialize
+      let lastPeriodEndDateForFY: Date = fyStartDate; 
 
       for (let q = 0; q < 4; q++) {
         const quarterStartDate = startOfMonth(addMonths(fyStartDate, currentMonthOffset));
@@ -136,12 +136,11 @@ const generateCalendarData = (
         let status: DisplayPeriod['status'] = 'Open';
         if (today > quarterEndDate) status = "Closed";
         else if (today < quarterStartDate) status = "Future";
-
-        // Fiscal year label for 4-4-5 is based on its actual end date
-        // We calculate a temporary FY end date for naming purposes if needed here,
-        // but the final fyEndDate will be the end of Q4.
-        const tempFyEndDateForNaming = endOfMonth(addMonths(fyStartDate, 12)); // End of 13th month from start
+        
+        // Calculate the FY label based on the actual end date of the 13-month year
+        const tempFyEndDateForNaming = endOfMonth(addMonths(fyStartDate, 12));
         const periodFyLabel = `FY${getYear(tempFyEndDateForNaming)}`;
+
 
         periods.push({
           id: `${periodFyLabel}-Q${q + 1}`,
@@ -155,8 +154,8 @@ const generateCalendarData = (
           lastPeriodEndDateForFY = quarterEndDate;
         }
       }
-      fyEndDate = lastPeriodEndDateForFY; // The actual end date of the 13-month fiscal year
-      fiscalYearLabel = `FY${getYear(fyEndDate)}`; // Label based on the actual end date
+      fyEndDate = lastPeriodEndDateForFY; 
+      fiscalYearLabel = `FY${getYear(fyEndDate)}`;
     }
 
     let fyStatus: DisplayPeriod['status'] = 'Open';
@@ -164,7 +163,7 @@ const generateCalendarData = (
     else if (today < fyStartDate) fyStatus = "Future";
 
     yearsData.push({
-      id: fiscalYearLabel, // Use FY label as unique ID for the year
+      id: fiscalYearLabel, 
       name: fiscalYearLabel,
       startDate: fyStartDate,
       endDate: fyEndDate,
@@ -208,12 +207,12 @@ export default function FiscalPeriodsPage() {
       console.error("Error generating fiscal calendar:", error);
       toast({
         title: "Error Generating Calendar",
-        description: "Could not generate fiscal periods. Please check console for details.",
+        description: `Could not generate fiscal periods. ${error instanceof Error ? error.message : 'Unknown error.'}`,
         variant: "destructive",
       });
       setGeneratedFiscalYears([]);
     }
-  }, [configuredCalendar, toast]); // `months` is stable, no need to include usually
+  }, [configuredCalendar, toast]); 
 
   const handleOpenDialog = (mode: 'create' | 'edit') => {
     if (mode === 'edit' && configuredCalendar) {
@@ -226,7 +225,6 @@ export default function FiscalPeriodsPage() {
 
   const handlePeriodClick = (periodName: string, type: 'Fiscal Year' | 'Period') => {
     console.log(`Clicked on ${type}: ${periodName}`);
-    // Placeholder for future action
   };
 
   const breadcrumbItems = [
@@ -235,12 +233,12 @@ export default function FiscalPeriodsPage() {
     { label: 'Fiscal Period Management' },
   ];
 
-  const getStatusBadgeVariant = (status: DisplayPeriod['status']): "default" | "destructive" | "secondary" => {
+  const getStatusBadgeVariant = (status: DisplayPeriod['status']): "secondary" | "destructive" | "outline" => {
     switch (status) {
-      case 'Open': return 'default'; // Consider a green-ish variant if available/customized
+      case 'Open': return 'secondary';
       case 'Closed': return 'destructive';
-      case 'Future': return 'secondary';
-      default: return 'secondary';
+      case 'Future': return 'outline';
+      default: return 'outline';
     }
   };
 
@@ -312,12 +310,11 @@ export default function FiscalPeriodsPage() {
                     <AccordionTrigger>
                       <div className="flex justify-between items-center w-full text-left">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
-                           <button 
-                            onClick={(e) => { e.stopPropagation(); handlePeriodClick(fy.name, 'Fiscal Year');}}
-                            className="font-semibold text-primary hover:underline text-left"
+                           <span 
+                            className="font-semibold text-primary text-left"
                           >
                             {fy.name}
-                          </button>
+                          </span>
                           <span className="text-xs text-muted-foreground mt-1 sm:mt-0">
                             (<FormattedDateTime date={fy.startDate} formatString="MMM d, yyyy" /> - <FormattedDateTime date={fy.endDate} formatString="MMM d, yyyy" />)
                           </span>
