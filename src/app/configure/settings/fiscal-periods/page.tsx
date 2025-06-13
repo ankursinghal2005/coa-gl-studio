@@ -118,7 +118,7 @@ const generateCalendarData = (
     fyStartDate.setHours(0,0,0,0);
 
     const periods: DisplayPeriod[] = [];
-    let fyActualEndDate: Date; // Actual end date of regular periods for FY status
+    let fyActualEndDate: Date; 
     let fiscalYearLabel: string;
 
     if (config.periodFrequency === 'Monthly') {
@@ -141,14 +141,14 @@ const generateCalendarData = (
           isAdhoc: false,
         });
       }
-    } else if (config.periodFrequency === '4-4-5') { // Now "Quarterly"
-      fyActualEndDate = endOfMonth(addMonths(fyStartDate, 11)); // Standard 12-month fiscal year
+    } else if (config.periodFrequency === '4-4-5') { 
+      fyActualEndDate = endOfMonth(addMonths(fyStartDate, 11)); 
       fiscalYearLabel = `FY${getYear(fyActualEndDate)}`;
 
-      for (let q = 0; q < 4; q++) { // 4 Quarters
+      for (let q = 0; q < 4; q++) { 
         const quarterStartMonthOffset = q * 3;
         const periodStart = startOfMonth(addMonths(fyStartDate, quarterStartMonthOffset));
-        const periodEnd = endOfMonth(addMonths(periodStart, 2)); // Each quarter is 3 months
+        const periodEnd = endOfMonth(addMonths(periodStart, 2)); 
 
         let status: PeriodStatus = 'Open';
         if (today > periodEnd) status = "Closed";
@@ -174,7 +174,7 @@ const generateCalendarData = (
       name: `ADJ-${fiscalYearLabel}`,
       startDate: undefined, 
       endDate: undefined,   
-      status: 'Future', // Default ADJ status to Future
+      status: 'Adjustment', 
       isAdhoc: true,
     };
     periods.push(adjPeriod);
@@ -271,17 +271,17 @@ export default function FiscalPeriodsPage() {
     }
 
     let actions: PeriodAction[] = [];
-    if (period.isAdhoc) { // ADJ Period
-      if (period.status === 'Future' || period.status === 'Closed') {
-        // Check if all other regular periods in its FY are closed or hard-closed
-        const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
-        const allRegularClosed = fy?.periods.filter(p => !p.isAdhoc).every(p => p.status === 'Closed' || p.status === 'Hard Closed');
-        if (allRegularClosed) actions.push('Open');
+    if (period.isAdhoc) { 
+      const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
+      const allRegularClosedOrHardClosed = fy?.periods.filter(p => !p.isAdhoc).every(p => p.status === 'Closed' || p.status === 'Hard Closed');
+      
+      if (period.status === 'Adjustment' || period.status === 'Future' || period.status === 'Closed') {
+        if (allRegularClosedOrHardClosed) actions.push('Open');
       } else if (period.status === 'Open') {
         actions.push('Close');
         actions.push('Hard Close');
       }
-    } else { // Regular Period
+    } else { 
       switch (period.status) {
         case 'Open':
           actions = ['Close', 'Hard Close'];
@@ -290,7 +290,18 @@ export default function FiscalPeriodsPage() {
           actions = ['Reopen', 'Hard Close'];
           break;
         case 'Future':
-          actions = ['Open']; // Assuming future periods can be opened directly
+          // Allow opening future periods directly
+          // Rule: To open a future period, the previous period must be closed (unless it's the first period)
+          const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
+          const periodIndex = fy?.periods.findIndex(p => p.id === period.id) ?? -1;
+          if (fy && periodIndex > 0) {
+            const previousPeriod = fy.periods[periodIndex -1];
+            if (previousPeriod.status === 'Closed' || previousPeriod.status === 'Hard Closed') {
+              actions.push('Open');
+            }
+          } else if (periodIndex === 0) { // First period of the year
+             actions.push('Open');
+          }
           break;
       }
     }
@@ -317,23 +328,32 @@ export default function FiscalPeriodsPage() {
     
     const targetPeriod = targetFiscalYear.periods[targetPeriodIndex];
 
-    // Rule: "Close" action requires previous period to be Closed or Hard Closed
+    
     if (action === 'Close' && !targetPeriod.isAdhoc) {
       if (targetPeriodIndex > 0) {
         const previousPeriod = targetFiscalYear.periods[targetPeriodIndex - 1];
-        if (previousPeriod.status !== 'Closed' && previousPeriod.status !== 'Hard Closed') {
+        if (!previousPeriod.isAdhoc && previousPeriod.status !== 'Closed' && previousPeriod.status !== 'Hard Closed') {
           toast({ title: "Action Denied", description: `Cannot close "${periodName}". Previous period "${previousPeriod.name}" must be Closed or Hard Closed first.`, variant: "destructive" });
           return;
         }
       }
     }
 
-    // Rule: "Open" ADJ period requires all other regular periods in its FY to be Closed or Hard Closed
     if (action === 'Open' && targetPeriod.isAdhoc) {
         const allRegularClosed = targetFiscalYear.periods.filter(p => !p.isAdhoc).every(p => p.status === 'Closed' || p.status === 'Hard Closed');
         if (!allRegularClosed) {
             toast({ title: "Action Denied", description: `Cannot open ADJ period "${periodName}". All regular periods in ${targetFiscalYear.name} must be Closed or Hard Closed first.`, variant: "destructive" });
             return;
+        }
+    }
+    
+    if (action === 'Open' && !targetPeriod.isAdhoc && targetPeriod.status === 'Future') {
+        if (targetPeriodIndex > 0) {
+            const previousPeriod = targetFiscalYear.periods[targetPeriodIndex - 1];
+            if (!previousPeriod.isAdhoc && previousPeriod.status !== 'Closed' && previousPeriod.status !== 'Hard Closed') {
+                 toast({ title: "Action Denied", description: `Cannot open future period "${periodName}". Previous period "${previousPeriod.name}" must be Closed or Hard Closed first.`, variant: "destructive" });
+                 return;
+            }
         }
     }
 
@@ -428,7 +448,7 @@ export default function FiscalPeriodsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <CalendarDays className="mr-2 h-6 w-6 text-primary" />
-              Generated Fiscal Calendar (Next 3 Years)
+              Generated Fiscal Calendar
             </CardTitle>
             <CardDesc>
               Based on your configuration. Click on a fiscal year to expand its periods. Includes an Adjustment (ADJ) period for each year. Click a period name to manage its status.
