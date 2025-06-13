@@ -35,7 +35,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { CalendarCog, CalendarDays, CheckCircle2, XCircle, Clock } from 'lucide-react'; // Added CheckCircle2, XCircle, Clock
+import { CalendarCog, CalendarDays, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { FormattedDateTime } from '@/components/ui/FormattedDateTime';
@@ -125,35 +125,48 @@ const generateCalendarData = (
         });
       }
     } else { 
-      const quarterMonths = [3, 3, 3, 4]; 
-      let currentMonthOffset = 0;
-      let lastPeriodEndDateForFY: Date = fyStartDate; 
+      // For 4-4-5, we interpret it as 4 quarters, with the last quarter having an extra month.
+      // Q1: 3 months, Q2: 3 months, Q3: 3 months, Q4: 4 months (Total 13 months for the FY)
+      const quarterWeeks = [4, 4, 5]; // Standard 4-4-5 week pattern
+      let currentPeriodStartDate = new Date(fyStartDate);
+      let fyEndYearForNaming: number;
 
-      // Calculate the FY label based on the actual end date of the 13-month year
-      const tempFyEndDateForNaming = endOfMonth(addMonths(fyStartDate, 12)); // 12 months for regular year part, +1 for the extra month in 4-4-5
-      fiscalYearLabel = `FY${getYear(tempFyEndDateForNaming)}`;
+      // Determine fiscal year label (typically year it ends in)
+      // A 13-period year will end in the next calendar year if startMonth is not January.
+      // Or, if startMonth is January, it will still end in the same calendar year for the first 12 periods.
+      // The 13th period pushes it.
+      // For 4-4-5 (13 periods), the FY ends approx. 1 year + 1 month from start.
+      let approxEndDateForFYLabel = addMonths(fyStartDate, 12); // 13 periods, so 12 months from start
+      fyEndYearForNaming = getYear(approxEndDateForFYLabel);
+      fiscalYearLabel = `FY${fyEndYearForNaming}`;
+      
+      let periodNumber = 1;
+      for (let q = 0; q < 4; q++) { // 4 Quarters
+        let quarterStartDate = new Date(currentPeriodStartDate);
+        let quarterEndDate: Date;
 
-      for (let q = 0; q < 4; q++) {
-        const quarterStartDate = startOfMonth(addMonths(fyStartDate, currentMonthOffset));
-        const quarterEndDate = endOfMonth(addMonths(quarterStartDate, quarterMonths[q] - 1));
-        
+        if (q < 3) { // First 3 quarters have 3 periods based on weeks (interpreted as months here)
+          quarterEndDate = endOfMonth(addMonths(currentPeriodStartDate, 2)); // 3 months
+          currentPeriodStartDate = addDays(quarterEndDate, 1);
+        } else { // Last quarter has 4 periods
+          quarterEndDate = endOfMonth(addMonths(currentPeriodStartDate, 3)); // 4 months
+          currentPeriodStartDate = addDays(quarterEndDate, 1);
+        }
+
         let status: DisplayPeriod['status'] = 'Open';
         if (today > quarterEndDate) status = "Closed";
         else if (today < quarterStartDate) status = "Future";
         
         periods.push({
           id: `${fiscalYearLabel}-Q${q + 1}`,
-          name: `Q${q + 1}${fiscalYearLabel}`,
+          name: `Q${q + 1}${fiscalYearLabel}`, // Using Q for quarter
           startDate: quarterStartDate,
           endDate: quarterEndDate,
           status: status,
         });
-        currentMonthOffset += quarterMonths[q];
-        if (q === 3) {
-          lastPeriodEndDateForFY = quarterEndDate;
-        }
+        periodNumber++;
       }
-      fyEndDate = lastPeriodEndDateForFY; 
+      fyEndDate = periods[periods.length - 1].endDate; // End date of the last period is FY end date
     }
 
     let fyStatus: DisplayPeriod['status'] = 'Open';
@@ -240,7 +253,7 @@ export default function FiscalPeriodsPage() {
       case 'Future':
         return { Icon: Clock, colorClass: 'text-yellow-500', title: 'Future' };
       default:
-        return { Icon: Clock, colorClass: 'text-muted-foreground', title: 'Unknown' }; // Fallback
+        return { Icon: Clock, colorClass: 'text-muted-foreground', title: 'Unknown' }; 
     }
   };
 
@@ -322,7 +335,7 @@ export default function FiscalPeriodsPage() {
                               (<FormattedDateTime date={fy.startDate} formatString="MMM d, yyyy" /> - <FormattedDateTime date={fy.endDate} formatString="MMM d, yyyy" />)
                             </span>
                           </div>
-                          <FyIcon className={`h-5 w-5 ml-auto sm:ml-4 shrink-0 ${fyColorClass}`} title={fyTitle}/>
+                          <FyIcon className={`h-5 w-5 ml-auto sm:ml-4 mr-3 shrink-0 ${fyColorClass}`} title={fyTitle}/>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent>
