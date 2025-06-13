@@ -100,6 +100,14 @@ interface ActionDialogState {
   availableActions: PeriodAction[];
 }
 
+interface ActionFeedback {
+  type: 'success' | 'error' | 'info' | 'warning';
+  title: string;
+  description?: string;
+  variant?: 'default' | 'destructive';
+  duration?: number;
+}
+
 
 const generateCalendarData = (
   config: FiscalCalendarFormValues,
@@ -216,6 +224,7 @@ export default function FiscalPeriodsPage() {
   const [generatedFiscalYears, setGeneratedFiscalYears] = useState<DisplayFiscalYear[]>([]);
   const { toast } = useToast();
   const [calendarGenerationError, setCalendarGenerationError] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<ActionFeedback | null>(null);
 
 
   const [actionDialogState, setActionDialogState] = useState<ActionDialogState>({
@@ -269,6 +278,18 @@ export default function FiscalPeriodsPage() {
       });
     }
   }, [calendarGenerationError, toast]);
+  
+  useEffect(() => {
+    if (actionFeedback) {
+      toast({
+        title: actionFeedback.title,
+        description: actionFeedback.description,
+        variant: actionFeedback.variant,
+        duration: actionFeedback.duration,
+      });
+      setActionFeedback(null); // Reset after showing
+    }
+  }, [actionFeedback, toast]);
 
 
   const handleOpenConfigDialog = (mode: 'create' | 'edit') => {
@@ -380,12 +401,12 @@ export default function FiscalPeriodsPage() {
     const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
     if (!fy) {
       console.error("Fiscal year not found for subledger click:", fiscalYearId);
-      toast({ title: "Error", description: "Fiscal year not found.", variant: "destructive" });
+      setActionFeedback({ title: "Error", description: "Fiscal year not found.", variant: "destructive", type: 'error' });
       return;
     }
     const currentSubledgerStatus = period.subledgerStatuses[subledger];
     if (currentSubledgerStatus === 'Hard Closed') {
-      toast({ title: "Action Denied", description: `${subledger} for period "${period.name}" is Hard Closed and cannot be modified.`, variant: "destructive" });
+      setActionFeedback({ title: "Action Denied", description: `${subledger} for period "${period.name}" is Hard Closed and cannot be modified.`, variant: "destructive", type: 'error' });
       return;
     }
     
@@ -407,7 +428,7 @@ export default function FiscalPeriodsPage() {
     console.log(`OVERALL PERIOD CLICK: Period Name="${period.name}", Period ID="${period.id}", FY ID="${fiscalYearId}"`);
     const overallStatus = getOverallPeriodStatus(period);
     if (overallStatus === 'Hard Closed') {
-      toast({ title: "Action Denied", description: `Period "${period.name}" is Hard Closed and cannot be modified.`, variant: "destructive" });
+      setActionFeedback({ title: "Action Denied", description: `Period "${period.name}" is Hard Closed and cannot be modified.`, variant: "destructive", type: 'error' });
       return;
     }
 
@@ -415,7 +436,7 @@ export default function FiscalPeriodsPage() {
     const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
     if (!fy) {
         console.error("Fiscal year not found for overall period click:", fiscalYearId);
-        toast({ title: "Error", description: "Fiscal year not found.", variant: "destructive" });
+        setActionFeedback({ title: "Error", description: "Fiscal year not found.", variant: "destructive", type: 'error' });
         return;
     }
 
@@ -550,7 +571,7 @@ export default function FiscalPeriodsPage() {
 
     if (!periodId || !fiscalYearId || (subledgerName === undefined) || !statusFromDialog) {
         console.error("ACTION_ERROR: Missing details for operation in dialog state:", actionDialogState);
-        toast({title:"Error", description: "Action details missing for operation.", variant: "destructive"});
+        setActionFeedback({title:"Error", description: "Action details missing for operation.", variant: "destructive", type: 'error'});
         return;
     }
 
@@ -560,7 +581,7 @@ export default function FiscalPeriodsPage() {
 
       if (targetFiscalYearIndex === -1) {
           console.error(`CRITICAL_ERROR: Fiscal year "${fiscalYearId}" not found during update.`);
-          toast({ title: "Critical Error", description: `FY ${fiscalYearId} not found. Cannot perform action.`, variant: "destructive" });
+          setActionFeedback({ title: "Critical Error", description: `FY ${fiscalYearId} not found. Cannot perform action.`, variant: "destructive", type: 'error' });
           return prevYears; 
       }
       const targetFiscalYear = updatedYears[targetFiscalYearIndex];
@@ -568,12 +589,12 @@ export default function FiscalPeriodsPage() {
 
       if (targetPeriodIndex === -1) {
           console.error(`CRITICAL_ERROR: Period "${periodId}" not found in FY "${fiscalYearId}" during update.`);
-          toast({ title: "Critical Error", description: `Period ${periodId} not found in ${fiscalYearId}. Cannot perform action.`, variant: "destructive" });
+          setActionFeedback({ title: "Critical Error", description: `Period ${periodId} not found in ${fiscalYearId}. Cannot perform action.`, variant: "destructive", type: 'error' });
           return prevYears; 
       }
       
-      // Make a deep copy of the period to update to ensure immutability
-      const periodToUpdate: DisplayPeriod = JSON.parse(JSON.stringify(targetFiscalYear.periods[targetPeriodIndex]));
+      const periodToUpdate = { ...targetFiscalYear.periods[targetPeriodIndex] };
+      periodToUpdate.subledgerStatuses = { ...periodToUpdate.subledgerStatuses };
 
 
       let mainActionResult: { success: boolean; message?: string; newStatus?: PeriodStatus } = { success: false, message: "Action not processed." };
@@ -585,7 +606,7 @@ export default function FiscalPeriodsPage() {
           if (mainActionResult.success && mainActionResult.newStatus) {
               finalToastMessage = `${subledgerName} for period "${periodName}" status changed to ${mainActionResult.newStatus}.${mainActionResult.message || ""}`;
           }
-      } else { // Period-level action
+      } else { 
           console.log(`ACTION_PROCESS: Overall period action for period "${periodToUpdate.name}"`);
           const effectiveSubledgerForPeriodAction = 'General Ledger'; 
           
@@ -620,15 +641,14 @@ export default function FiscalPeriodsPage() {
 
       if (mainActionResult.success) {
           console.log(`ACTION_SUCCESS: Final Toast: "${finalToastMessage}"`);
-          toast({ title: "Success", description: finalToastMessage || `Action "${action}" on "${periodName}" successful.` });
+          setActionFeedback({ title: "Success", description: finalToastMessage || `Action "${action}" on "${periodName}" successful.`, type: 'success' });
           
-          // Update the fiscal year and period in the cloned array
           updatedYears[targetFiscalYearIndex].periods[targetPeriodIndex] = periodToUpdate;
           
           return updatedYears;
       } else {
           console.error("ACTION_FAILED: Reason:", mainActionResult.message);
-          toast({ title: "Action Failed", description: mainActionResult.message || `Could not perform '${action}' on ${subledgerName || 'period'} "${periodName}".`, variant: "destructive", duration: 7000 });
+          setActionFeedback({ title: "Action Failed", description: mainActionResult.message || `Could not perform '${action}' on ${subledgerName || 'period'} "${periodName}".`, variant: "destructive", duration: 7000, type: 'error' });
           return prevYears; 
       }
     });
@@ -929,3 +949,6 @@ export default function FiscalPeriodsPage() {
     
 
       
+
+
+    
