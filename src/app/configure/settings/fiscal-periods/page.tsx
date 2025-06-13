@@ -142,13 +142,14 @@ const generateCalendarData = (
         });
       }
     } else if (config.periodFrequency === '4-4-5') { 
+      // Generate 4 quarters for a 12-month fiscal year
       fyActualEndDate = endOfMonth(addMonths(fyStartDate, 11)); 
       fiscalYearLabel = `FY${getYear(fyActualEndDate)}`;
 
       for (let q = 0; q < 4; q++) { 
         const quarterStartMonthOffset = q * 3;
         const periodStart = startOfMonth(addMonths(fyStartDate, quarterStartMonthOffset));
-        const periodEnd = endOfMonth(addMonths(periodStart, 2)); 
+        const periodEnd = endOfMonth(addMonths(periodStart, 2)); // Each quarter is 3 months long
 
         let status: PeriodStatus = 'Open';
         if (today > periodEnd) status = "Closed";
@@ -290,8 +291,6 @@ export default function FiscalPeriodsPage() {
           actions = ['Reopen', 'Hard Close'];
           break;
         case 'Future':
-          // Allow opening future periods directly
-          // Rule: To open a future period, the previous period must be closed (unless it's the first period)
           const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
           const periodIndex = fy?.periods.findIndex(p => p.id === period.id) ?? -1;
           if (fy && periodIndex > 0) {
@@ -299,7 +298,7 @@ export default function FiscalPeriodsPage() {
             if (previousPeriod.status === 'Closed' || previousPeriod.status === 'Hard Closed') {
               actions.push('Open');
             }
-          } else if (periodIndex === 0) { // First period of the year
+          } else if (periodIndex === 0) { 
              actions.push('Open');
           }
           break;
@@ -328,7 +327,6 @@ export default function FiscalPeriodsPage() {
     
     const targetPeriod = targetFiscalYear.periods[targetPeriodIndex];
 
-    
     if (action === 'Close' && !targetPeriod.isAdhoc) {
       if (targetPeriodIndex > 0) {
         const previousPeriod = targetFiscalYear.periods[targetPeriodIndex - 1];
@@ -356,7 +354,6 @@ export default function FiscalPeriodsPage() {
             }
         }
     }
-
 
     if (window.confirm(`Are you sure you want to ${action.toLowerCase()} period "${periodName}"?`)) {
       setGeneratedFiscalYears(prevYears =>
@@ -408,39 +405,45 @@ export default function FiscalPeriodsPage() {
       </header>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Accounting Calendar Definition</CardTitle>
-          <CardDesc>
-            {configuredCalendar
-              ? 'View or edit your current accounting calendar configuration.'
-              : 'Configure the start date and period frequency for your primary accounting calendar.'}
-          </CardDesc>
-        </CardHeader>
-        <CardContent className="flex flex-col items-start space-y-4">
-          {configuredCalendar ? (
-            <div className="space-y-3 p-4 border rounded-md bg-muted/50 w-full">
-              <h3 className="text-lg font-semibold text-primary">Current Configuration:</h3>
-              <p className="text-sm">
-                <span className="font-medium text-muted-foreground">Start Date:</span> {configuredCalendar.startMonth} 1, {configuredCalendar.startYear}
-              </p>
-              <p className="text-sm">
-                <span className="font-medium text-muted-foreground">Period Frequency:</span> {configuredCalendar.periodFrequency === '4-4-5' ? 'Quarterly (4 periods per FY)' : configuredCalendar.periodFrequency}
-              </p>
-              <Button onClick={() => handleOpenConfigDialog('edit')} className="mt-2">
-                Edit Configuration
-              </Button>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Currently, no accounting calendar is defined. Click below to set it up.
-              </p>
-              <Button onClick={() => handleOpenConfigDialog('create')}>
-                Configure Accounting Calendar
-              </Button>
-            </>
-          )}
-        </CardContent>
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="calendar-definition">
+            <AccordionTrigger className="p-6 hover:no-underline">
+              <div className="flex flex-col items-start text-left">
+                <CardTitle>Accounting Calendar Definition</CardTitle>
+                <CardDesc className="mt-1">
+                  {configuredCalendar
+                    ? 'View or edit your current accounting calendar configuration.'
+                    : 'Configure the start date and period frequency for your primary accounting calendar.'}
+                </CardDesc>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              {configuredCalendar ? (
+                <div className="space-y-3 pt-2 border-t">
+                  <h3 className="text-md font-semibold text-primary pt-3">Current Configuration:</h3>
+                  <p className="text-sm">
+                    <span className="font-medium text-muted-foreground">Start Date:</span> {configuredCalendar.startMonth} 1, {configuredCalendar.startYear}
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-medium text-muted-foreground">Period Frequency:</span> {configuredCalendar.periodFrequency === '4-4-5' ? 'Quarterly (4 periods per FY)' : configuredCalendar.periodFrequency}
+                  </p>
+                  <Button onClick={() => handleOpenConfigDialog('edit')} className="mt-2">
+                    Edit Configuration
+                  </Button>
+                </div>
+              ) : (
+                <div className="pt-2 border-t">
+                  <p className="text-sm text-muted-foreground pt-3">
+                    Currently, no accounting calendar is defined. Click below to set it up.
+                  </p>
+                  <Button onClick={() => handleOpenConfigDialog('create')} className="mt-3">
+                    Configure Accounting Calendar
+                  </Button>
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </Card>
 
       {configuredCalendar && (
