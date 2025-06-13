@@ -90,6 +90,11 @@ export const mainNavItems: NavItemConfig[] = [
         icon: <BarChart3 className="h-4 w-4" />,
         disabled: true,
       },
+      {
+        title: 'Settings', // New Settings item under General Ledger
+        href: '/configure/settings',
+        icon: <Settings className="h-4 w-4" />,
+      },
     ],
   },
   {
