@@ -87,7 +87,6 @@ interface DisplayFiscalYear {
   name: string;
   startDate: Date;
   endDate: Date;
-  status: PeriodStatus; // Overall status of the fiscal year, can be derived
   periods: DisplayPeriod[];
 }
 
@@ -159,14 +158,14 @@ const generateCalendarData = (
           isAdhoc: false,
         });
       }
-    } else if (config.periodFrequency === '4-4-5') { // Interpreted as 4 standard quarters
-      fyActualEndDate = endOfMonth(addMonths(fyStartDate, 11)); // Standard 12-month year
+    } else if (config.periodFrequency === '4-4-5') { 
+      fyActualEndDate = endOfMonth(addMonths(fyStartDate, 11)); 
       fiscalYearLabel = `FY${getYear(fyActualEndDate)}`;
 
       for (let q = 0; q < 4; q++) {
         const quarterStartMonthOffset = q * 3;
         const periodStart = startOfMonth(addMonths(fyStartDate, quarterStartMonthOffset));
-        const periodEnd = endOfMonth(addMonths(periodStart, 2)); // Each quarter is 3 months
+        const periodEnd = endOfMonth(addMonths(periodStart, 2)); 
         
         periods.push({
           id: `${fiscalYearLabel}-Q${q + 1}`,
@@ -185,7 +184,7 @@ const generateCalendarData = (
     
     const adjPeriodSubledgerStatuses: Record<SubledgerName, PeriodStatus> = {
         'General Ledger': 'Adjustment',
-        'Accounts Payable': 'Future', // AP/AR typically not active in ADJ
+        'Accounts Payable': 'Future', 
         'Accounts Receivable': 'Future',
     };
     const adjPeriod: DisplayPeriod = {
@@ -198,29 +197,11 @@ const generateCalendarData = (
     };
     periods.push(adjPeriod);
 
-    let fyStatus: PeriodStatus = 'Open';
-    if (periods.length > 0) {
-        const allRegularPeriodsClosed = periods.filter(p => !p.isAdhoc).every(p => 
-            Object.values(p.subledgerStatuses).every(s => s === 'Closed' || s === 'Hard Closed')
-        );
-        const anyRegularPeriodOpen = periods.filter(p => !p.isAdhoc).some(p => 
-            Object.values(p.subledgerStatuses).some(s => s === 'Open')
-        );
-
-        if (allRegularPeriodsClosed) fyStatus = "Closed";
-        else if (anyRegularPeriodOpen) fyStatus = "Open";
-        else fyStatus = "Future"; // Default if no open/closed found
-    }
-    if (today > fyActualEndDate) fyStatus = "Closed";
-    else if (today < fyStartDate) fyStatus = "Future";
-
-
     yearsData.push({
       id: fiscalYearLabel,
       name: fiscalYearLabel,
       startDate: fyStartDate,
       endDate: fyActualEndDate,
-      status: fyStatus, // This will be dynamically updated based on child periods later
       periods: periods,
     });
   }
@@ -307,7 +288,6 @@ export default function FiscalPeriodsPage() {
 
     let actions: PeriodAction[] = [];
     
-    // Specific rules for ADJ period's General Ledger
     if (period.isAdhoc && subledger === 'General Ledger') { 
         const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
         const allRegularGLClosedOrHardClosed = fy?.periods.filter(p => !p.isAdhoc).every(p => 
@@ -315,15 +295,14 @@ export default function FiscalPeriodsPage() {
         );
 
         if (currentSubledgerStatus === 'Adjustment' || currentSubledgerStatus === 'Future' || currentSubledgerStatus === 'Closed') {
-            // Only allow opening ADJ GL if all regular GL periods are closed/hard-closed
             if (allRegularGLClosedOrHardClosed) actions.push('Open');
         } else if (currentSubledgerStatus === 'Open') {
-            actions.push('Close'); // Can close an open ADJ GL
-            actions.push('Hard Close'); // Can hard close an open ADJ GL
+            actions.push('Close'); 
+            actions.push('Hard Close');
         }
-    } else if (period.isAdhoc) { // AP/AR for ADJ periods are generally not managed this way
+    } else if (period.isAdhoc) { 
         actions = []; 
-    } else { // For regular periods (non-ADJ)
+    } else { 
       switch (currentSubledgerStatus) {
         case 'Open':
           actions = ['Close', 'Hard Close'];
@@ -332,7 +311,6 @@ export default function FiscalPeriodsPage() {
           actions = ['Reopen', 'Hard Close'];
           break;
         case 'Future':
-          // Rule: Can only open a future GL period if the previous regular GL period is closed/hard-closed.
           if (subledger === 'General Ledger') {
             const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
             const periodIndex = fy?.periods.findIndex(p => p.id === period.id) ?? -1;
@@ -341,10 +319,10 @@ export default function FiscalPeriodsPage() {
               if (!previousPeriod.isAdhoc && (previousPeriod.subledgerStatuses['General Ledger'] === 'Closed' || previousPeriod.subledgerStatuses['General Ledger'] === 'Hard Closed')) {
                 actions.push('Open');
               }
-            } else if (periodIndex === 0) { // First regular period of the FY can always be opened
+            } else if (periodIndex === 0) { 
               actions.push('Open');
             }
-          } else { // AP and AR can be opened more freely from 'Future'
+          } else { 
              actions.push('Open');
           }
           break;
@@ -383,7 +361,6 @@ export default function FiscalPeriodsPage() {
     
     const targetPeriod = targetFiscalYear.periods[targetPeriodIndex];
 
-    // Rule: Closing General Ledger requires previous regular GL period to be Closed/Hard Closed.
     if (action === 'Close' && !targetPeriod.isAdhoc && subledgerName === 'General Ledger') {
       if (targetPeriodIndex > 0) {
         const previousPeriod = targetFiscalYear.periods[targetPeriodIndex - 1];
@@ -394,7 +371,6 @@ export default function FiscalPeriodsPage() {
       }
     }
     
-    // Rule: Opening General Ledger for ADJ period requires all regular GL periods in that FY to be Closed/Hard Closed.
     if (action === 'Open' && targetPeriod.isAdhoc && subledgerName === 'General Ledger') {
         const allRegularGLClosed = targetFiscalYear.periods.filter(p => !p.isAdhoc).every(p => 
             p.subledgerStatuses['General Ledger'] === 'Closed' || p.subledgerStatuses['General Ledger'] === 'Hard Closed'
@@ -405,7 +381,6 @@ export default function FiscalPeriodsPage() {
         }
     }
     
-    // Rule: Opening General Ledger for a future regular period requires the previous regular GL period to be Closed/Hard Closed.
     if (action === 'Open' && !targetPeriod.isAdhoc && currentStatus === 'Future' && subledgerName === 'General Ledger') {
         if (targetPeriodIndex > 0) {
             const previousPeriod = targetFiscalYear.periods[targetPeriodIndex - 1];
@@ -426,7 +401,7 @@ export default function FiscalPeriodsPage() {
               periods: fy.periods.map(p => {
                 if (p.id === periodId) {
                   const newSubledgerStatuses = { ...p.subledgerStatuses };
-                  let newStatusForTargetSubledger: PeriodStatus = newSubledgerStatuses[subledgerName]; // Initialize with current status
+                  let newStatusForTargetSubledger: PeriodStatus = currentStatus; 
 
                   switch (action) {
                     case 'Open': newStatusForTargetSubledger = 'Open'; break;
@@ -436,7 +411,6 @@ export default function FiscalPeriodsPage() {
                   }
                   newSubledgerStatuses[subledgerName] = newStatusForTargetSubledger;
 
-                  // Cascading logic: If GL is Closed or Hard Closed, set AP and AR to Closed
                   if (subledgerName === 'General Ledger' && (newStatusForTargetSubledger === 'Closed' || newStatusForTargetSubledger === 'Hard Closed')) {
                     let apChanged = false;
                     let arChanged = false;
@@ -449,7 +423,7 @@ export default function FiscalPeriodsPage() {
                       arChanged = true;
                     }
                     if (apChanged || arChanged) {
-                        cascadeMessage = " Accounts Payable and Accounts Receivable were also set to Closed.";
+                        cascadeMessage = " Accounts Payable and Accounts Receivable were also automatically set to Closed.";
                     }
                   }
                   return { ...p, subledgerStatuses: newSubledgerStatuses };
@@ -467,19 +441,35 @@ export default function FiscalPeriodsPage() {
   };
 
   const getOverallPeriodStatus = (period: DisplayPeriod): PeriodStatus => {
-    if (period.isAdhoc) return period.subledgerStatuses['General Ledger'] || 'Adjustment'; // ADJ period overall status is its GL status
+    if (period.isAdhoc) return period.subledgerStatuses['General Ledger'] || 'Adjustment'; 
 
     const statuses = Object.values(period.subledgerStatuses);
     if (statuses.every(s => s === 'Hard Closed')) return 'Hard Closed';
-    if (statuses.every(s => s === 'Closed' || s === 'Hard Closed')) return 'Closed'; // All are closed or hard closed
-    if (statuses.some(s => s === 'Open')) return 'Open'; // At least one is open
-    // If none are open, and not all are closed/hard-closed, it implies some are future
+    if (statuses.every(s => s === 'Closed' || s === 'Hard Closed')) return 'Closed'; 
+    if (statuses.some(s => s === 'Open')) return 'Open'; 
     if (statuses.every(s => s === 'Future' || s === 'Closed' || s === 'Hard Closed')) {
-         if (statuses.every(s => s === 'Future')) return 'Future'; // All are future
-         if (statuses.some(s => s === 'Future')) return 'Future'; // Some are future (and others might be closed)
-         return 'Closed'; // Should not be reached if some are future but caught by previous, implies all are closed if here
+         if (statuses.every(s => s === 'Future')) return 'Future'; 
+         if (statuses.some(s => s === 'Future')) return 'Future'; 
+         return 'Closed'; 
     }
-    return 'Open'; // Default fallback if logic above doesn't catch a specific mixed state clearly
+    return 'Open'; 
+  };
+
+  const getOverallFiscalYearStatus = (fiscalYear: DisplayFiscalYear): PeriodStatus => {
+    const regularPeriods = fiscalYear.periods.filter(p => !p.isAdhoc);
+    if (regularPeriods.length === 0) return 'Future'; // Or 'Open' if no regular periods means everything is open by default
+
+    const overallPeriodStatuses = regularPeriods.map(p => getOverallPeriodStatus(p));
+
+    if (overallPeriodStatuses.every(s => s === 'Hard Closed')) return 'Hard Closed';
+    if (overallPeriodStatuses.every(s => s === 'Closed' || s === 'Hard Closed')) return 'Closed';
+    if (overallPeriodStatuses.some(s => s === 'Open')) return 'Open';
+    if (overallPeriodStatuses.every(s => s === 'Future')) return 'Future';
+    
+    // If some are future and others closed/hard-closed, consider it Future until an Open one appears
+    if (overallPeriodStatuses.some(s => s === 'Future')) return 'Future';
+    
+    return 'Open'; // Default if no other clear status
   };
 
 
@@ -560,7 +550,8 @@ export default function FiscalPeriodsPage() {
             {generatedFiscalYears.length > 0 ? (
               <Accordion type="multiple" className="w-full">
                 {generatedFiscalYears.map((fy) => {
-                  const { Icon: FyIcon, colorClass: fyColorClass, title: fyTitle } = getStatusIconAndColor(fy.status);
+                  const overallFYStatus = getOverallFiscalYearStatus(fy);
+                  const { Icon: FyIcon, colorClass: fyColorClass, title: fyTitle } = getStatusIconAndColor(overallFYStatus);
                   return (
                     <AccordionItem value={fy.id} key={fy.id}>
                       <AccordionTrigger>
