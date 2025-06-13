@@ -94,10 +94,11 @@ interface ActionDialogState {
   isOpen: boolean;
   periodId: string | null;
   periodName: string | null;
-  subledgerName?: SubledgerName | null; // null for period-level actions
-  currentStatus: PeriodStatus | null; // For subledger, its status. For period, its OVERALL status.
+  subledgerName: SubledgerName | null; // null for period-level actions that affect GL implicitly
+  currentStatus: PeriodStatus | null;
   fiscalYearId: string | null;
   availableActions: PeriodAction[];
+  isAdhocPeriod?: boolean; // To pass context to dialog/actions
 }
 
 interface ActionFeedback {
@@ -173,7 +174,7 @@ const generateCalendarData = (
 
       for (let q = 0; q < 4; q++) { // 4 quarters
         const periodStart = new Date(currentPeriodStartDate);
-        const periodEnd = endOfMonth(addMonths(periodStart, 2)); // Each standard quarter is 3 months
+        const periodEnd = endOfMonth(addMonths(periodStart, 2)); 
         
         periods.push({
           id: `${fiscalYearLabel}-Q${q + 1}`,
@@ -193,10 +194,10 @@ const generateCalendarData = (
     
     const adjPeriod: DisplayPeriod = {
       id: `${fiscalYearLabel}-ADJ`,
-      name: `ADJ-${fiscalYearLabel}`,
+      name: `ADJ Period - ${fiscalYearLabel}`,
       startDate: undefined,
       endDate: undefined,
-      subledgerStatuses: {}, // ADJ periods have no specific subledger statuses to manage this way
+      subledgerStatuses: { 'General Ledger': 'Future' }, // ADJ only has GL, starts as Future
       isAdhoc: true,
     };
     periods.push(adjPeriod);
@@ -226,10 +227,11 @@ export default function FiscalPeriodsPage() {
     isOpen: false,
     periodId: null,
     periodName: null,
-    subledgerName: undefined,
+    subledgerName: null,
     currentStatus: null,
     fiscalYearId: null,
     availableActions: [],
+    isAdhocPeriod: false,
   });
 
   const form = useForm<FiscalCalendarFormValues>({
@@ -282,7 +284,7 @@ export default function FiscalPeriodsPage() {
         variant: actionFeedback.variant,
         duration: actionFeedback.duration,
       });
-      setActionFeedback(null); // Reset after showing
+      setActionFeedback(null); 
     }
   }, [actionFeedback, toast]);
 
@@ -308,10 +310,12 @@ export default function FiscalPeriodsPage() {
   };
 
   const getOverallPeriodStatus = (period: DisplayPeriod): PeriodStatus => {
-    if (period.isAdhoc) return 'Adjustment'; 
+    if (period.isAdhoc) {
+        return period.subledgerStatuses['General Ledger'] || 'Future'; // ADJ period overall status is its GL status
+    }
 
     const statuses = Object.values(period.subledgerStatuses);
-    if (statuses.length === 0 && !period.isAdhoc) return 'Future'; // Default for non-adhoc if no statuses (should be rare with init)
+    if (statuses.length === 0) return 'Future';
 
     if (statuses.every(s => s === 'Hard Closed')) return 'Hard Closed';
     if (statuses.every(s => s === 'Closed' || s === 'Hard Closed')) return 'Closed'; 
@@ -325,17 +329,15 @@ export default function FiscalPeriodsPage() {
   };
 
   const getOverallFiscalYearStatus = (fiscalYear: DisplayFiscalYear): PeriodStatus => {
-    const regularPeriods = fiscalYear.periods.filter(p => !p.isAdhoc);
-    if (regularPeriods.length === 0) return 'Future';
+    // Consider ADJ period GL status as well for FY overall status
+    const allPeriodStatuses = fiscalYear.periods.map(p => getOverallPeriodStatus(p));
 
-    const overallPeriodStatuses = regularPeriods.map(p => getOverallPeriodStatus(p));
-
-    if (overallPeriodStatuses.every(s => s === 'Hard Closed')) return 'Hard Closed';
-    if (overallPeriodStatuses.every(s => s === 'Closed' || s === 'Hard Closed')) return 'Closed';
-    if (overallPeriodStatuses.some(s => s === 'Open')) return 'Open';
-    if (overallPeriodStatuses.every(s => s === 'Future')) return 'Future';
+    if (allPeriodStatuses.every(s => s === 'Hard Closed')) return 'Hard Closed';
+    if (allPeriodStatuses.every(s => s === 'Closed' || s === 'Hard Closed')) return 'Closed';
+    if (allPeriodStatuses.some(s => s === 'Open')) return 'Open';
+    if (allPeriodStatuses.every(s => s === 'Future')) return 'Future';
     
-    if (overallPeriodStatuses.some(s => s === 'Future')) return 'Future';
+    if (allPeriodStatuses.some(s => s === 'Future')) return 'Future';
     
     return 'Open';
   };
@@ -345,16 +347,31 @@ export default function FiscalPeriodsPage() {
     fiscalYear: DisplayFiscalYear,
     subledger: SubledgerName
   ): PeriodAction[] => {
-    const currentSubledgerStatus = period.subledgerStatuses[subledger];
-    let actions: PeriodAction[] = [];
+    console.log(`Determining actions for: Period=${period.name}, Subledger=${subledger}, Adhoc=${period.isAdhoc}`);
+    
+    if (period.isAdhoc) {
+      if (subledger !== 'General Ledger') return []; // Only GL for ADJ
+      const glStatus = period.subledgerStatuses['General Ledger'];
+      if (glStatus === 'Hard Closed') return [];
 
+      if (glStatus === 'Future') {
+        const allRegularClosed = fiscalYear.periods
+            .filter(p => !p.isAdhoc)
+            .every(p => p.subledgerStatuses['General Ledger'] === 'Closed' || p.subledgerStatuses['General Ledger'] === 'Hard Closed');
+        return allRegularClosed ? ['Open'] : [];
+      }
+      if (glStatus === 'Open') return ['Close', 'Hard Close'];
+      if (glStatus === 'Closed') return ['Reopen', 'Hard Close'];
+      return [];
+    }
+
+    // Regular period logic
+    const currentSubledgerStatus = period.subledgerStatuses[subledger];
     if (currentSubledgerStatus === 'Hard Closed') return [];
 
-    // Adhoc periods subledgers (other than GL which is handled by period-level) are not directly managed
-    if (period.isAdhoc) return [];
-
-
+    let actions: PeriodAction[] = [];
     const periodIndex = fiscalYear.periods.findIndex(p => p.id === period.id);
+
     switch (currentSubledgerStatus) {
       case 'Open':
         actions = ['Close', 'Hard Close'];
@@ -380,23 +397,17 @@ export default function FiscalPeriodsPage() {
         actions = [];
         break;
     }
-    
     return actions;
   };
   
   const handleSubledgerStatusClick = (period: DisplayPeriod, fiscalYearId: string, subledger: SubledgerName) => {
-    console.log(`SUBLEDGER CLICK: ${subledger} for period ${period.name}`);
-    if (period.isAdhoc) {
-      setActionFeedback({ type: 'info', title: 'Informational Period', description: `Subledgers for ADJ period "${period.name}" cannot be managed individually.` });
-      return;
-    }
-
+    console.log(`SUBLEDGER ICON CLICK: Subledger=${subledger}, Period=${period.name}, Adhoc=${period.isAdhoc}`);
     const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
     if (!fy) {
-      console.error("Fiscal year not found for subledger click:", fiscalYearId);
       setActionFeedback({ title: "Error", description: "Fiscal year not found.", variant: "destructive", type: 'error' });
       return;
     }
+
     const currentSubledgerStatus = period.subledgerStatuses[subledger];
     if (currentSubledgerStatus === 'Hard Closed') {
       setActionFeedback({ title: "Action Denied", description: `${subledger} for period "${period.name}" is Hard Closed and cannot be modified.`, variant: "destructive", type: 'error' });
@@ -410,20 +421,24 @@ export default function FiscalPeriodsPage() {
       isOpen: true,
       periodId: period.id,
       periodName: period.name,
-      subledgerName: subledger,
-      currentStatus: currentSubledgerStatus || null, // Handle if status is undefined
+      subledgerName: subledger, // Explicitly managing this subledger
+      currentStatus: currentSubledgerStatus || null,
       fiscalYearId: fiscalYearId,
       availableActions: actions,
+      isAdhocPeriod: period.isAdhoc,
     });
   };
   
   const handleOverallPeriodClick = (period: DisplayPeriod, fiscalYearId: string) => {
-    console.log(`OVERALL PERIOD CLICK: Period Name="${period.name}", Period ID="${period.id}", FY ID="${fiscalYearId}"`);
+    console.log(`OVERALL PERIOD CLICK: Period Name="${period.name}", Adhoc=${period.isAdhoc}`);
+    
     if (period.isAdhoc) {
-      setActionFeedback({ type: 'info', title: 'Informational Period', description: `Adjustment period "${period.name}" is for informational purposes and cannot be directly managed.` });
+      // For ADJ periods, clicking the name manages its General Ledger
+      handleSubledgerStatusClick(period, fiscalYearId, 'General Ledger');
       return;
     }
 
+    // For Regular periods:
     const overallStatus = getOverallPeriodStatus(period);
     if (overallStatus === 'Hard Closed') {
       setActionFeedback({ title: "Action Denied", description: `Period "${period.name}" is Hard Closed and cannot be modified.`, variant: "destructive", type: 'error' });
@@ -433,7 +448,6 @@ export default function FiscalPeriodsPage() {
     let actions: PeriodAction[] = [];
     const fy = generatedFiscalYears.find(f => f.id === fiscalYearId);
     if (!fy) {
-        console.error("Fiscal year not found for overall period click:", fiscalYearId);
         setActionFeedback({ title: "Error", description: "Fiscal year not found.", variant: "destructive", type: 'error' });
         return;
     }
@@ -451,10 +465,11 @@ export default function FiscalPeriodsPage() {
       isOpen: true,
       periodId: period.id,
       periodName: period.name,
-      subledgerName: null, 
+      subledgerName: null, // Indicates overall period action, implicitly affecting GL and cascading
       currentStatus: overallStatus,
       fiscalYearId: fiscalYearId,
       availableActions: actions,
+      isAdhocPeriod: period.isAdhoc, // false for this branch
     });
   };
 
@@ -462,17 +477,19 @@ export default function FiscalPeriodsPage() {
     targetFiscalYear: DisplayFiscalYear,
     targetPeriod: DisplayPeriod,
     subledger: SubledgerName,
-    action: PeriodAction
+    action: PeriodAction,
+    isAdhocContext: boolean // Is the period being acted upon an ADJ period?
   ): { success: boolean; message?: string; newStatus?: PeriodStatus } => {
     const originalStatus = targetPeriod.subledgerStatuses[subledger];
-    let newStatus: PeriodStatus = originalStatus || 'Future'; // Default to Future if undefined
+    let newStatus: PeriodStatus = originalStatus || 'Future'; 
     let ruleViolationMessage: string | undefined;
 
-    console.log(`ACTION_PERFORM (Subledger): Action="${action}", Subledger="${subledger}", Period="${targetPeriod.name}", OriginalStatus="${originalStatus}"`);
+    console.log(`ACTION_PERFORM (Subledger): Action="${action}", Subledger="${subledger}", Period="${targetPeriod.name}", OriginalStatus="${originalStatus}", IsAdhocContext=${isAdhocContext}`);
 
+    // Rule Checks
     if (subledger === 'General Ledger') {
       const periodIndex = targetFiscalYear.periods.findIndex(p => p.id === targetPeriod.id);
-      if (action === 'Close' && !targetPeriod.isAdhoc) {
+      if (action === 'Close' && !isAdhocContext) { // Closing regular GL
         if (periodIndex > 0) {
           const prevPeriod = targetFiscalYear.periods[periodIndex - 1];
           if (!prevPeriod.isAdhoc && (prevPeriod.subledgerStatuses['General Ledger'] !== 'Closed' && prevPeriod.subledgerStatuses['General Ledger'] !== 'Hard Closed')) {
@@ -480,22 +497,34 @@ export default function FiscalPeriodsPage() {
           }
         }
       } else if (action === 'Open') {
-        if (targetPeriod.isAdhoc) { // This case should be prevented by UI for subledger action
-           ruleViolationMessage = `Cannot perform '${action}' directly on ${subledger} for ADJ period "${targetPeriod.name}". Manage through period-level.`;
-        } else if (originalStatus === 'Future' && periodIndex > 0) {
+        if (isAdhocContext) { // Opening ADJ GL
+          const allRegularGLsClosed = targetFiscalYear.periods
+            .filter(p => !p.isAdhoc)
+            .every(p => p.subledgerStatuses['General Ledger'] === 'Closed' || p.subledgerStatuses['General Ledger'] === 'Hard Closed');
+          if (!allRegularGLsClosed) {
+            ruleViolationMessage = `Cannot open General Ledger for ADJ period "${targetPeriod.name}" until all regular periods' General Ledger in this fiscal year are 'Closed' or 'Hard Closed'.`;
+          }
+        } else if (originalStatus === 'Future' && periodIndex > 0) { // Opening regular Future GL
           const prevPeriod = targetFiscalYear.periods[periodIndex - 1];
           if (!prevPeriod.isAdhoc && prevPeriod.subledgerStatuses['General Ledger'] !== 'Closed' && prevPeriod.subledgerStatuses['General Ledger'] !== 'Hard Closed') {
             ruleViolationMessage = `Cannot perform '${action}' on ${subledger} for future period "${targetPeriod.name}". Rule: ${subledger} in the previous regular period ("${prevPeriod.name}") must be 'Closed' or 'Hard Closed' first.`;
           }
+        } else if (originalStatus === 'Closed' && !isAdhocContext) { // Reopening regular GL
+            const adjPeriodForFY = targetFiscalYear.periods.find(p => p.isAdhoc);
+            if (adjPeriodForFY && adjPeriodForFY.subledgerStatuses['General Ledger'] && adjPeriodForFY.subledgerStatuses['General Ledger'] !== 'Future') {
+                ruleViolationMessage = `Cannot reopen General Ledger for regular period "${targetPeriod.name}" because the Adjustment Period for ${targetFiscalYear.name} has already been processed (status: ${adjPeriodForFY.subledgerStatuses['General Ledger']}). Manage the ADJ period first if needed.`;
+            }
         }
       }
     }
+
 
     if (ruleViolationMessage) {
       console.error("Rule violation for subledger action:", ruleViolationMessage);
       return { success: false, message: ruleViolationMessage };
     }
 
+    // Determine new status
     switch (action) {
       case 'Open': newStatus = 'Open'; break;
       case 'Close': newStatus = 'Closed'; break;
@@ -506,51 +535,42 @@ export default function FiscalPeriodsPage() {
     const updatedSubledgerStatuses = { ...targetPeriod.subledgerStatuses, [subledger]: newStatus };
     let cascadedMessagePart = "";
 
-    // If General Ledger is Closed or Hard Closed, cascade to AP and AR (unless they are Hard Closed)
-    if (subledger === 'General Ledger' && (newStatus === 'Closed' || newStatus === 'Hard Closed')) {
-      let apChanged = false, arChanged = false;
-      if (updatedSubledgerStatuses['Accounts Payable'] !== 'Hard Closed') {
-        updatedSubledgerStatuses['Accounts Payable'] = 'Closed';
-        apChanged = true;
-      }
-      if (updatedSubledgerStatuses['Accounts Receivable'] !== 'Hard Closed') {
-        updatedSubledgerStatuses['Accounts Receivable'] = 'Closed';
-        arChanged = true;
-      }
-      if (apChanged || arChanged) {
-          cascadedMessagePart = ` Also, ${apChanged ? "AP" : ""}${apChanged && arChanged ? " and " : ""}${arChanged ? "AR" : ""} set to Closed.`;
-      }
-      console.log(`CASCADE (GL ${newStatus}): GL ${newStatus} on "${targetPeriod.name}". AP: ${updatedSubledgerStatuses['Accounts Payable']}, AR: ${updatedSubledgerStatuses['Accounts Receivable']}`);
-    }
-    
-    // If General Ledger is Opened (from Future or Reopened from Closed), also open AP/AR if they were Future/Closed respectively
-    if (subledger === 'General Ledger' && newStatus === 'Open') {
-        let apChanged = false, arChanged = false;
-        if(originalStatus === 'Future' && updatedSubledgerStatuses['Accounts Payable'] === 'Future') { 
-            updatedSubledgerStatuses['Accounts Payable'] = 'Open';
+    // Cascading logic - ONLY for regular periods
+    if (!isAdhocContext) {
+        if (subledger === 'General Ledger' && (newStatus === 'Closed' || newStatus === 'Hard Closed')) {
+          let apChanged = false, arChanged = false;
+          if (updatedSubledgerStatuses['Accounts Payable'] !== 'Hard Closed') {
+            updatedSubledgerStatuses['Accounts Payable'] = 'Closed';
             apChanged = true;
-        } else if (originalStatus === 'Closed' && updatedSubledgerStatuses['Accounts Payable'] === 'Closed') {
-            // If reopening GL from Closed, and AP was just Closed (not Hard Closed), set AP to Open
-            if (targetPeriod.subledgerStatuses['Accounts Payable'] === 'Closed') {
+          }
+          if (updatedSubledgerStatuses['Accounts Receivable'] !== 'Hard Closed') {
+            updatedSubledgerStatuses['Accounts Receivable'] = 'Closed';
+            arChanged = true;
+          }
+          if (apChanged || arChanged) {
+              cascadedMessagePart = ` Also, ${apChanged ? "AP" : ""}${apChanged && arChanged ? " and " : ""}${arChanged ? "AR" : ""} automatically set to Closed.`;
+          }
+        } else if (subledger === 'General Ledger' && newStatus === 'Open') {
+            let apChanged = false, arChanged = false;
+            if(originalStatus === 'Future' && updatedSubledgerStatuses['Accounts Payable'] === 'Future') { 
+                updatedSubledgerStatuses['Accounts Payable'] = 'Open';
+                apChanged = true;
+            } else if (originalStatus === 'Closed' && targetPeriod.subledgerStatuses['Accounts Payable'] === 'Closed') {
                  updatedSubledgerStatuses['Accounts Payable'] = 'Open';
                  apChanged = true;
             }
-        }
 
-        if(originalStatus === 'Future' && updatedSubledgerStatuses['Accounts Receivable'] === 'Future') {
-            updatedSubledgerStatuses['Accounts Receivable'] = 'Open';
-            arChanged = true;
-        } else if (originalStatus === 'Closed' && updatedSubledgerStatuses['Accounts Receivable'] === 'Closed') {
-            if (targetPeriod.subledgerStatuses['Accounts Receivable'] === 'Closed') {
+            if(originalStatus === 'Future' && updatedSubledgerStatuses['Accounts Receivable'] === 'Future') {
+                updatedSubledgerStatuses['Accounts Receivable'] = 'Open';
+                arChanged = true;
+            } else if (originalStatus === 'Closed' && targetPeriod.subledgerStatuses['Accounts Receivable'] === 'Closed') {
                 updatedSubledgerStatuses['Accounts Receivable'] = 'Open';
                 arChanged = true;
             }
+            if (apChanged || arChanged) {
+               cascadedMessagePart = ` Also, ${apChanged ? "AP" : ""}${apChanged && arChanged ? " and " : ""}${arChanged ? "AR" : ""} automatically set to Open.`;
+            }
         }
-
-        if (apChanged || arChanged) {
-           cascadedMessagePart = ` Also, ${apChanged ? "AP" : ""}${apChanged && arChanged ? " and " : ""}${arChanged ? "AR" : ""} set to Open.`;
-        }
-        console.log(`CASCADE (GL Open): GL Open on "${targetPeriod.name}". Original GL Status: ${originalStatus}. AP: ${updatedSubledgerStatuses['Accounts Payable']}, AR: ${updatedSubledgerStatuses['Accounts Receivable']}`);
     }
     
     targetPeriod.subledgerStatuses = updatedSubledgerStatuses;
@@ -558,10 +578,10 @@ export default function FiscalPeriodsPage() {
   };
 
   const handlePerformAction = (action: PeriodAction) => {
-    const { periodId, periodName, fiscalYearId, subledgerName } = actionDialogState;
-    console.log(`Attempting Action (Dialog): "${action}", Period: "${periodName}", Subledger: "${subledgerName || 'PERIOD-LEVEL'}"`);
+    const { periodId, periodName, fiscalYearId, subledgerName, isAdhocPeriod } = actionDialogState;
+    console.log(`Attempting Action (Dialog): "${action}", Period: "${periodName}", Subledger: "${subledgerName || 'OVERALL_PERIOD'}", IsAdhoc=${isAdhocPeriod}`);
 
-    if (!periodId || !fiscalYearId || (subledgerName === undefined)) {
+    if (!periodId || !fiscalYearId ) {
         console.error("ACTION_ERROR: Missing details for operation in dialog state:", actionDialogState);
         setActionFeedback({title:"Error", description: "Action details missing for operation.", variant: "destructive", type: 'error'});
         return;
@@ -586,30 +606,27 @@ export default function FiscalPeriodsPage() {
       }
       
       const originalPeriod = targetFiscalYear.periods[targetPeriodIndex];
-      let periodToUpdate: DisplayPeriod = {
-        ...originalPeriod,
-        subledgerStatuses: { ...originalPeriod.subledgerStatuses },
-      };
-
+      // Ensure we're working with a mutable copy for modifications
+      let periodToUpdate: DisplayPeriod = JSON.parse(JSON.stringify(originalPeriod));
 
       let mainActionResult: { success: boolean; message?: string; newStatus?: PeriodStatus } = { success: false, message: "Action not processed." };
       let finalToastMessage = "";
 
-      if (subledgerName) { // Individual subledger action
-          console.log(`ACTION_PROCESS: Individual subledger action for "${subledgerName}" on period "${periodToUpdate.name}"`);
-          mainActionResult = performSubledgerAction(targetFiscalYear, periodToUpdate, subledgerName, action);
+      if (subledgerName) { // Explicit subledger action (could be GL of ADJ, or any subledger of Regular)
+          console.log(`ACTION_PROCESS: Explicit subledger action for "${subledgerName}" on period "${periodToUpdate.name}" (Adhoc=${periodToUpdate.isAdhoc})`);
+          mainActionResult = performSubledgerAction(targetFiscalYear, periodToUpdate, subledgerName, action, !!periodToUpdate.isAdhoc);
           if (mainActionResult.success && mainActionResult.newStatus) {
               finalToastMessage = `${subledgerName} for period "${periodName}" status changed to ${mainActionResult.newStatus}.${mainActionResult.message || ""}`;
           }
-      } else { // Overall period action
-          console.log(`ACTION_PROCESS: Overall period action for period "${periodToUpdate.name}"`);
-          if (periodToUpdate.isAdhoc) {
-             mainActionResult = { success: false, message: "Adjustment periods cannot be managed this way."}; // Should be caught by handleOverallPeriodClick
+      } else { // Overall period action (only for Regular periods)
+          if (periodToUpdate.isAdhoc) { // Should not happen with new logic for ADJ period clicks
+             mainActionResult = { success: false, message: "Overall period actions are not applicable to ADJ periods directly. Manage its GL instead."};
           } else {
+            console.log(`ACTION_PROCESS: Overall period action for regular period "${periodToUpdate.name}"`);
             const effectiveSubledgerForPeriodAction = 'General Ledger'; 
             
             if (action === 'Close') {
-                mainActionResult = performSubledgerAction(targetFiscalYear, periodToUpdate, effectiveSubledgerForPeriodAction, 'Close');
+                mainActionResult = performSubledgerAction(targetFiscalYear, periodToUpdate, effectiveSubledgerForPeriodAction, 'Close', false);
                 if (mainActionResult.success) finalToastMessage = `Period "${periodName}" closed (GL set to ${periodToUpdate.subledgerStatuses['General Ledger']}).${mainActionResult.message || ""}`;
             } else if (action === 'Hard Close') {
                 let allHardClosedSuccessfully = true;
@@ -617,7 +634,7 @@ export default function FiscalPeriodsPage() {
                 
                 for (const sl of subledgersToHardClose) {
                     if (periodToUpdate.subledgerStatuses[sl] !== 'Hard Closed') {
-                        const res = performSubledgerAction(targetFiscalYear, periodToUpdate, sl, 'Hard Close');
+                        const res = performSubledgerAction(targetFiscalYear, periodToUpdate, sl, 'Hard Close', false);
                         if (!res.success) {
                             allHardClosedSuccessfully = false;
                             mainActionResult = { success: false, message: res.message || `Failed to hard close ${sl} for period ${periodName}.`};
@@ -629,12 +646,11 @@ export default function FiscalPeriodsPage() {
                      mainActionResult = { success: true };
                      finalToastMessage = `Period "${periodName}" hard closed (all subledgers attempted).`;
                 }
-
             } else if (action === 'Reopen') {
-                mainActionResult = performSubledgerAction(targetFiscalYear, periodToUpdate, effectiveSubledgerForPeriodAction, 'Reopen');
-                if (mainActionResult.success) finalToastMessage = `Period "${periodName}" reopened (GL set to Open). AP/AR may need individual reopening.`;
-            } else if (action === 'Open') {
-                mainActionResult = performSubledgerAction(targetFiscalYear, periodToUpdate, effectiveSubledgerForPeriodAction, 'Open');
+                mainActionResult = performSubledgerAction(targetFiscalYear, periodToUpdate, effectiveSubledgerForPeriodAction, 'Reopen', false);
+                if (mainActionResult.success) finalToastMessage = `Period "${periodName}" reopened (GL set to Open).${mainActionResult.message || ""}`;
+            } else if (action === 'Open') { // Opening a 'Future' regular period
+                mainActionResult = performSubledgerAction(targetFiscalYear, periodToUpdate, effectiveSubledgerForPeriodAction, 'Open', false);
                 if (mainActionResult.success) finalToastMessage = `Period "${periodName}" opened (GL, AP, AR set to Open).${mainActionResult.message || ""}`;
             }
           }
@@ -645,14 +661,12 @@ export default function FiscalPeriodsPage() {
           setActionFeedback({ title: "Success", description: finalToastMessage || `Action "${action}" on "${periodName}" successful.`, type: 'success' });
           
           const updatedPeriods = [...targetFiscalYear.periods];
-          updatedPeriods[targetPeriodIndex] = periodToUpdate; // periodToUpdate has already been modified by performSubledgerAction
+          updatedPeriods[targetPeriodIndex] = periodToUpdate; 
           
-          const updatedTargetFiscalYear = {
+          updatedYears[targetFiscalYearIndex] = {
             ...targetFiscalYear,
             periods: updatedPeriods,
           };
-
-          updatedYears[targetFiscalYearIndex] = updatedTargetFiscalYear;
           
           return updatedYears;
       } else {
@@ -661,7 +675,7 @@ export default function FiscalPeriodsPage() {
           return prevYears; 
       }
     });
-    setActionDialogState({ isOpen: false, periodId: null, periodName: null, subledgerName: undefined, currentStatus: null, fiscalYearId: null, availableActions: [] });
+    setActionDialogState({ isOpen: false, periodId: null, periodName: null, subledgerName: null, currentStatus: null, fiscalYearId: null, availableActions: [], isAdhocPeriod: false });
   };
 
 
@@ -735,7 +749,7 @@ export default function FiscalPeriodsPage() {
             </CardTitle>
             <CardDesc>
               Based on your configuration. Expand fiscal years, then periods, to view and manage subledger statuses.
-              Includes an Adjustment (ADJ) period for each year.
+              ADJ periods are for year-end adjustments and only manage General Ledger status.
             </CardDesc>
           </CardHeader>
           <CardContent>
@@ -780,7 +794,7 @@ export default function FiscalPeriodsPage() {
                                                 {period.startDate && period.endDate ? (
                                                     <>(<FormattedDateTime date={period.startDate} formatString="MMM d" /> - <FormattedDateTime date={period.endDate} formatString="MMM d, yyyy" />)</>
                                                 ) : (
-                                                    <>(No Date Range)</>
+                                                    period.isAdhoc ? <>(Adjustment Period)</> : <>(No Date Range)</>
                                                 )}
                                                 </span>
                                             </div>
@@ -789,20 +803,40 @@ export default function FiscalPeriodsPage() {
                                     </AccordionTrigger>
                                     <AccordionContent className="pt-0 pb-3 px-3">
                                       {period.isAdhoc ? (
-                                         <p className="text-xs text-muted-foreground pl-3 pt-1 ml-1">
-                                          This is an adjustment period for informational purposes. Its status reflects the overall year-end state.
-                                        </p>
+                                        <div className="space-y-1.5 pl-3 border-l-2 border-border ml-1 pt-1">
+                                            <p className="text-xs text-muted-foreground pb-1">
+                                                This is an Adjustment Period. Its General Ledger can be opened for year-end adjustments once all regular periods are closed.
+                                            </p>
+                                            {(['General Ledger'] as SubledgerName[]).map(subledger => { // Only show GL for ADJ
+                                                const subStatus = period.subledgerStatuses[subledger];
+                                                if (subStatus === undefined) return null;
+                                                const { Icon: SubIcon, colorClass: subColorClass, title: subTitle } = getStatusIconAndColor(subStatus);
+                                                return (
+                                                <div key={subledger} className="flex justify-between items-center text-xs py-0.5">
+                                                    <button 
+                                                        onClick={() => handleSubledgerStatusClick(period, fy.id, subledger)}
+                                                        className={` ${subStatus !== 'Hard Closed' ? 'text-muted-foreground hover:text-accent-foreground cursor-pointer' : 'text-muted-foreground/70 cursor-default'}`}
+                                                        disabled={subStatus === 'Hard Closed'}
+                                                        title={subStatus !== 'Hard Closed' ? `Manage ${subledger} status for ADJ period` : `${subledger} status is ${subTitle}`}
+                                                    >
+                                                    {subledger}
+                                                    </button>
+                                                    <SubIcon className={`h-4 w-4 shrink-0 ${subColorClass}`} title={subTitle}/>
+                                                </div>
+                                                );
+                                            })}
+                                        </div>
                                       ) : (
                                         <div className="space-y-1.5 pl-3 border-l-2 border-border ml-1 pt-1">
                                         {subledgerNames.map(subledger => {
                                             const subStatus = period.subledgerStatuses[subledger];
-                                            if (subStatus === undefined) return null; // Should not happen for non-adhoc
+                                            if (subStatus === undefined) return null; 
                                             const { Icon: SubIcon, colorClass: subColorClass, title: subTitle } = getStatusIconAndColor(subStatus);
                                             
                                             return (
                                             <div key={subledger} className="flex justify-between items-center text-xs py-0.5">
                                                 <button 
-                                                    onClick={() => subStatus !== 'Hard Closed' && handleSubledgerStatusClick(period, fy.id, subledger)}
+                                                    onClick={() => handleSubledgerStatusClick(period, fy.id, subledger)}
                                                     className={` ${subStatus !== 'Hard Closed' ? 'text-muted-foreground hover:text-accent-foreground cursor-pointer' : 'text-muted-foreground/70 cursor-default'}`}
                                                     disabled={subStatus === 'Hard Closed'}
                                                     title={subStatus !== 'Hard Closed' ? `Manage ${subledger} status` : `${subledger} status is ${subTitle}`}
@@ -925,8 +959,9 @@ export default function FiscalPeriodsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Manage Status: {actionDialogState.subledgerName ? `${actionDialogState.subledgerName} for ` : 'Period: '}
+              Manage Status: {actionDialogState.subledgerName ? `${actionDialogState.subledgerName} for ` : ''}
               {actionDialogState.periodName}
+              {actionDialogState.isAdhocPeriod && !actionDialogState.subledgerName ? ' (ADJ Period GL)' : ''}
             </DialogTitle>
             <DialogDescription>
               Current Status: <span className="font-semibold">{actionDialogState.currentStatus}</span>. Select an action.
@@ -934,7 +969,8 @@ export default function FiscalPeriodsPage() {
           </DialogHeader>
           <div className="space-y-3 py-4">
             {actionDialogState.availableActions.map(action => {
-              const buttonText = actionDialogState.subledgerName ? `${action} ${actionDialogState.subledgerName}` : `${action} Period`;
+              const targetSubledger = actionDialogState.subledgerName || 'General Ledger'; // Default to GL for overall period actions
+              const buttonText = `${action} ${targetSubledger}${actionDialogState.isAdhocPeriod && !actionDialogState.subledgerName ? ' (ADJ Period)' : ''}`;
               return (
                 <Button
                   key={action}
@@ -947,7 +983,7 @@ export default function FiscalPeriodsPage() {
               );
             })}
             {actionDialogState.availableActions.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center">No actions available for this {actionDialogState.subledgerName ? 'subledger' : 'period'} in its current state or due to other period statuses.</p>
+                <p className="text-sm text-muted-foreground text-center">No actions available for this {actionDialogState.subledgerName || (actionDialogState.isAdhocPeriod ? 'ADJ Period GL' : 'period')} in its current state or due to other period statuses.</p>
             )}
           </div>
           <DialogFooter>
@@ -962,11 +998,5 @@ export default function FiscalPeriodsPage() {
   );
 }
     
-
-      
-
-
-    
-
 
     
