@@ -47,7 +47,7 @@ const fiscalCalendarSchema = z.object({
     .int()
     .min(1900, "Year must be 1900 or later.")
     .max(2100, "Year must be 2100 or earlier."),
-  periodFrequency: z.enum(['Monthly', '4-4-5'] as [string, ...string[]], {
+  periodFrequency: z.enum(['Monthly', '4-4-5'] as [string, ...string[]], { // Internal value '4-4-5' for Quarterly
     required_error: "Period frequency is required.",
   }),
 });
@@ -70,9 +70,9 @@ const defaultFormValues: FiscalCalendarFormValues = exampleCalendarConfig;
 interface DisplayPeriod {
   id: string;
   name: string;
-  startDate: Date;
-  endDate: Date;
-  status: 'Open' | 'Closed' | 'Future';
+  startDate?: Date; // Optional for ADJ period
+  endDate?: Date;   // Optional for ADJ period
+  status: 'Open' | 'Closed' | 'Future' | 'Adjustment'; // Added 'Adjustment' status
 }
 
 interface DisplayFiscalYear {
@@ -108,7 +108,7 @@ const generateCalendarData = (
     let fiscalYearLabel: string;
 
     if (config.periodFrequency === 'Monthly') {
-      fyEndDate = endOfMonth(addMonths(fyStartDate, 11)); // 12 months total
+      fyEndDate = endOfMonth(addMonths(fyStartDate, 11)); 
       fiscalYearLabel = `FY${getYear(fyEndDate)}`;
 
       for (let m = 0; m < 12; m++) {
@@ -126,79 +126,58 @@ const generateCalendarData = (
           status: status,
         });
       }
-    } else { 
-      let currentPeriodStartDate = new Date(fyStartDate);
-      
-      let calculatedFyEndYear = currentFYStartCalendarYear;
-      if (startMonthIndex > 0) { // If FY starts in Feb or later, it ends in the next calendar year for a 12-month or 13-month cycle
-        calculatedFyEndYear +=1;
-      }
-      
-      // For a 13 "period" 4-4-5 year, the fiscal year often ends 1 year from its start date plus one week if 53-week years are handled,
-      // or it just covers 13 nominal 4-week "months". Here, we'll model it as 3 quarters of 3 * 4-week "months"
-      // and 1 quarter of 4 * 4-week "months", roughly mapping to a 13 "month" concept where each "month" is ~4 weeks.
-      // More simply, the fiscal year label should be consistent with the year it primarily falls in or ends in.
-      // If it starts Jan 2025, 13 "months" will end in Jan 2026. So the label would be FY2026.
-      // If it starts July 2025, 13 "months" will end in July 2026. Label FY2026.
-      // The logic below approximates this.
-      
-      // Determine the calendar year the fiscal year predominantly ends in.
-      // A 13-period structure from Jan 2025 would end in Jan 2026.
-      // A 13-period structure from Jul 2025 would end in Jul 2026.
-      let tempEndDateForLabel = addMonths(fyStartDate, 12); // Approximate end for labeling
-      fiscalYearLabel = `FY${getYear(tempEndDateForLabel)}`;
-
-
-      let cumulativeEndDate = fyStartDate;
-      const quarterDurationsInPeriods = [3, 3, 3, 4]; // Q1, Q2, Q3 have 3 "periods", Q4 has 4 "periods" (total 13)
+    } else if (config.periodFrequency === '4-4-5') { // Logic for "Quarterly"
+      fyEndDate = endOfMonth(addMonths(fyStartDate, 11)); // Standard 12-month fiscal year for quarterly
+      fiscalYearLabel = `FY${getYear(fyEndDate)}`; // Name by end year
 
       for (let q = 0; q < 4; q++) { // 4 Quarters
-        const numPeriodsInQuarter = quarterDurationsInPeriods[q];
-        const quarterStartDate = new Date(cumulativeEndDate);
-        
-        // Simulate periods within quarter. For 4-4-5, these aren't standard calendar months.
-        // We'll just use the quarter start/end.
-        // Each "period" in 4-4-5 is typically 4 or 5 weeks.
-        // A quarter is 13 weeks. (4+4+5 or other combination).
-        // The actual end date for 4-4-5 is often 364 days (52 weeks) or 371 days (53 weeks).
-        // For simplicity, we'll base quarter end dates by adding nominal months.
-        // Q1: 3 nominal months, Q2: 3 nominal months, Q3: 3 nominal months, Q4: 4 nominal months.
-        
-        let quarterEndDateCalc = new Date(quarterStartDate);
-        if (q === 0 || q === 1) { // First two quarters are 3 "periods" (approx 3 months)
-            quarterEndDateCalc = endOfMonth(addMonths(quarterStartDate, 2)); // 3 full "months"
-        } else if (q === 2) { // Third quarter is 3 "periods"
-             quarterEndDateCalc = endOfMonth(addMonths(quarterStartDate, 2)); 
-        } else { // Fourth quarter is 4 "periods"
-            quarterEndDateCalc = endOfMonth(addMonths(quarterStartDate, 3));
-        }
-        
-        cumulativeEndDate = addDays(quarterEndDateCalc, 1); // Start of next quarter
+        const quarterStartMonthOffset = q * 3;
+        const periodStart = startOfMonth(addMonths(fyStartDate, quarterStartMonthOffset));
+        const periodEnd = endOfMonth(addMonths(periodStart, 2)); // Each quarter is 3 months
 
         let status: DisplayPeriod['status'] = 'Open';
-        if (today > quarterEndDateCalc) status = "Closed";
-        else if (today < quarterStartDate) status = "Future";
-        
+        if (today > periodEnd) status = "Closed";
+        else if (today < periodStart) status = "Future";
+
         periods.push({
           id: `${fiscalYearLabel}-Q${q + 1}`,
           name: `Q${q + 1}-${fiscalYearLabel}`,
-          startDate: quarterStartDate,
-          endDate: quarterEndDateCalc,
+          startDate: periodStart,
+          endDate: periodEnd,
           status: status,
         });
       }
-      fyEndDate = periods[periods.length - 1].endDate;
+    } else { // Should not happen with enum validation
+        console.error("Unknown period frequency:", config.periodFrequency);
+        fyEndDate = endOfMonth(addMonths(fyStartDate, 11)); // Default to monthly if error
+        fiscalYearLabel = `FY${getYear(fyEndDate)}`;
     }
+    
+    // Add ADJ period
+    const adjPeriod: DisplayPeriod = {
+      id: `${fiscalYearLabel}-ADJ`,
+      name: `ADJ-${fiscalYearLabel}`,
+      startDate: undefined, 
+      endDate: undefined,   
+      status: 'Adjustment', 
+    };
+    periods.push(adjPeriod);
+
 
     let fyStatus: DisplayPeriod['status'] = 'Open';
-    if (today > fyEndDate) fyStatus = "Closed";
+    // Calculate FY status based on its actual end date (excluding ADJ for this calculation)
+    const actualFyEndDateForStatus = config.periodFrequency === 'Monthly' || config.periodFrequency === '4-4-5'
+      ? endOfMonth(addMonths(fyStartDate, 11))
+      : fyEndDate; // Fallback, should be one of the two
+
+    if (today > actualFyEndDateForStatus) fyStatus = "Closed";
     else if (today < fyStartDate) fyStatus = "Future";
 
     yearsData.push({
       id: fiscalYearLabel, 
       name: fiscalYearLabel,
       startDate: fyStartDate,
-      endDate: fyEndDate,
+      endDate: actualFyEndDateForStatus, // Use actual end date for FY display
       status: fyStatus,
       periods: periods,
     });
@@ -222,7 +201,7 @@ export default function FiscalPeriodsPage() {
     setConfiguredCalendar(values);
     toast({
       title: "Configuration Saved",
-      description: `Calendar configured: Start ${values.startMonth} ${values.startYear}, Frequency: ${values.periodFrequency}.`,
+      description: `Calendar configured: Start ${values.startMonth} ${values.startYear}, Frequency: ${values.periodFrequency === '4-4-5' ? 'Quarterly' : values.periodFrequency}.`,
     });
     setIsConfigureDialogOpen(false);
   };
@@ -273,6 +252,8 @@ export default function FiscalPeriodsPage() {
         return { Icon: XCircle, colorClass: 'text-red-600', title: 'Closed' };
       case 'Future':
         return { Icon: Clock, colorClass: 'text-yellow-500', title: 'Future' };
+      case 'Adjustment':
+        return { Icon: CalendarCog, colorClass: 'text-blue-500', title: 'Adjustment Period' }; // Or a different icon like Settings2, Edit3
       default:
         return { Icon: Clock, colorClass: 'text-muted-foreground', title: 'Unknown' }; 
     }
@@ -309,7 +290,7 @@ export default function FiscalPeriodsPage() {
                 <span className="font-medium text-muted-foreground">Start Date:</span> {configuredCalendar.startMonth} 1, {configuredCalendar.startYear}
               </p>
               <p className="text-sm">
-                <span className="font-medium text-muted-foreground">Period Frequency:</span> {configuredCalendar.periodFrequency}
+                <span className="font-medium text-muted-foreground">Period Frequency:</span> {configuredCalendar.periodFrequency === '4-4-5' ? 'Quarterly' : configuredCalendar.periodFrequency}
               </p>
               <Button onClick={() => handleOpenDialog('edit')} className="mt-2">
                 Edit Configuration
@@ -336,7 +317,7 @@ export default function FiscalPeriodsPage() {
               Generated Fiscal Calendar (Next 3 Years)
             </CardTitle>
             <CardDesc>
-              Based on your configuration. Click on a fiscal year to expand its periods.
+              Based on your configuration. Click on a fiscal year to expand its periods. Includes an Adjustment (ADJ) period for each year.
             </CardDesc>
           </CardHeader>
           <CardContent>
@@ -372,9 +353,13 @@ export default function FiscalPeriodsPage() {
                                   >
                                     {period.name}
                                   </button>
-                                  <span className="text-xs text-muted-foreground mt-0.5 sm:mt-0">
-                                    (<FormattedDateTime date={period.startDate} formatString="MMM d" /> - <FormattedDateTime date={period.endDate} formatString="MMM d, yyyy" />)
-                                  </span>
+                                   <span className="text-xs text-muted-foreground mt-0.5 sm:mt-0">
+                                      {period.startDate && period.endDate ? (
+                                        <>(<FormattedDateTime date={period.startDate} formatString="MMM d" /> - <FormattedDateTime date={period.endDate} formatString="MMM d, yyyy" />)</>
+                                      ) : (
+                                        <>(No Date Range)</>
+                                      )}
+                                    </span>
                               </div>
                               <PeriodIcon className={`h-5 w-5 shrink-0 ${periodColorClass}`} title={periodTitle} />
                             </div>
@@ -461,7 +446,7 @@ export default function FiscalPeriodsPage() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Monthly">Monthly</SelectItem>
-                        <SelectItem value="4-4-5">4-4-5 (Quarterly periods, 13-month FY)</SelectItem>
+                        <SelectItem value="4-4-5">Quarterly (4 periods per FY)</SelectItem> 
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -483,3 +468,4 @@ export default function FiscalPeriodsPage() {
     </div>
   );
 }
+
