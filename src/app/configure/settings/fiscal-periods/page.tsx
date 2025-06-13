@@ -59,11 +59,13 @@ const months = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-const defaultFormValues: FiscalCalendarFormValues = {
-  startMonth: '',
-  startYear: new Date().getFullYear(),
+const exampleCalendarConfig: FiscalCalendarFormValues = {
+  startMonth: 'January',
+  startYear: 2025,
   periodFrequency: 'Monthly' as 'Monthly' | '4-4-5',
 };
+
+const defaultFormValues: FiscalCalendarFormValues = exampleCalendarConfig;
 
 interface DisplayPeriod {
   id: string;
@@ -125,48 +127,41 @@ const generateCalendarData = (
         });
       }
     } else { 
-      // For 4-4-5, we interpret it as 4 quarters, with the last quarter having an extra month.
-      // Q1: 3 months, Q2: 3 months, Q3: 3 months, Q4: 4 months (Total 13 months for the FY)
-      const quarterWeeks = [4, 4, 5]; // Standard 4-4-5 week pattern
       let currentPeriodStartDate = new Date(fyStartDate);
-      let fyEndYearForNaming: number;
+      
+      // For 4-4-5, the FY typically lasts 13 periods (52 weeks + 1 week for some schemes, or 13 4-week periods).
+      // Here, we are modeling it as: 3 quarters of 3 "months" each, and 1 quarter of 4 "months", totaling 13 "months".
+      // The exact end date depends on this.
+      let calculatedFyEndDate = fyStartDate; // Start with FY start
+      for(let q=0; q<3; q++) calculatedFyEndDate = addMonths(calculatedFyEndDate, 3); // Q1, Q2, Q3
+      calculatedFyEndDate = addMonths(calculatedFyEndDate, 4); // Q4
+      calculatedFyEndDate = endOfMonth(subDays(calculatedFyEndDate,1)); // End of the 13th month
 
-      // Determine fiscal year label (typically year it ends in)
-      // A 13-period year will end in the next calendar year if startMonth is not January.
-      // Or, if startMonth is January, it will still end in the same calendar year for the first 12 periods.
-      // The 13th period pushes it.
-      // For 4-4-5 (13 periods), the FY ends approx. 1 year + 1 month from start.
-      let approxEndDateForFYLabel = addMonths(fyStartDate, 12); // 13 periods, so 12 months from start
-      fyEndYearForNaming = getYear(approxEndDateForFYLabel);
-      fiscalYearLabel = `FY${fyEndYearForNaming}`;
+      fiscalYearLabel = `FY${getYear(calculatedFyEndDate)}`;
       
       let periodNumber = 1;
       for (let q = 0; q < 4; q++) { // 4 Quarters
         let quarterStartDate = new Date(currentPeriodStartDate);
         let quarterEndDate: Date;
+        let numMonthsInQuarter = (q < 3) ? 3 : 4; // Q1,Q2,Q3 are 3 months, Q4 is 4 months
 
-        if (q < 3) { // First 3 quarters have 3 periods based on weeks (interpreted as months here)
-          quarterEndDate = endOfMonth(addMonths(currentPeriodStartDate, 2)); // 3 months
-          currentPeriodStartDate = addDays(quarterEndDate, 1);
-        } else { // Last quarter has 4 periods
-          quarterEndDate = endOfMonth(addMonths(currentPeriodStartDate, 3)); // 4 months
-          currentPeriodStartDate = addDays(quarterEndDate, 1);
-        }
-
+        quarterEndDate = endOfMonth(addMonths(currentPeriodStartDate, numMonthsInQuarter - 1));
+        currentPeriodStartDate = addDays(quarterEndDate, 1);
+        
         let status: DisplayPeriod['status'] = 'Open';
         if (today > quarterEndDate) status = "Closed";
         else if (today < quarterStartDate) status = "Future";
         
         periods.push({
           id: `${fiscalYearLabel}-Q${q + 1}`,
-          name: `Q${q + 1}${fiscalYearLabel}`, // Using Q for quarter
+          name: `Q${q + 1}${fiscalYearLabel}`,
           startDate: quarterStartDate,
           endDate: quarterEndDate,
           status: status,
         });
         periodNumber++;
       }
-      fyEndDate = periods[periods.length - 1].endDate; // End date of the last period is FY end date
+      fyEndDate = periods[periods.length - 1].endDate;
     }
 
     let fyStatus: DisplayPeriod['status'] = 'Open';
@@ -188,7 +183,7 @@ const generateCalendarData = (
 
 export default function FiscalPeriodsPage() {
   const [isConfigureDialogOpen, setIsConfigureDialogOpen] = useState(false);
-  const [configuredCalendar, setConfiguredCalendar] = useState<FiscalCalendarFormValues | null>(null);
+  const [configuredCalendar, setConfiguredCalendar] = useState<FiscalCalendarFormValues | null>(exampleCalendarConfig);
   const [generatedFiscalYears, setGeneratedFiscalYears] = useState<DisplayFiscalYear[]>([]);
   const { toast } = useToast();
 
@@ -229,6 +224,7 @@ export default function FiscalPeriodsPage() {
     if (mode === 'edit' && configuredCalendar) {
       form.reset(configuredCalendar);
     } else {
+      // If creating, or if configuredCalendar is somehow null, use default (which is the example)
       form.reset(defaultFormValues);
     }
     setIsConfigureDialogOpen(true);
@@ -236,6 +232,7 @@ export default function FiscalPeriodsPage() {
 
   const handlePeriodClick = (periodName: string, type: 'Fiscal Year' | 'Period') => {
     console.log(`Clicked on ${type}: ${periodName}`);
+    // Placeholder for future actions, e.g., opening/closing periods, viewing details
   };
 
   const breadcrumbItems = [
@@ -378,7 +375,11 @@ export default function FiscalPeriodsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {configuredCalendar && form.formState.isDirty ? 'Edit Accounting Calendar' : (configuredCalendar ? 'View Accounting Calendar' : 'Configure Accounting Calendar')}
+              {/* Adjust title based on whether editing existing or creating new from example */}
+              {configuredCalendar && !form.formState.isDirty && form.getValues().startMonth === configuredCalendar.startMonth && form.getValues().startYear === configuredCalendar.startYear && form.getValues().periodFrequency === configuredCalendar.periodFrequency
+                ? 'View/Edit Accounting Calendar' 
+                : (configuredCalendar ? 'Edit Accounting Calendar' : 'Configure Accounting Calendar')
+              }
             </DialogTitle>
             <DialogDescription>
               Set the start date and period frequency. The start day is always the 1st of the month.
