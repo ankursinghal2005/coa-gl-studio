@@ -35,8 +35,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
-import { CalendarCog, CalendarDays } from 'lucide-react';
+import { CalendarCog, CalendarDays, CheckCircle2, XCircle, Clock } from 'lucide-react'; // Added CheckCircle2, XCircle, Clock
+import type { LucideIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { FormattedDateTime } from '@/components/ui/FormattedDateTime';
 
@@ -129,6 +129,10 @@ const generateCalendarData = (
       let currentMonthOffset = 0;
       let lastPeriodEndDateForFY: Date = fyStartDate; 
 
+      // Calculate the FY label based on the actual end date of the 13-month year
+      const tempFyEndDateForNaming = endOfMonth(addMonths(fyStartDate, 12)); // 12 months for regular year part, +1 for the extra month in 4-4-5
+      fiscalYearLabel = `FY${getYear(tempFyEndDateForNaming)}`;
+
       for (let q = 0; q < 4; q++) {
         const quarterStartDate = startOfMonth(addMonths(fyStartDate, currentMonthOffset));
         const quarterEndDate = endOfMonth(addMonths(quarterStartDate, quarterMonths[q] - 1));
@@ -137,14 +141,9 @@ const generateCalendarData = (
         if (today > quarterEndDate) status = "Closed";
         else if (today < quarterStartDate) status = "Future";
         
-        // Calculate the FY label based on the actual end date of the 13-month year
-        const tempFyEndDateForNaming = endOfMonth(addMonths(fyStartDate, 12));
-        const periodFyLabel = `FY${getYear(tempFyEndDateForNaming)}`;
-
-
         periods.push({
-          id: `${periodFyLabel}-Q${q + 1}`,
-          name: `Q${q + 1}${periodFyLabel}`,
+          id: `${fiscalYearLabel}-Q${q + 1}`,
+          name: `Q${q + 1}${fiscalYearLabel}`,
           startDate: quarterStartDate,
           endDate: quarterEndDate,
           status: status,
@@ -155,7 +154,6 @@ const generateCalendarData = (
         }
       }
       fyEndDate = lastPeriodEndDateForFY; 
-      fiscalYearLabel = `FY${getYear(fyEndDate)}`;
     }
 
     let fyStatus: DisplayPeriod['status'] = 'Open';
@@ -233,14 +231,19 @@ export default function FiscalPeriodsPage() {
     { label: 'Fiscal Period Management' },
   ];
 
-  const getStatusBadgeVariant = (status: DisplayPeriod['status']): "secondary" | "destructive" | "outline" => {
+  const getStatusIconAndColor = (status: DisplayPeriod['status']): { Icon: LucideIcon, colorClass: string, title: string } => {
     switch (status) {
-      case 'Open': return 'secondary';
-      case 'Closed': return 'destructive';
-      case 'Future': return 'outline';
-      default: return 'outline';
+      case 'Open':
+        return { Icon: CheckCircle2, colorClass: 'text-green-600', title: 'Open' };
+      case 'Closed':
+        return { Icon: XCircle, colorClass: 'text-red-600', title: 'Closed' };
+      case 'Future':
+        return { Icon: Clock, colorClass: 'text-yellow-500', title: 'Future' };
+      default:
+        return { Icon: Clock, colorClass: 'text-muted-foreground', title: 'Unknown' }; // Fallback
     }
   };
+
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -305,46 +308,49 @@ export default function FiscalPeriodsPage() {
           <CardContent>
             {generatedFiscalYears.length > 0 ? (
               <Accordion type="multiple" className="w-full">
-                {generatedFiscalYears.map((fy) => (
-                  <AccordionItem value={fy.id} key={fy.id}>
-                    <AccordionTrigger>
-                      <div className="flex justify-between items-center w-full text-left">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
-                           <span 
-                            className="font-semibold text-primary text-left"
-                          >
-                            {fy.name}
-                          </span>
-                          <span className="text-xs text-muted-foreground mt-1 sm:mt-0">
-                            (<FormattedDateTime date={fy.startDate} formatString="MMM d, yyyy" /> - <FormattedDateTime date={fy.endDate} formatString="MMM d, yyyy" />)
-                          </span>
-                        </div>
-                        <Badge variant={getStatusBadgeVariant(fy.status)} className="ml-auto sm:ml-4 shrink-0">{fy.status}</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-2 pl-4 pt-2">
-                        {fy.periods.map(period => (
-                          <div key={period.id} className="flex justify-between items-center p-2 border-b border-dashed last:border-b-0">
-                             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
-                               <button
-                                  onClick={() => handlePeriodClick(period.name, 'Period')}
-                                  className="text-sm text-primary/90 hover:underline text-left"
-                                >
-                                  {period.name}
-                                </button>
-                                <span className="text-xs text-muted-foreground mt-0.5 sm:mt-0">
-                                  (<FormattedDateTime date={period.startDate} formatString="MMM d" /> - <FormattedDateTime date={period.endDate} formatString="MMM d, yyyy" />)
-                                </span>
-                            </div>
-                            <Badge variant={getStatusBadgeVariant(period.status)} size="sm" className="shrink-0">{period.status}</Badge>
+                {generatedFiscalYears.map((fy) => {
+                  const { Icon: FyIcon, colorClass: fyColorClass, title: fyTitle } = getStatusIconAndColor(fy.status);
+                  return (
+                    <AccordionItem value={fy.id} key={fy.id}>
+                      <AccordionTrigger>
+                        <div className="flex justify-between items-center w-full text-left">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
+                            <span className="font-semibold text-primary text-left">
+                              {fy.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground mt-1 sm:mt-0">
+                              (<FormattedDateTime date={fy.startDate} formatString="MMM d, yyyy" /> - <FormattedDateTime date={fy.endDate} formatString="MMM d, yyyy" />)
+                            </span>
                           </div>
-                        ))}
-                        {fy.periods.length === 0 && <p className="text-sm text-muted-foreground p-2">No periods generated for this fiscal year.</p>}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
+                          <FyIcon className={`h-5 w-5 ml-auto sm:ml-4 shrink-0 ${fyColorClass}`} title={fyTitle}/>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-2 pl-4 pt-2">
+                          {fy.periods.map(period => {
+                             const { Icon: PeriodIcon, colorClass: periodColorClass, title: periodTitle } = getStatusIconAndColor(period.status);
+                            return (
+                            <div key={period.id} className="flex justify-between items-center p-2 border-b border-dashed last:border-b-0">
+                               <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
+                                 <button
+                                    onClick={() => handlePeriodClick(period.name, 'Period')}
+                                    className="text-sm text-primary/90 hover:underline text-left"
+                                  >
+                                    {period.name}
+                                  </button>
+                                  <span className="text-xs text-muted-foreground mt-0.5 sm:mt-0">
+                                    (<FormattedDateTime date={period.startDate} formatString="MMM d" /> - <FormattedDateTime date={period.endDate} formatString="MMM d, yyyy" />)
+                                  </span>
+                              </div>
+                              <PeriodIcon className={`h-5 w-5 shrink-0 ${periodColorClass}`} title={periodTitle} />
+                            </div>
+                          )})}
+                          {fy.periods.length === 0 && <p className="text-sm text-muted-foreground p-2">No periods generated for this fiscal year.</p>}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
               </Accordion>
             ) : (
               <p className="text-center text-muted-foreground py-4">
