@@ -4,7 +4,7 @@ import {
   LayoutDashboard,
   BookOpen,
   ListTree,
-  FilePenLine, // Added FilePenLine
+  FilePenLine, 
   BarChart3,
   CreditCard,
   Target,
@@ -17,7 +17,8 @@ import {
   Code2,
   Network,
   Shuffle,
-  ShieldCheck
+  ShieldCheck,
+  CalendarDays 
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -73,8 +74,12 @@ export const mainNavItems: NavItemConfig[] = [
           },
           {
             title: 'Settings',
-            href: '/configure/settings',
+            href: '/configure/settings', // This is the main settings page for COA
             icon: <Settings className="h-4 w-4" />,
+            // Children of COA Settings used to include Fiscal Period Management
+            children: [
+              // "Fiscal Period Management" removed from here
+            ],
           },
         ],
       },
@@ -91,9 +96,19 @@ export const mainNavItems: NavItemConfig[] = [
         disabled: true,
       },
       {
-        title: 'Settings', // New Settings item under General Ledger
-        href: '/configure/settings',
+        title: 'Settings', // Settings item under General Ledger
+        href: '/configure/settings', // Links to the same settings page as COA settings main link
         icon: <Settings className="h-4 w-4" />,
+        // This "Settings" under "General Ledger" can have its own sub-menu if needed in future
+        // For now, it's a direct link. If it were to have children, it would be:
+        children: [
+           {
+            title: 'Fiscal Period Management',
+            href: '/configure/settings/fiscal-periods',
+            icon: <CalendarDays className="h-4 w-4" />,
+          }
+          // Other GL-specific settings can go here
+        ]
       },
     ],
   },
